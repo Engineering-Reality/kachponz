@@ -294,6 +294,57 @@ export default function ToolsPage() {
               </button>
             </div>
             <div className="p-6 overflow-y-auto max-h-[80vh]">
+              {/* Quick Preset Buttons */}
+              {modalMode === "create" && (
+                <div className="mb-5">
+                  <p className="text-[10px] font-mono uppercase tracking-wider text-slate-400 mb-2">Quick Fill Preset</p>
+                  <div className="flex gap-2">
+                    <button
+                      type="button"
+                      onClick={() => setFormData({
+                        name: "mcp-uipath",
+                        description: "UiPath MCP Server — RPA job trigger and monitoring for Amadeus orchestration",
+                        on_status: "Online",
+                        port: "10001",
+                        args: "node /path/to/microservice/mcp-uipath/build/index.js",
+                        method: "sse"
+                      })}
+                      className="flex-1 px-3 py-2 text-[10px] font-mono font-bold uppercase tracking-wider border border-orange-200 bg-orange-50 text-orange-700 hover:bg-orange-100 rounded-md transition-colors"
+                    >
+                      UiPath MCP
+                    </button>
+                    <button
+                      type="button"
+                      onClick={() => setFormData({
+                        name: "amadeus-mcp",
+                        description: "Amadeus Orchestrator MCP — transaction tracker & step dispatcher for LC/SKBDN/SBLC settlement",
+                        on_status: "Online",
+                        port: "10002",
+                        args: "node /path/to/microservice/amadeus-mcp/build/index.js",
+                        method: "sse"
+                      })}
+                      className="flex-1 px-3 py-2 text-[10px] font-mono font-bold uppercase tracking-wider border border-blue-200 bg-blue-50 text-blue-700 hover:bg-blue-100 rounded-md transition-colors"
+                    >
+                      Amadeus MCP
+                    </button>
+                    <button
+                      type="button"
+                      onClick={() => setFormData({
+                        name: "sendgrid-mcp",
+                        description: "SendGrid MCP — email sending, contact management, and campaign automation",
+                        on_status: "Online",
+                        port: "10003",
+                        args: "node /path/to/microservice/mcp_lib/sendgrid_mcp/build/index.js",
+                        method: "sse"
+                      })}
+                      className="flex-1 px-3 py-2 text-[10px] font-mono font-bold uppercase tracking-wider border border-emerald-200 bg-emerald-50 text-emerald-700 hover:bg-emerald-100 rounded-md transition-colors"
+                    >
+                      SendGrid MCP
+                    </button>
+                  </div>
+                </div>
+              )}
+
               <form id="tool-form" onSubmit={handleSave} className="space-y-4 font-mono text-sm text-slate-900">
                 <div>
                   <label className="block text-slate-500 mb-1 uppercase text-xs">MCP Server Name</label>
