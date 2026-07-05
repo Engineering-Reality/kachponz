@@ -70,10 +70,10 @@ export async function buildServer() {
     done(new DomainError('UNSUPPORTED_MEDIA_TYPE', 'Content-Type harus application/json', 415));
   });
 
-  await registerTransactionRoutes(app);
-  await registerOrchestratorRoutes(app);
-  await registerToolsRoutes(app);
-  await registerAgentsRoutes(app);
+  await registerTransactionRoutes(app as any);
+  await registerOrchestratorRoutes(app as any);
+  await registerToolsRoutes(app as any, {});
+  await registerAgentsRoutes(app as any, {});
 
   // Error handler terpusat — TIDAK PERNAH kirim stack trace / detail internal
   // ke klien (CISO Code Review #27, #28, #32).
