@@ -219,6 +219,7 @@ export async function runAgenticStep(
   auth: AuthContext,
   transactionId: string,
   idempotencyKey: string,
+  prompt?: string,
 ): Promise<A2AResult> {
   const log = txLogger(transactionId);
   log.info("Starting Universal LangGraph Engine");
@@ -251,8 +252,14 @@ export async function runAgenticStep(
   try {
     // 4. Instantiate LangGraph createReactAgent In-Memory
     const llm = new ChatOpenAI({
-      modelName: agentConfig.model || "gpt-4o",
+      modelName: agentConfig.model && agentConfig.model !== "gpt-4o" 
+        ? agentConfig.model 
+        : process.env.QWEN_LLM_MODEL || "qwen-max",
       temperature: 0,
+      apiKey: process.env.QWEN_API_KEY,
+      configuration: {
+        baseURL: process.env.QWEN_BASE_URL || "https://dashscope.aliyuncs.com/compatible-mode/v1",
+      }
     });
 
     const agent = createReactAgent({
@@ -263,7 +270,7 @@ export async function runAgenticStep(
 
     // 5. Invoke LangGraph
     const result = await agent.invoke({
-      messages: [{ role: "user", content: `Execute step ${step} for transaction ${transactionId}` }]
+      messages: [{ role: "user", content: prompt || `Execute step ${step} for transaction ${transactionId}` }]
     });
 
     const finalMessage = result.messages[result.messages.length - 1] as BaseMessage;

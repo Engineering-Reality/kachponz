@@ -292,7 +292,14 @@ export default function AmadeusDashboard() {
                     const step = STEP_FLOW.find(s => s.key === tx.current_step);
                     return (
                       <tr key={tx.id} className="border-b border-slate-50 hover:bg-slate-50/50 transition-colors text-xs">
-                        <td className="py-3 px-5 font-mono text-slate-700 flex items-center gap-1.5">
+                        <td 
+                          className="py-3 px-5 font-mono text-slate-700 flex items-center gap-1.5 cursor-pointer hover:text-blue-600"
+                          title={`Click to copy full UUID: ${tx.id}`}
+                          onClick={() => {
+                            navigator.clipboard.writeText(tx.id);
+                            alert(`Copied full UUID: ${tx.id}`);
+                          }}
+                        >
                           <Hash className="w-3 h-3 text-slate-300" />
                           {tx.id.substring(0, 12)}...
                         </td>

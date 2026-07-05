@@ -41,6 +41,7 @@ const RunAgenticSchema = z
   .object({
     transactionId: z.string().uuid(),
     idempotencyKey: IDEM,
+    prompt: z.string().optional(),
   })
   .strict();
 
@@ -65,8 +66,8 @@ export async function registerOrchestratorRoutes(app: FastifyInstance): Promise<
     typedSecured.post('/orchestrator/run-agentic', {
       schema: { body: RunAgenticSchema }
     }, async (req, reply) => {
-      const body = req.body as { transactionId: string; idempotencyKey: string };
-      const result = await runAgenticStep(req.auth!, body.transactionId, body.idempotencyKey);
+      const body = req.body as { transactionId: string; idempotencyKey: string; prompt?: string };
+      const result = await runAgenticStep(req.auth!, body.transactionId, body.idempotencyKey, body.prompt);
       return reply.send(result);
     });
 

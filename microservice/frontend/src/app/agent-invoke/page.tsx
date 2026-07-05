@@ -1,6 +1,6 @@
 "use client";
 
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import Link from 'next/link';
 import { 
   ArrowLeft, 
@@ -22,21 +22,70 @@ export default function AgentInvoke() {
   const [input, setInput] = useState('');
   const [messages, setMessages] = useState<Message[]>([]);
   const [status, setStatus] = useState('UPLINK: STABLE');
+  const [transactionId, setTransactionId] = useState('');
+  const [agents, setAgents] = useState<any[]>([]);
+  const [selectedAgent, setSelectedAgent] = useState<string>('');
+  
+  const apiUrl = process.env.NEXT_PUBLIC_API_URL ?? "http://localhost:8080";
+  const robotKey = process.env.NEXT_PUBLIC_ROBOT_KEY ?? "amadeus_local_dev";
 
-  const handleSend = () => {
-    if (!input.trim()) return;
-    setMessages(prev => [...prev, { role: 'user', content: input }]);
+  useEffect(() => {
+    const fetchAgents = async () => {
+      try {
+        const res = await fetch(`${apiUrl}/agents`, { headers: { "x-robot-key": robotKey } });
+        if (res.ok) {
+          const data = await res.json();
+          setAgents(data || []);
+        }
+      } catch (err) {
+        console.error("Failed to load agents", err);
+      }
+    };
+    fetchAgents();
+  }, [apiUrl, robotKey]);
+
+  const handleSend = async () => {
+    if (!input.trim() || !transactionId.trim()) {
+      setStatus('Error: Missing Transaction ID (HASH)');
+      return;
+    }
+    const currentInput = input;
+    setMessages(prev => [...prev, { role: 'user', content: currentInput }]);
     setInput('');
-    setStatus('Connecting...');
+    setStatus('Processing...');
     
-    // Mock bot response for boilerplate
-    setTimeout(() => {
+    try {
+      const res = await fetch(`${apiUrl}/orchestrator/run-agentic`, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          'X-Robot-Key': robotKey
+        },
+        body: JSON.stringify({
+          transactionId: transactionId.trim(),
+          idempotencyKey: `invoke-${Date.now()}`,
+          prompt: currentInput
+        })
+      });
+      
+      const data = await res.json();
+      
+      if (!res.ok) {
+        throw new Error(data.message || data.error?.message || 'API Error');
+      }
+      
       setMessages(prev => [...prev, { 
         role: 'bot', 
-        content: "I am analyzing your input..." 
+        content: data.data?.agent_output || "Agent execution completed. (Check orchestrator logs or dashboard for state changes)" 
       }]);
       setStatus('Stream Complete');
-    }, 1500);
+    } catch (err: any) {
+      setMessages(prev => [...prev, { 
+        role: 'system', 
+        content: `Error: ${err.message}` 
+      }]);
+      setStatus('UPLINK: ERROR');
+    }
   };
 
   const clearChat = () => {
@@ -72,10 +121,17 @@ export default function AgentInvoke() {
             {/* Agent Select */}
             <div>
               <label className="block text-xs font-bold text-slate-500 uppercase tracking-wider mb-2">Active Node</label>
-              <select className="w-full bg-slate-50 border border-slate-200 text-slate-900 rounded-lg p-2.5 text-sm mb-2 focus:ring-2 focus:ring-blue-500/20 focus:border-blue-500 outline-none transition-all">
+              <select 
+                value={selectedAgent}
+                onChange={(e) => setSelectedAgent(e.target.value)}
+                className="w-full bg-slate-50 border border-slate-200 text-slate-900 rounded-lg p-2.5 text-sm mb-2 focus:ring-2 focus:ring-blue-500/20 focus:border-blue-500 outline-none transition-all"
+              >
                 <option value="">Select an agent</option>
-                <option value="1">Data Analyst Bot</option>
-                <option value="2">Customer Support</option>
+                {agents.map(agent => (
+                  <option key={agent.agent_id} value={agent.agent_id}>
+                    {agent.agent_name}
+                  </option>
+                ))}
               </select>
               <button className="w-full bg-slate-100 text-slate-700 py-2.5 rounded-lg text-sm font-medium hover:bg-slate-200 transition-colors flex items-center justify-center gap-2">
                 <Search className="w-4 h-4" /> Inspect Node
@@ -88,7 +144,13 @@ export default function AgentInvoke() {
               
               <div className="flex rounded-lg border border-slate-200 overflow-hidden mb-3">
                 <span className="bg-slate-50 border-r border-slate-200 text-slate-500 text-xs font-bold px-3 flex items-center">HASH</span>
-                <input type="text" placeholder="Thread ID" defaultValue="1" className="w-full p-2.5 text-sm outline-none" />
+                <input 
+                  type="text" 
+                  placeholder="Transaction UUID" 
+                  value={transactionId} 
+                  onChange={(e) => setTransactionId(e.target.value)} 
+                  className="w-full p-2.5 text-sm outline-none" 
+                />
               </div>
 
               <select className="w-full bg-slate-50 border border-slate-200 text-slate-900 rounded-lg p-2.5 text-sm mb-4 outline-none">
