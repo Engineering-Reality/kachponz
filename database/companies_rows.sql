@@ -1,0 +1,1 @@
+INSERT INTO "public"."companies" ("company_id", "name", "description", "created_at") VALUES ('455bbe68-f931-4c1a-ad06-402f92292099', 'Kompeni', 'Ini Kompeni', '2025-11-07 12:04:26+00'), ('b2bd4b35-11f5-418a-8b1c-84ccd6a0aca0', 'Predefined', 'Template company - not displayed in company listings', '2026-04-03 19:05:35.988056+00');

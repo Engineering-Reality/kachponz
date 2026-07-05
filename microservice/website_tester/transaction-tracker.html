@@ -1,0 +1,181 @@
+<!DOCTYPE html>
+<html lang="en">
+
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Transaction Tracker - Amadeus</title>
+    <!-- Favicon -->
+    <link rel="icon" type="image/svg+xml" href="assets/amadeus.svg">
+    <!-- Fonts -->
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Orbitron:wght@400;500;600;700;800;900&family=Inter:wght@300;400;500;600&display=swap" rel="stylesheet">
+    <!-- Custom CSS -->
+    <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0-alpha1/dist/css/bootstrap.min.css" rel="stylesheet">
+    <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/bootstrap-icons@1.11.1/font/bootstrap-icons.css">
+    <link href="css/styles.css" rel="stylesheet">
+    <style>
+        .tracker-container {
+            margin-top: 100px;
+            padding: 20px;
+        }
+
+        .status-badge {
+            padding: 4px 10px;
+            border-radius: 4px;
+            font-size: 0.85em;
+            font-weight: 600;
+        }
+
+        .status-pending { background-color: rgba(255, 193, 7, 0.2); color: #ffc107; border: 1px solid rgba(255,193,7,0.4); }
+        .status-processing { background-color: rgba(13, 110, 253, 0.2); color: #0d6efd; border: 1px solid rgba(13,110,253,0.4); }
+        .status-completed { background-color: rgba(25, 135, 84, 0.2); color: #198754; border: 1px solid rgba(25,135,84,0.4); }
+        .status-failed { background-color: rgba(220, 53, 69, 0.2); color: #dc3545; border: 1px solid rgba(220,53,69,0.4); }
+
+        .timeline {
+            border-left: 2px solid rgba(255, 255, 255, 0.1);
+            padding-left: 20px;
+            margin-top: 20px;
+            position: relative;
+        }
+
+        .timeline-item {
+            margin-bottom: 20px;
+            position: relative;
+        }
+
+        .timeline-item::before {
+            content: '';
+            position: absolute;
+            left: -26px;
+            top: 4px;
+            width: 10px;
+            height: 10px;
+            border-radius: 50%;
+            background-color: var(--c-cyan);
+            box-shadow: 0 0 10px var(--c-cyan);
+        }
+
+        .timeline-date {
+            font-size: 0.8em;
+            color: rgba(255, 255, 255, 0.5);
+            margin-bottom: 5px;
+        }
+
+        .timeline-content {
+            background: rgba(255, 255, 255, 0.03);
+            border: 1px solid rgba(255, 255, 255, 0.1);
+            padding: 10px 15px;
+            border-radius: 6px;
+        }
+
+        .timeline-step {
+            font-family: 'Orbitron', sans-serif;
+            font-size: 0.9em;
+            color: var(--c-cyan);
+            margin-bottom: 5px;
+        }
+    </style>
+</head>
+
+<body>
+    <!-- Navbar -->
+    <nav class="navbar-glass">
+        <a href="index.html" class="navbar-brand">
+            <img src="assets/amadeus.svg" alt="Amadeus" style="height: 70px; width: auto;">
+        </a>
+        <div class="navbar-nav">
+            <a href="index.html" class="nav-link">Home</a>
+            <a href="agents.html" class="nav-link">Agents</a>
+            <a href="transaction-tracker.html" class="nav-link active">Tracker</a>
+            <a href="tools.html" class="nav-link">MCP</a>
+            <a href="system-config.html" class="btn-login"><i class="bi bi-gear me-2"></i>Config</a>
+        </div>
+    </nav>
+
+    <!-- Three.js Background -->
+    <div id="canvas-container"></div>
+
+    <div class="container tracker-container position-relative z-1">
+        <div class="d-flex justify-content-between align-items-end mb-4">
+            <div>
+                <h1 class="page-title mb-1">Transaction Tracker</h1>
+                <p class="text-white-50">Monitor and orchestrate cross-agent transaction state machine.</p>
+            </div>
+            <button class="btn-tech" onclick="loadTransactions()"><i class="bi bi-arrow-clockwise me-2"></i>Refresh</button>
+        </div>
+
+        <!-- Transactions List Panel -->
+        <div class="glass-panel mb-4">
+            <div class="panel-header d-flex justify-content-between align-items-center">
+                <h3 class="panel-title m-0"><i class="bi bi-list-ul me-2"></i>Active Transactions</h3>
+                <div class="d-flex gap-2">
+                    <select id="filter-type" class="form-select bg-dark text-white border-secondary" onchange="loadTransactions()">
+                        <option value="">All Types</option>
+                        <option value="import_lc">Import LC</option>
+                        <option value="export_lc">Export LC</option>
+                        <option value="skbdn">SKBDN</option>
+                    </select>
+                    <select id="filter-status" class="form-select bg-dark text-white border-secondary" onchange="loadTransactions()">
+                        <option value="">All Statuses</option>
+                        <option value="active">Active</option>
+                        <option value="completed">Completed</option>
+                        <option value="failed">Failed</option>
+                    </select>
+                </div>
+            </div>
+            <div class="panel-body p-0">
+                <div id="transactions-loading" class="text-center p-4">
+                    <div class="spinner-border text-info" role="status"></div>
+                </div>
+                <div class="table-responsive">
+                    <table class="table table-dark table-hover mb-0" id="transactions-table" style="display: none;">
+                        <thead>
+                            <tr>
+                                <th>ID</th>
+                                <th>Type</th>
+                                <th>Current Step</th>
+                                <th>Status</th>
+                                <th>Updated</th>
+                                <th>Action</th>
+                            </tr>
+                        </thead>
+                        <tbody id="transactions-tbody">
+                            <!-- Populated by JS -->
+                        </tbody>
+                    </table>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Transaction Detail Modal -->
+    <div class="modal fade" id="transactionModal" tabindex="-1" aria-hidden="true">
+        <div class="modal-dialog modal-lg modal-dialog-centered">
+            <div class="modal-content bg-dark text-white" style="border: 1px solid rgba(0, 255, 255, 0.2); box-shadow: 0 0 20px rgba(0, 255, 255, 0.1);">
+                <div class="modal-header border-secondary">
+                    <h5 class="modal-title font-orbitron text-info"><i class="bi bi-search me-2"></i>Transaction Details</h5>
+                    <button type="button" class="btn-close btn-close-white" data-bs-dismiss="modal" aria-label="Close"></button>
+                </div>
+                <div class="modal-body" id="transaction-detail-body">
+                    <!-- Populated by JS -->
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Scripts -->
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/three.js/r134/three.min.js"></script>
+    <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0-alpha1/dist/js/bootstrap.bundle.min.js"></script>
+    <script src="js/tesseract-bg.js"></script>
+    <script src="js/main.js"></script>
+    <script src="js/transaction-tracker.js"></script>
+
+    <script>
+        document.addEventListener('DOMContentLoaded', () => {
+            initTesseractBackground('canvas-container', { dimmer: true, scale: 4 });
+        });
+    </script>
+</body>
+</html>

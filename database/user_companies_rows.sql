@@ -1,0 +1,1 @@
+INSERT INTO "public"."user_companies" ("user_id", "company_id", "role_id") VALUES ('12b673cf-c6a3-4d80-afc4-30b6566b3690', 'b2bd4b35-11f5-418a-8b1c-84ccd6a0aca0', 4), ('a706d02e-94d8-45b1-83ed-37e023e5ded6', '455bbe68-f931-4c1a-ad06-402f92292099', 2);

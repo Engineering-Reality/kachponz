@@ -1,0 +1,99 @@
+<!DOCTYPE html>
+<html lang="en">
+
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>System Configuration - Amadeus</title>
+    <!-- Fonts -->
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link
+        href="https://fonts.googleapis.com/css2?family=Orbitron:wght@400;500;600;700;800;900&family=Inter:wght@300;400;500;600&display=swap"
+        rel="stylesheet">
+    <!-- Custom CSS -->
+    <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0-alpha1/dist/css/bootstrap.min.css" rel="stylesheet">
+    <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/bootstrap-icons@1.11.1/font/bootstrap-icons.css">
+    <link href="css/styles.css" rel="stylesheet">
+</head>
+
+<body>
+    <!-- Three.js Background -->
+    <div id="canvas-container"></div>
+
+    <div class="config-container">
+        <div class="config-header">
+            <h1 class="config-title">Log in</h1>
+            <p class="config-subtitle">Authenticate & Connect to Local Host</p>
+        </div>
+
+        <label class="form-label-tech">JWT Access Token</label>
+        <input type="text" class="form-control-tech" id="jwt-token-input" placeholder="eyJhbGciOiJIUzI1NiIsInR5c...">
+
+        <label class="form-label-tech">Robot Key (For Transaction Tracker)</label>
+        <input type="text" class="form-control-tech" id="robot-key-input" placeholder="amadeus-robot-key...">
+
+        <label class="form-label-tech">Localhost API URL</label>
+        <input type="text" class="form-control-tech" id="localhost-input" placeholder="http://localhost:8000"
+            value="http://localhost:8000">
+
+        <button class="btn-tech" id="save-config"> Authenticate System</button>
+
+        <a href="index.html" class="back-link"><i class="bi bi-arrow-left me-2"></i>Return to Home</a>
+    </div>
+
+    <!-- Scripts -->
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/three.js/r134/three.min.js"></script>
+    <script>
+        // Config Handling
+        const saveConfig = document.getElementById('save-config');
+        const jwtInput = document.getElementById('jwt-token-input');
+        const robotKeyInput = document.getElementById('robot-key-input');
+        const localhostInput = document.getElementById('localhost-input');
+
+        // Load saved values
+        jwtInput.value = localStorage.getItem('jwt_token') || '';
+        robotKeyInput.value = localStorage.getItem('robot_key') || '';
+        localhostInput.value = localStorage.getItem('api_base_url') || 'http://localhost:8000';
+
+        // Save configuration
+        saveConfig.addEventListener('click', () => {
+            const jwtToken = jwtInput.value.trim();
+            const robotKey = robotKeyInput.value.trim();
+            const localhostUrl = localhostInput.value.trim();
+
+            if (jwtToken) {
+                localStorage.setItem('jwt_token', jwtToken);
+            } else {
+                localStorage.removeItem('jwt_token');
+            }
+            
+            if (robotKey) {
+                localStorage.setItem('robot_key', robotKey);
+            } else {
+                localStorage.removeItem('robot_key');
+            }
+
+            if (localhostUrl) {
+                localStorage.setItem('api_base_url', localhostUrl);
+            }
+
+            // Show success animation/feedback
+            const originalText = saveConfig.textContent;
+            saveConfig.textContent = "SYSTEM CONNECTED";
+            saveConfig.style.background = "var(--c-cyan)";
+            saveConfig.style.color = "#000";
+
+            setTimeout(() => {
+                window.location.href = 'index.html';
+            }, 1000);
+        });
+
+        // --- TESSERACT BACKGROUND ---
+        document.addEventListener('DOMContentLoaded', () => {
+            initTesseractBackground('canvas-bg', { dimmer: true, scale: 3, cameraZ: 40 });
+        });
+    </script>
+</body>
+
+</html>

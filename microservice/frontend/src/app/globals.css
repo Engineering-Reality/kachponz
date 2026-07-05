@@ -1,0 +1,95 @@
+@import "tailwindcss";
+
+@theme {
+  --color-mono-50: #ffffff;
+  --color-mono-100: #f5f5f5;
+  --color-mono-200: #e5e5e5;
+  --color-mono-300: #d4d4d4;
+  --color-mono-400: #a3a3a3;
+  --color-mono-500: #737373;
+  --color-mono-600: #525252;
+  --color-mono-700: #404040;
+  --color-mono-800: #262626;
+  --color-mono-900: #171717;
+  --color-mono-950: #0a0a0a;
+  --color-mono-black: #000000;
+
+  --color-rainbow-red: #ef4444;
+  --color-rainbow-orange: #f97316;
+  --color-rainbow-yellow: #eab308;
+  --color-rainbow-green: #22c55e;
+  --color-rainbow-blue: #3b82f6;
+  --color-rainbow-indigo: #6366f1;
+  --color-rainbow-purple: #a855f7;
+  --color-rainbow-pink: #ec4899;
+
+  --animate-wave: wave 10s ease-in-out infinite alternate;
+  --animate-border-spin: border-spin 4s linear infinite;
+  --animate-ribbon: ribbon-stretch 2s ease-in-out infinite alternate;
+}
+
+:root {
+  --background: #ffffff;
+  --foreground: #0f172a;
+}
+
+@keyframes wave {
+  0% { transform: translateY(0) scaleY(1); }
+  50% { transform: translateY(-5%) scaleY(1.05); }
+  100% { transform: translateY(0) scaleY(1); }
+}
+
+@keyframes border-spin {
+  0% { background-position: 0% 50%; }
+  100% { background-position: 200% 50%; }
+}
+
+@keyframes ribbon-stretch {
+  0% { transform: scaleX(0.5); opacity: 0.7; }
+  100% { transform: scaleX(1.5); opacity: 1; }
+}
+
+body {
+  background: var(--background);
+  color: var(--foreground);
+}
+
+.glass-panel {
+  background: rgba(255, 255, 255, 0.7);
+  backdrop-filter: blur(12px);
+  -webkit-backdrop-filter: blur(12px);
+  border: 1px solid rgba(255, 255, 255, 0.4);
+  box-shadow: 0 4px 6px -1px rgba(0, 0, 0, 0.05), 0 2px 4px -1px rgba(0, 0, 0, 0.03);
+}
+
+/* The vibrant rainbow gradient for rotating borders */
+.vibrant-rainbow-border {
+  background: linear-gradient(
+    90deg,
+    #22d3ee,
+    #3b82f6,
+    #d946ef,
+    #ec4899,
+    #fb923c,
+    #facc15,
+    #22d3ee
+  );
+  background-size: 200% 200%;
+}
+
+.vibrant-rainbow-text {
+  background: linear-gradient(
+    90deg,
+    #22d3ee,
+    #3b82f6,
+    #d946ef,
+    #ec4899,
+    #fb923c,
+    #facc15,
+    #22d3ee
+  );
+  background-size: 200% auto;
+  color: transparent;
+  -webkit-background-clip: text;
+  background-clip: text;
+}
