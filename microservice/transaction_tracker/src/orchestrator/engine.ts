@@ -1,4 +1,4 @@
-import { completeStep, getTransactionWithEvents, failStep as txFailStep } from '../services/transactions.js';
+import { completeStep, getTransactionWithEvents, failStep as txFailStep, createTransaction } from '../services/transactions.js';
 import { getFlow } from '../config/stepFlows.js';
 import { DomainError } from '../types/domain.js';
 import type { AuthContext } from '../types/domain.js';
@@ -256,24 +256,57 @@ async function loadMcpTools(toolConfigs: any[], log: ReturnType<typeof txLogger>
  */
 export async function runAgenticStep(
   auth: AuthContext,
-  transactionId: string,
+  transactionId: string | undefined,
   idempotencyKey: string,
   prompt?: string,
+  agentId?: string,
 ): Promise<A2AResult> {
-  const log = txLogger(transactionId);
+  let txId: string;
+  
+  if (!transactionId) {
+    // Try to get the latest transaction, or create a new one
+    const latestTx = await query("SELECT id FROM transactions ORDER BY created_at DESC LIMIT 1");
+    if (latestTx.rows[0]) {
+      txId = latestTx.rows[0].id;
+    } else {
+      const newTx = await createTransaction(auth, {
+        type: 'import_lc',
+        idempotencyKey: `auto-create-${Date.now()}`,
+        payload: { description: "Auto-created transaction for direct agent interaction" }
+      });
+      txId = newTx.id;
+    }
+  } else {
+    txId = transactionId;
+  }
+
+  const log = txLogger(txId);
   log.info("Starting Universal LangGraph Engine");
 
-  const { transaction } = await getTransactionWithEvents(transactionId);
+  const { transaction } = await getTransactionWithEvents(txId);
   const step = transaction.current_step;
 
   // 1. Resolve Agent Configuration from Database
-  // Instead of static `registry.findForStep`, we pull from the DB for dynamic configs.
-  const agentRes = await query("SELECT * FROM agents WHERE agent_id = $1 LIMIT 1", [step]);
-  const agentConfig = agentRes.rows[0];
+  // If agentId is passed, use it. Otherwise, try to use step as a UUID if it's a valid UUID, otherwise query by agent_name or step name.
+  let agentConfig;
+  if (agentId) {
+    const agentRes = await query("SELECT * FROM agents WHERE agent_id = $1 LIMIT 1", [agentId]);
+    agentConfig = agentRes.rows[0];
+  } else {
+    const isUuid = /^[0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{12}$/.test(step);
+    if (isUuid) {
+      const agentRes = await query("SELECT * FROM agents WHERE agent_id = $1 LIMIT 1", [step]);
+      agentConfig = agentRes.rows[0];
+    } else {
+      const agentRes = await query("SELECT * FROM agents WHERE agent_name ILIKE $1 OR description ILIKE $1 LIMIT 1", [`%${step}%`]);
+      agentConfig = agentRes.rows[0];
+    }
+  }
+
   if (!agentConfig) {
     throw new DomainError(
       'NO_AGENT',
-      `Tidak ada agent config di database untuk step ${step}`,
+      `Tidak ada agent config di database untuk agent_id/step ${agentId || step}`,
       404,
     );
   }
@@ -309,7 +342,7 @@ export async function runAgenticStep(
 
     // 5. Invoke LangGraph
     const result = await agent.invoke({
-      messages: [{ role: "user", content: prompt || `Execute step ${step} for transaction ${transactionId}` }]
+      messages: [{ role: "user", content: prompt || `Execute step ${step} for transaction ${txId}` }]
     });
 
     const finalMessage = result.messages[result.messages.length - 1] as BaseMessage;
@@ -320,7 +353,7 @@ export async function runAgenticStep(
       {
         protocol: 'amadeus.a2a/0',
         type: 'task.complete',
-        transactionId,
+        transactionId: txId,
         step,
         idempotencyKey,
         correlationId: `agentic:${agentConfig?.agent_id || step}`,
@@ -342,7 +375,7 @@ export async function runAgenticStep(
       {
         protocol: 'amadeus.a2a/0',
         type: 'task.failed',
-        transactionId,
+        transactionId: txId,
         step,
         idempotencyKey,
         correlationId: `agentic:${agentConfig?.agent_id || step}`,

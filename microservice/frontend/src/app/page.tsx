@@ -66,7 +66,7 @@ const NAV_APPS = [
   {
     href: "/docs",
     label: "Documentation",
-    desc: "Architecture guides, cURL references, and A2A protocol specs.",
+    desc: "Full system architecture, MCP servers, A2A protocol, and known gaps.",
     icon: BookOpen,
     accent: "text-emerald-600",
     bg: "bg-emerald-50",
@@ -581,6 +581,82 @@ export default function Home() {
             </div>
           </div>
 
+        </div>
+      </section>
+
+      {/* System Architecture at a Glance */}
+      <section className="py-24 bg-white border-y border-slate-100 scroll-reveal">
+        <div className="max-w-6xl mx-auto px-6 space-y-10">
+          <div className="text-center space-y-2">
+            <span className="badge badge-slate mx-auto">System Map</span>
+            <h2 className="text-3xl font-extrabold text-slate-900 tracking-tight">Architecture at a glance</h2>
+            <p className="text-slate-500 text-sm max-w-xl mx-auto">
+              Two systems live in this codebase: the actively-developed LC settlement
+              stack, and a separate Supabase-backed agent platform it grew alongside.
+            </p>
+          </div>
+
+          <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
+            {/* LC Settlement Stack */}
+            <div className="relative group rounded-2xl border border-slate-200/60 bg-white p-8 shadow-sm hover:shadow-md transition-all duration-500">
+              <div className="absolute -inset-0.5 bg-gradient-to-r from-blue-500 via-cyan-500 to-emerald-500 rounded-2xl blur opacity-0 group-hover:opacity-10 transition duration-500 pointer-events-none"></div>
+              <div className="relative z-10 space-y-4">
+                <div className="flex items-center gap-2">
+                  <div className="w-8 h-8 rounded-lg bg-blue-50 border border-blue-100 flex items-center justify-center text-blue-600">
+                    <Cpu className="w-4.5 h-4.5" />
+                  </div>
+                  <h3 className="font-bold text-slate-900">LC Settlement Orchestrator Stack</h3>
+                </div>
+                <p className="text-sm text-slate-500 leading-relaxed">
+                  A 9-step state machine for Import LC/SKBDN/SBLC settlement, with a
+                  cost-aware router that picks the cheapest of an LLM, PAD, or UiPath
+                  executor per step — and HMAC-signed financial steps.
+                </p>
+                <ul className="space-y-1.5 text-xs font-mono text-slate-600">
+                  <li><span className="text-blue-600 font-bold">transaction_tracker</span> — Fastify + Postgres, :8080</li>
+                  <li><span className="text-blue-600 font-bold">amadeus-mcp</span> — 8 MCP tools, SSE :10002</li>
+                  <li><span className="text-blue-600 font-bold">mcp-uipath</span> — real UiPath Cloud OAuth2, SSE :10001</li>
+                  <li><span className="text-blue-600 font-bold">this console</span> — Next.js, :3000</li>
+                </ul>
+                <Link href="/docs/lc-settlement-stack" className="inline-flex items-center gap-1.5 text-xs font-semibold text-blue-600 pt-1">
+                  Read the settlement stack docs <ArrowRight className="w-3.5 h-3.5" />
+                </Link>
+              </div>
+            </div>
+
+            {/* Legacy Agent Platform */}
+            <div className="relative group rounded-2xl border border-slate-200/60 bg-white p-8 shadow-sm hover:shadow-md transition-all duration-500">
+              <div className="absolute -inset-0.5 bg-gradient-to-r from-violet-500 via-pink-500 to-orange-500 rounded-2xl blur opacity-0 group-hover:opacity-10 transition duration-500 pointer-events-none"></div>
+              <div className="relative z-10 space-y-4">
+                <div className="flex items-center gap-2">
+                  <div className="w-8 h-8 rounded-lg bg-violet-50 border border-violet-100 flex items-center justify-center text-violet-600">
+                    <Layers className="w-4.5 h-4.5" />
+                  </div>
+                  <h3 className="font-bold text-slate-900">Agent Platform (Legacy)</h3>
+                </div>
+                <p className="text-sm text-slate-500 leading-relaxed">
+                  A general-purpose "describe an agent in plain text, wire up MCP
+                  tools, run it" platform that predates the settlement stack, backed by
+                  one shared Supabase project.
+                </p>
+                <ul className="space-y-1.5 text-xs font-mono text-slate-600">
+                  <li><span className="text-violet-600 font-bold">app.py</span> — Combined FastAPI API, :8080</li>
+                  <li><span className="text-violet-600 font-bold">agent_backend / agent_creator</span> — agent CRUD + NL builder</li>
+                  <li><span className="text-violet-600 font-bold">agent_boilerplate</span> — LangGraph runtime, MultiServerMCPClient</li>
+                  <li><span className="text-violet-600 font-bold">mcp_tools / mcp_2</span> — MCP process managers</li>
+                </ul>
+                <Link href="/docs/agent-platform-legacy" className="inline-flex items-center gap-1.5 text-xs font-semibold text-violet-600 pt-1">
+                  Read the agent platform docs <ArrowRight className="w-3.5 h-3.5" />
+                </Link>
+              </div>
+            </div>
+          </div>
+
+          <div className="flex justify-center">
+            <Link href="/docs/architecture-overview" className="btn-secondary px-5 py-2.5 text-sm bg-white">
+              <BookOpen className="w-4 h-4" /> Full architecture documentation
+            </Link>
+          </div>
         </div>
       </section>
 

@@ -40,6 +40,20 @@ function AgentInvokeInner() {
   const apiUrl = process.env.NEXT_PUBLIC_API_URL ?? "http://localhost:8080";
   const robotKey = process.env.NEXT_PUBLIC_ROBOT_KEY ?? "amadeus_local_dev";
 
+  // Auto-generate transaction ID if empty
+  useEffect(() => {
+    if (typeof window !== 'undefined' && !transactionId) {
+      try {
+        setTransactionId(window.crypto.randomUUID());
+      } catch (e) {
+        setTransactionId('xxxxxxxx-xxxx-4xxx-yxxx-xxxxxxxxxxxx'.replace(/[xy]/g, function(c) {
+          const r = Math.random() * 16 | 0, v = c === 'x' ? r : (r & 0x3 | 0x8);
+          return v.toString(16);
+        }));
+      }
+    }
+  }, [transactionId]);
+
   useEffect(() => {
     const fetchAgents = async () => {
       try {
@@ -66,8 +80,7 @@ function AgentInvokeInner() {
   }, [preselectAgent, agents, selectedAgent]);
 
   const handleSend = async () => {
-    if (!input.trim() || !transactionId.trim()) {
-      setStatus('Error: Missing Transaction ID (HASH)');
+    if (!input.trim()) {
       return;
     }
     const currentInput = input;
@@ -83,7 +96,8 @@ function AgentInvokeInner() {
           'X-Robot-Key': robotKey
         },
         body: JSON.stringify({
-          transactionId: transactionId.trim(),
+          transactionId: transactionId.trim() || undefined,
+          agentId: selectedAgent || undefined,
           idempotencyKey: `invoke-${Date.now()}`,
           prompt: currentInput
         })

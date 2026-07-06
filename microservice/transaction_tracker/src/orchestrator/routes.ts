@@ -42,7 +42,8 @@ const A2AEnvelopeSchema = z
 
 const RunAgenticSchema = z
   .object({
-    transactionId: z.string().uuid(),
+    transactionId: z.string().uuid().optional(),
+    agentId: z.string().uuid().optional(),
     idempotencyKey: IDEM,
     prompt: z.string().optional(),
   })
@@ -86,8 +87,8 @@ export async function registerOrchestratorRoutes(app: FastifyInstance): Promise<
     typedSecured.post('/orchestrator/run-agentic', {
       schema: { body: RunAgenticSchema }
     }, async (req, reply) => {
-      const body = req.body as { transactionId: string; idempotencyKey: string; prompt?: string };
-      const result = await runAgenticStep(req.auth!, body.transactionId, body.idempotencyKey, body.prompt);
+      const body = req.body as { transactionId?: string; agentId?: string; idempotencyKey: string; prompt?: string };
+      const result = await runAgenticStep(req.auth!, body.transactionId, body.idempotencyKey, body.prompt, body.agentId);
       return reply.send(result);
     });
 
