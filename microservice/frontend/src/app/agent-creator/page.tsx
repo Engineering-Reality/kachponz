@@ -10,6 +10,7 @@ import {
   Headset,
   LineChart,
   Code2,
+  Landmark,
   X,
 } from "lucide-react";
 
@@ -22,6 +23,7 @@ const EXAMPLES = [
   { icon: Headset, label: "Customer Support", text: "Create a customer support agent that answers questions about LC settlement status and escalates unresolved issues to a human checker." },
   { icon: LineChart, label: "Data Analyst", text: "Create a data analyst agent that queries transaction history and generates settlement summaries in JSON format." },
   { icon: Code2, label: "Code Reviewer", text: "Create a code reviewer agent that validates UiPath bot scripts against Amadeus A2A protocol v1 specifications." },
+  { icon: Landmark, label: "LC Settlement Orchestrator", text: "Create an orchestrator agent that coordinates Import LC settlement across 9 steps using amadeus-mcp and mcp-uipath tools. It should use cost-aware routing (LLM for doc examination, PAD for simple CRUD, UiPath for financial steps) and provide real-time status updates." },
 ];
 
 export default function AgentCreator() {

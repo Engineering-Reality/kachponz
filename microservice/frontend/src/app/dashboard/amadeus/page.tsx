@@ -6,7 +6,7 @@ import { GlassCard } from "@/components/GlassCard";
 import {
   ArrowLeft, RefreshCw, Activity, CheckCircle, AlertTriangle,
   Layers, Clock, Shield, ChevronRight, Hash, ArrowRightLeft,
-  TrendingUp, Zap
+  TrendingUp, Zap, Rocket, BookOpen
 } from "lucide-react";
 
 const STEP_FLOW = [
@@ -197,6 +197,35 @@ export default function AmadeusDashboard() {
             color={failed.length > 0 ? "text-red-600" : "text-slate-400"}
           />
         </div>
+
+        {/* E2E Settlement Demo */}
+        <GlassCard className="flex flex-col md:flex-row md:items-center md:justify-between gap-4">
+          <div className="flex items-start gap-3">
+            <div className="w-9 h-9 rounded-lg bg-blue-50 border border-blue-100 flex items-center justify-center flex-shrink-0">
+              <Rocket className="w-4 h-4 text-blue-600" />
+            </div>
+            <div>
+              <h3 className="text-sm font-bold text-slate-900">E2E Settlement Demo</h3>
+              <p className="text-xs text-slate-500 mt-0.5">
+                Run a full Import LC settlement from submitted to advised — 9 steps, cost-aware routing across LLM/PAD/UiPath.
+              </p>
+            </div>
+          </div>
+          <div className="flex gap-2 flex-shrink-0">
+            <Link
+              href="/agent-invoke?agent=orchestrator"
+              className="flex items-center gap-1.5 px-3 py-1.5 text-xs font-bold bg-slate-900 text-white rounded-lg hover:bg-slate-800 transition-colors whitespace-nowrap"
+            >
+              <Zap className="w-3.5 h-3.5" /> Run via Agent
+            </Link>
+            <Link
+              href="/docs"
+              className="flex items-center gap-1.5 px-3 py-1.5 text-xs font-medium border border-slate-200 bg-white text-slate-600 rounded-lg hover:bg-slate-50 transition-colors whitespace-nowrap"
+            >
+              <BookOpen className="w-3.5 h-3.5" /> Setup Guide
+            </Link>
+          </div>
+        </GlassCard>
 
         {/* State Machine Pipeline */}
         <div className="bg-white border border-slate-200 rounded-xl overflow-hidden">

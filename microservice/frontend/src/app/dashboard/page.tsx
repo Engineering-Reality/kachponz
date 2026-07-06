@@ -6,7 +6,7 @@ import { TransactionGraph } from "@/components/TransactionGraph";
 import {
   ArrowLeft, RefreshCw, Play, CheckCircle, ChevronRight,
   Activity, Server, Database, Clock, Shield, Zap,
-  ArrowRightLeft, Layers, Hash, AlertTriangle, ExternalLink
+  ArrowRightLeft, Layers, Hash, AlertTriangle, ExternalLink, Rocket
 } from "lucide-react";
 
 const STEP_FLOW_DISPLAY = [
@@ -142,6 +142,9 @@ export default function Dashboard() {
           )}
           <span className="badge badge-blue">{activeCount} Active</span>
           <span className="badge badge-green">{completedCount} Completed</span>
+          <Link href="/dashboard/amadeus" className="btn-primary text-[11px] py-1.5 px-3">
+            <Rocket className="w-3 h-3" /> E2E Demo
+          </Link>
           <button onClick={createTestTransaction} className="btn-primary text-[11px] py-1.5 px-3">
             <Play className="w-3 h-3" /> Inject Tx
           </button>

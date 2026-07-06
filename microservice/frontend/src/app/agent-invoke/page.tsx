@@ -1,11 +1,12 @@
 "use client";
 
-import { useState, useEffect } from 'react';
+import { useState, useEffect, Suspense } from 'react';
 import Link from 'next/link';
-import { 
-  ArrowLeft, 
-  Bot, 
-  Send, 
+import { useSearchParams } from 'next/navigation';
+import {
+  ArrowLeft,
+  Bot,
+  Send,
   Settings2,
   Trash2,
   Activity,
@@ -19,13 +20,23 @@ interface Message {
 }
 
 export default function AgentInvoke() {
+  return (
+    <Suspense fallback={null}>
+      <AgentInvokeInner />
+    </Suspense>
+  );
+}
+
+function AgentInvokeInner() {
+  const searchParams = useSearchParams();
+  const preselectAgent = searchParams.get('agent');
   const [input, setInput] = useState('');
   const [messages, setMessages] = useState<Message[]>([]);
   const [status, setStatus] = useState('UPLINK: STABLE');
   const [transactionId, setTransactionId] = useState('');
   const [agents, setAgents] = useState<any[]>([]);
   const [selectedAgent, setSelectedAgent] = useState<string>('');
-  
+
   const apiUrl = process.env.NEXT_PUBLIC_API_URL ?? "http://localhost:8080";
   const robotKey = process.env.NEXT_PUBLIC_ROBOT_KEY ?? "amadeus_local_dev";
 
@@ -43,6 +54,16 @@ export default function AgentInvoke() {
     };
     fetchAgents();
   }, [apiUrl, robotKey]);
+
+  // Pre-select agent from ?agent= query param (e.g. /agent-invoke?agent=orchestrator)
+  // by loose name match, since we don't know the generated agent_id ahead of time.
+  useEffect(() => {
+    if (!preselectAgent || selectedAgent || agents.length === 0) return;
+    const match = agents.find((a) =>
+      a.agent_name?.toLowerCase().includes(preselectAgent.toLowerCase())
+    );
+    if (match) setSelectedAgent(match.agent_id);
+  }, [preselectAgent, agents, selectedAgent]);
 
   const handleSend = async () => {
     if (!input.trim() || !transactionId.trim()) {
