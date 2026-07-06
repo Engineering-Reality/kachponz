@@ -2,6 +2,7 @@
 
 import { useEffect, useState } from "react";
 import { RainbowRibbonLoader } from "@/components/RainbowRibbonLoader";
+import { Select } from "@/components/Select";
 import {
   RefreshCw,
   Plus,
@@ -26,7 +27,7 @@ export default function ToolsPage() {
   const [modalMode, setModalMode] = useState<"create" | "edit">("create");
   const [currentTool, setCurrentTool] = useState<any>(null);
   const [formData, setFormData] = useState({ name: "", description: "", on_status: "Online", port: "", args: "", method: "sse" });
-  
+
   const [searchQuery, setSearchQuery] = useState("");
   const [methodFilter, setMethodFilter] = useState("all");
   const [copiedId, setCopiedId] = useState<string | null>(null);
@@ -58,7 +59,7 @@ export default function ToolsPage() {
         const latest = versions[versions.length - 1];
         return { port: latest.released?.port || "—", args: latest.released?.args || "", method: latest.released?.method || "sse" };
       }
-    } catch {}
+    } catch { }
     return { port: "—", args: "", method: "sse" };
   };
 
@@ -142,7 +143,7 @@ export default function ToolsPage() {
   const filteredTools = tools.filter(t => {
     const { method } = parseVersions(t);
     const matchesSearch = t.name?.toLowerCase().includes(searchQuery.toLowerCase()) ||
-                          t.description?.toLowerCase().includes(searchQuery.toLowerCase());
+      t.description?.toLowerCase().includes(searchQuery.toLowerCase());
     const matchesMethod = methodFilter === "all" || method === methodFilter;
     return matchesSearch && matchesMethod;
   });
@@ -152,10 +153,11 @@ export default function ToolsPage() {
       {/* Page Header */}
       <div className="page-header border-b border-slate-100 pb-6 mb-6">
         <div>
-          <h1 className="text-3xl font-extrabold text-slate-900 tracking-tight mb-1">Smithery Registry</h1>
+          <p className="ui-label text-slate-400 mb-2">MCP Infrastructure</p>
+          <h1 className="section-head text-3xl text-slate-900 mb-1">Tools Registry</h1>
           <p className="text-sm text-slate-500">
             {tools.length} MCP server{tools.length !== 1 ? "s" : ""} registered ·{" "}
-            {tools.filter(t => !t.on_status?.toLowerCase().includes("offline")).length} active & running
+            {tools.filter(t => !t.on_status?.toLowerCase().includes("offline")).length} active &amp; running
           </p>
         </div>
         <div className="flex items-center gap-3">
@@ -170,18 +172,48 @@ export default function ToolsPage() {
 
       {/* Quick Presets Grid */}
       <div className="mb-8">
-        <h2 className="text-xs font-mono uppercase tracking-wider text-slate-400 mb-3 flex items-center gap-1.5"><Zap className="w-3.5 h-3.5 text-amber-500" /> Quick-install presets</h2>
+        <h2 className="ui-label text-slate-400 mb-3 flex items-center gap-1.5"><Zap className="w-3.5 h-3.5 text-amber-500" /> Quick-install presets</h2>
         <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
           {[
-            { label: "UiPath MCP Integration", desc: "Trigger RPA settlement robot queues", color: "border-orange-200 hover:border-orange-300 bg-orange-50/20 text-orange-700", preset: { name: "mcp-uipath", description: "UiPath MCP — RPA trigger and monitoring", on_status: "Online", port: "10001", args: "node /path/to/mcp-uipath/build/index.js", method: "sse" } },
-            { label: "Amadeus MCP Core", desc: "Verify LC steps & append transitions", color: "border-blue-200 hover:border-blue-300 bg-blue-50/20 text-blue-700", preset: { name: "amadeus-mcp", description: "Amadeus Orchestrator MCP — transaction tracker & step dispatcher", on_status: "Online", port: "10002", args: "node /path/to/amadeus-mcp/build/index.js", method: "sse" } },
-            { label: "SendGrid MCP Mailer", desc: "Dispatch payment receipts to clients", color: "border-emerald-200 hover:border-emerald-300 bg-emerald-50/20 text-emerald-700", preset: { name: "sendgrid-mcp", description: "SendGrid MCP — email sending and campaign automation", on_status: "Online", port: "10003", args: "node /path/to/sendgrid_mcp/build/index.js", method: "sse" } },
-          ].map(({ label, desc, color, preset }) => (
+            { 
+              label: "UiPath MCP Integration", 
+              desc: "Trigger RPA settlement robot queues", 
+              color: "border-orange-200 hover:border-orange-300 bg-orange-50/20 text-orange-700", 
+              logo: (
+                <svg className="w-5 h-5 mb-2" viewBox="0 0 32 32" fill="none" xmlns="http://www.w3.org/2000/svg">
+                  <path d="M5 13V24C5 26.2091 6.79086 28 9 28H19V19H12C10.3431 19 9 17.6569 9 16V13H5Z" fill="#FA4616" />
+                  <rect x="19" y="4" width="8" height="8" rx="2" fill="#FA4616" />
+                  <path d="M19 14H27V28H19V14Z" fill="#141414" />
+                </svg>
+              ),
+              preset: { name: "mcp-uipath", description: "UiPath MCP — RPA trigger and monitoring", on_status: "Online", port: "10001", args: "node /path/to/mcp-uipath/build/index.js", method: "sse" } 
+            },
+            { 
+              label: "Amadeus MCP Core", 
+              desc: "Verify LC steps & append transitions", 
+              color: "border-indigo-200 hover:border-indigo-300 bg-indigo-50/20 text-indigo-700", 
+              logo: <img src="/amadeus.svg" alt="Amadeus" className="w-5 h-5 mb-2" />,
+              preset: { name: "amadeus-mcp", description: "Amadeus Orchestrator MCP — transaction tracker & step dispatcher", on_status: "Online", port: "10002", args: "node /path/to/amadeus-mcp/build/index.js", method: "sse" } 
+            },
+            { 
+              label: "Power Automate MCP", 
+              desc: "Trigger desktop automation flows", 
+              color: "border-blue-200 hover:border-blue-300 bg-blue-50/20 text-blue-700", 
+              logo: (
+                <svg className="w-5 h-5 mb-2" viewBox="0 0 32 32" fill="none" xmlns="http://www.w3.org/2000/svg">
+                  <path d="M11 2L2 11L11 20L20 11L11 2Z" fill="#0078D4" />
+                  <path d="M21 12L12 21L21 30L30 21L21 12Z" fill="#005A9E" />
+                </svg>
+              ),
+              preset: { name: "mcp-pad", description: "Power Automate Desktop MCP — Windows automation triggers", on_status: "Online", port: "10003", args: "node /path/to/mcp-pad/build/index.js", method: "sse" } 
+            },
+          ].map(({ label, desc, color, logo, preset }) => (
             <button
               key={label}
               onClick={() => { setModalMode("create"); setCurrentTool(null); setFormData(preset); setIsModalOpen(true); }}
               className={`border p-4 rounded-2xl text-left hover:shadow-md transition-all duration-200 ${color}`}
             >
+              {logo}
               <div className="font-bold text-xs">{label}</div>
               <div className="text-[10px] opacity-80 mt-1">{desc}</div>
             </button>
@@ -203,7 +235,7 @@ export default function ToolsPage() {
             <Server className="w-4 h-4 text-slate-400 absolute left-3 top-3" />
           </div>
           <div className="flex items-center gap-2 w-full md:w-auto overflow-x-auto pb-1 md:pb-0">
-            <span className="text-xs font-mono uppercase tracking-wider text-slate-400 mr-2 flex-shrink-0">Transport:</span>
+            <span className="ui-label text-slate-400 mr-2 flex-shrink-0">Transport</span>
             {[
               { id: "all", label: "All Methods" },
               { id: "sse", label: "SSE (HTTP)" },
@@ -212,11 +244,10 @@ export default function ToolsPage() {
               <button
                 key={tab.id}
                 onClick={() => setMethodFilter(tab.id)}
-                className={`text-xs font-semibold px-3 py-1.5 rounded-lg border transition-all ${
-                  methodFilter === tab.id
-                    ? "bg-slate-900 border-slate-950 text-white shadow-sm"
-                    : "bg-white border-slate-200 text-slate-500 hover:text-slate-700 hover:bg-slate-50"
-                }`}
+                className={`text-xs font-semibold px-3 py-1.5 rounded-lg border transition-all ${methodFilter === tab.id
+                  ? "bg-slate-900 border-slate-950 text-white shadow-sm"
+                  : "bg-white border-slate-200 text-slate-500 hover:text-slate-700 hover:bg-slate-50"
+                  }`}
               >
                 {tab.label}
               </button>
@@ -295,11 +326,11 @@ export default function ToolsPage() {
 
                 {/* Copyable Console blocks */}
                 <div className="space-y-3 mt-auto">
-                  
+
                   {/* CLI Command */}
                   {args && (
                     <div className="space-y-1">
-                      <div className="flex justify-between items-center text-[10px] font-mono uppercase tracking-wider text-slate-400">
+                      <div className="flex justify-between items-center ui-label text-slate-400">
                         <span className="flex items-center gap-1"><Terminal className="w-3 h-3" /> Command Line Args</span>
                         <button
                           onClick={() => copyToClipboard(args, `${tool.tool_id}-args`)}
@@ -326,7 +357,7 @@ export default function ToolsPage() {
 
                   {/* JSON Config Box */}
                   <div className="space-y-1">
-                    <div className="flex justify-between items-center text-[10px] font-mono uppercase tracking-wider text-slate-400">
+                    <div className="flex justify-between items-center ui-label text-slate-400">
                       <span>Claude Desktop Configuration</span>
                       <button
                         onClick={() => copyToClipboard(jsonSnippet, `${tool.tool_id}-json`)}
@@ -393,17 +424,27 @@ export default function ToolsPage() {
               <div className="grid grid-cols-2 gap-4">
                 <div>
                   <label className="form-label">Status</label>
-                  <select value={formData.on_status} onChange={e => setFormData({ ...formData, on_status: e.target.value })} className="form-input rounded-xl border-slate-200">
-                    <option>Online</option>
-                    <option>Offline</option>
-                  </select>
+                  <Select
+                    value={formData.on_status}
+                    onChange={(v) => setFormData({ ...formData, on_status: v })}
+                    options={[
+                      { value: "Online", label: "Online" },
+                      { value: "Offline", label: "Offline" },
+                    ]}
+                    triggerClassName="rounded-xl"
+                  />
                 </div>
                 <div>
                   <label className="form-label">Transport Protocol</label>
-                  <select value={formData.method} onChange={e => setFormData({ ...formData, method: e.target.value })} className="form-input rounded-xl border-slate-200">
-                    <option value="sse">SSE (HTTP)</option>
-                    <option value="stdio">STDIO</option>
-                  </select>
+                  <Select
+                    value={formData.method}
+                    onChange={(v) => setFormData({ ...formData, method: v })}
+                    options={[
+                      { value: "sse", label: "SSE (HTTP)" },
+                      { value: "stdio", label: "STDIO" },
+                    ]}
+                    triggerClassName="rounded-xl"
+                  />
                 </div>
               </div>
               <div>

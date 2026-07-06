@@ -1,77 +1,101 @@
-# A2A Protocol & Signatures
+The **Agent-to-Agent (A2A)** protocol is Amadeus’s proprietary standard for coordinating heterogeneous actors—LLM reasoning engines, RPA robots (UiPath, Power Automate), and Human checkers—around a single immutable state machine within the `transaction_tracker`.
 
-Amadeus A2A ("agent-to-agent") is an **in-house protocol**, not a vendor standard — built
-for coordinating RPA robots (UiPath, PAD) and LLM agents (Qwen VL) around one shared
-state machine in `transaction_tracker`. Two versions are both live for backwards
-compatibility.
+## Core Protocol Architecture
 
-## v0 — envelope style (`amadeus.a2a/0`)
+Amadeus implements two operational versions of the A2A protocol. Both are actively supported by the tracker engine to ensure backward compatibility with older RPA bot deployments.
 
-`POST /a2a` with a flat envelope:
+```mermaid
+sequenceDiagram
+    autonumber
+    participant Agent as LangGraph Agent (MCP)
+    participant Tracker as Transaction Tracker
+    participant RPA as UiPath/Power Automate
+    
+    Agent->>Tracker: POST /orchestrator/dispatch (Trigger State)
+    Tracker-->>Agent: Returns step context & requirements
+    
+    Agent->>RPA: trigger_uipath_job (MCP Tool)
+    RPA-->>Agent: Job ID / Status
+    
+    Note over RPA,Tracker: RPA completes job asynchronously
+    
+    RPA->>Tracker: POST /a2a (Task Complete + HMAC Signature)
+    Tracker-->>RPA: 200 OK (State Mutated)
+```
+
+---
+
+## Protocol v1: JSON-RPC 2.0 (`amadeus.a2a/1`)
+
+The modern standard utilizing the robust JSON-RPC 2.0 envelope format. All requests are sent to `POST /a2a/rpc`.
+
+### Supported RPC Methods
+
+- `task.submit` — Submit a task completion payload for a specific `(transactionId, step)`. Returns a `taskId` and the initial `state`.
+- `task.get` — Long-poll or check a task's current state.
+- `task.cancel` — Gracefully terminate a pending asynchronous task.
+- `task.provideInput` — Supply human-in-the-loop (HITL) input for a task blocked in the `input_required` state.
+- `agent.card` — Discover orchestrator capabilities (see below).
+
+> [!NOTE]  
+> The `task.submit` payload securely encapsulates the financial HMAC signature inside the RPC `params` block, ensuring it is preserved across network proxies.
+
+---
+
+## Protocol v0: Envelope Style (`amadeus.a2a/0`)
+
+The legacy flat-envelope standard. Used extensively by older `amadeus-mcp` implementations and the frontend A2A dashboard tab. Sent to `POST /a2a`.
 
 ```json
 {
   "protocol": "amadeus.a2a/0",
   "type": "task.complete",
-  "transactionId": "...",
+  "transactionId": "tx_abc123",
   "step": "mt_converted",
-  "idempotencyKey": "...",
-  "correlationId": "...",
-  "reason": "optional, required for task.failed",
+  "idempotencyKey": "idem_789",
+  "correlationId": "agent_alpha",
+  "reason": "Successfully converted MT202 Swift message.",
   "data": {},
   "sentAt": "2026-07-06T05:06:24.803Z"
 }
 ```
 
-`type` is one of `task.assign` / `task.complete` / `task.failed` / `task.status`. This is
-what `amadeus-mcp`'s `fail_step` tool sends, and what the frontend's A2A tab on
-`/dashboard` shows as a reference payload.
+The `type` field acts as the RPC method analog, supporting: `task.assign`, `task.complete`, `task.failed`, and `task.status`.
 
-## v1 — JSON-RPC 2.0 (`amadeus.a2a/1`)
+---
 
-`POST /a2a/rpc`, standard JSON-RPC 2.0 envelope (`jsonrpc: "2.0"`, `id`, `method`,
-`params`). Supported methods:
+## Agent Card Discovery
 
-- `task.submit` — submit a task for a `(transactionId, step)`; returns `taskId` + initial
-  `state`.
-- `task.get` — poll a task's current state.
-- `task.cancel` — cancel a pending task.
-- `task.provideInput` — supply input for a task in `input_required` state.
-- `agent.card` — machine-readable capability discovery (see below).
+To allow external third-party tools to dynamically integrate, the tracker exposes an unauthenticated discovery route:
 
-Task lifecycle: `submitted → working → (input_required) → completed | failed | canceled`.
+`GET /.well-known/amadeus-agent-card.json`
 
-`task.submit` accepts an optional `signature: { timestamp, hmac }` — same HMAC-SHA512
-scheme as the REST financial-step signature (see below), carried inside the RPC params
-instead of HTTP headers.
+This card advertises supported authentication schemes (`robot_key`, `hmac_signature`, `oauth2_client_credentials`), eliminating integration guesswork.
 
-## Agent Card discovery
+---
 
-`GET /.well-known/amadeus-agent-card.json` — public, unauthenticated — advertises the
-orchestrator's supported auth schemes: `robot_key`, `hmac_signature`, and (per the card
-builder) `oauth2_client_credentials`.
+## The Cryptographic Signature Layer
 
-## The financial signature layer (shared by both protocol versions)
+To ensure absolute zero-trust security between the transaction ledger and the execution agents, **Financial Steps** (`mt_converted`, `swift_released`, `settled`) mandate an HMAC-SHA512 cryptographic signature in addition to standard `X-Robot-Key` authentication.
 
-Financial steps (`mt_converted`, `swift_released`, `settled`) require a second auth
-layer on top of `X-Robot-Key`:
+### Construction
 
-```
+```text
 canonical_string = METHOD \n PATH \n TIMESTAMP \n sha256(body)
 signature        = HMAC-SHA512(key, canonical_string)
+
+// Key Derivation:
 key              = signing_secret                        (if SIGNATURE_PEPPER unset)
-                  = `${signing_secret}:${SIGNATURE_PEPPER}` (if set)
+key              = `${signing_secret}:${SIGNATURE_PEPPER}` (if configured)
 ```
 
-Sent as `X-Signature` (the HMAC, hex) + `X-Robot-Timestamp` (unix seconds, checked
-against `SIGNATURE_MAX_SKEW_SEC` for anti-replay) + `X-Robot-Signing-Secret` (sent in
-the clear on the wire — the server re-hashes and compares against the stored argon2
-hash; this is a deliberate interim design documented in `middleware/auth.ts`, with
-OAuth2/mTLS hardening noted as a roadmap item, not an oversight).
+### Transport Headers (v0)
 
-**The `SIGNATURE_PEPPER` gotcha:** every client that needs to complete a financial step
-— `amadeus-mcp`, `e2e-demo.ts`, or any future robot — must know and use the *exact same*
-`SIGNATURE_PEPPER` value as `transaction_tracker`, or its HMAC will never match and the
-step will be rejected with `SIGNATURE_REQUIRED` even though a signature was sent. This
-was hit and fixed live while building the settlement stack; both `amadeus-mcp/.env` and
-`e2e-demo.ts`'s env now document `AMADEUS_SIGNATURE_PEPPER` explicitly for this reason.
+- `X-Signature`: The computed HMAC signature (Hex string).
+- `X-Robot-Timestamp`: Unix epoch in seconds. (Validated against `SIGNATURE_MAX_SKEW_SEC` to prevent replay attacks).
+- `X-Robot-Signing-Secret`: The cleartext secret used to authorize the signature. 
+  *(The server rapidly hashes this via Argon2 and compares it against the database. Migration to OAuth2/mTLS is on the roadmap.)*
+
+> [!CAUTION]
+> **The `SIGNATURE_PEPPER` Failure Mode:** 
+> If the `transaction_tracker` has `AMADEUS_SIGNATURE_PEPPER` set, every agent (e.g., `amadeus-mcp`) must have identical environment configuration. If it is missing from the client, the HMAC computation will fail silently and the server will return `SIGNATURE_REQUIRED`.

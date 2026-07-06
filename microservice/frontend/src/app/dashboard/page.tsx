@@ -160,7 +160,7 @@ export default function Dashboard() {
         {/* Left: Transaction Table */}
         <div className="w-[55%] border-r border-slate-200 flex flex-col bg-white">
           <div className="px-4 py-2.5 border-b border-slate-100 flex items-center justify-between bg-slate-50/50">
-            <h2 className="text-[11px] font-bold uppercase tracking-wider text-slate-500">Transaction Ledger</h2>
+            <h2 className="ui-label text-slate-500">Transaction Ledger</h2>
             <span className="text-[10px] font-mono text-slate-400">{transactions.length} records</span>
           </div>
 
@@ -195,11 +195,16 @@ export default function Dashboard() {
                 <tbody>
                   {transactions.map((tx) => {
                     const isSelected = selectedTx?.id === tx.id;
+                    const borderColor =
+                      tx.status === "completed" ? "border-l-emerald-400" :
+                      tx.status === "failed" ? "border-l-red-400" :
+                      tx.status === "in_progress" ? "border-l-blue-500" :
+                      "border-l-slate-300";
                     return (
                       <tr
                         key={tx.id}
                         onClick={() => selectTx(tx)}
-                        className={`border-b border-slate-50 cursor-pointer text-xs transition-colors ${
+                        className={`border-b border-slate-50 border-l-[3px] ${borderColor} cursor-pointer text-xs transition-colors ${
                           isSelected ? "bg-blue-50/70" : "hover:bg-slate-50"
                         }`}
                       >
@@ -210,7 +215,9 @@ export default function Dashboard() {
                           </div>
                         </td>
                         <td className="py-2.5 px-3 text-slate-600 uppercase text-[10px] tracking-wider font-medium">{tx.type?.replace('_', ' ')}</td>
-                        <td className="py-2.5 px-3 font-mono text-[10px] text-slate-500">{tx.current_step}</td>
+                        <td className="py-2.5 px-3">
+                          <span className="font-mono text-[10px] text-slate-700 bg-[#f8fafc] px-1.5 py-0.5 rounded">{tx.current_step}</span>
+                        </td>
                         <td className="py-2.5 px-3"><StepPipeline currentStep={tx.current_step} status={tx.status} /></td>
                         <td className="py-2.5 px-3">
                           <span className={`inline-flex items-center gap-1 px-1.5 py-0.5 text-[10px] font-medium rounded ${

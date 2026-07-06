@@ -2,6 +2,7 @@
 
 import { useState, useEffect, useRef } from "react";
 import Link from "next/link";
+import { TransactionGraph } from "@/components/TransactionGraph";
 import {
   ShieldCheck,
   Lock,
@@ -16,60 +17,64 @@ import {
   Zap,
   BookOpen,
   Cpu,
-  Clock,
-  Coins,
-  FileSignature,
   Layers,
+  Send,
 } from "lucide-react";
 
 const NAV_APPS = [
   {
     href: "/dashboard",
+    step: "Step 01",
     label: "Transaction Tracker",
-    desc: "Monitor live state machine transitions for LC settlement.",
+    desc: "Monitor live state machine transitions and audit trails for LC settlement.",
     icon: Activity,
     accent: "text-blue-600",
     bg: "bg-blue-50",
   },
   {
-    href: "/agents",
-    label: "Agent Matrix",
-    desc: "Manage and configure your AI agent registry.",
-    icon: Bot,
-    accent: "text-violet-600",
-    bg: "bg-violet-50",
-  },
-  {
     href: "/tools",
+    step: "Step 02",
     label: "MCP Tool Registry",
-    desc: "Register and monitor connected MCP tool servers.",
+    desc: "Register and connect external tools (UiPath, APIs) for agents to use.",
     icon: Wrench,
     accent: "text-orange-600",
     bg: "bg-orange-50",
   },
   {
     href: "/agent-creator",
+    step: "Step 03",
     label: "Agent Creator",
-    desc: "Design new agents from natural language descriptions.",
+    desc: "Design new AI agents easily using natural language descriptions.",
     icon: Wand2,
     accent: "text-pink-600",
     bg: "bg-pink-50",
   },
   {
-    href: "/agent-invoke",
-    label: "Agent Invoke",
-    desc: "Stream real-time agent reasoning over a selected transaction.",
-    icon: Zap,
-    accent: "text-cyan-600",
-    bg: "bg-cyan-50",
+    href: "/agents",
+    step: "Step 04",
+    label: "Agent Matrix",
+    desc: "Manage your agent registry, assign personas, and attach MCP tools.",
+    icon: Bot,
+    accent: "text-violet-600",
+    bg: "bg-violet-50",
   },
   {
     href: "/docs",
+    step: "Reference",
     label: "Documentation",
     desc: "Full system architecture, MCP servers, A2A protocol, and known gaps.",
     icon: BookOpen,
     accent: "text-emerald-600",
     bg: "bg-emerald-50",
+  },
+  {
+    href: "/agent-invoke",
+    step: "Step 05",
+    label: "Agent Invoke",
+    desc: "Stream real-time agent reasoning over a selected transaction.",
+    icon: Zap,
+    accent: "text-cyan-600",
+    bg: "bg-cyan-50",
   },
 ];
 
@@ -109,12 +114,61 @@ const BENCHMARKS = {
   },
 };
 
+// Import LC state machine — drives the live ticker
+const LC_STEPS = [
+  "submitted",
+  "distributed_to_analyst",
+  "doc_examined",
+  "ee_ntf_created",
+  "ee_ntf_approved",
+  "mt_converted",
+  "swift_released",
+  "settled",
+  "advised",
+];
+
+// Small count-up that animates once `start` is true and re-runs when value changes
+function CountUp({ value, start, decimals = 0 }: { value: number; start: boolean; decimals?: number }) {
+  const [display, setDisplay] = useState(0);
+  const rafRef = useRef<number | null>(null);
+
+  useEffect(() => {
+    if (!start) return;
+    const duration = 750;
+    const t0 = performance.now();
+    const tick = (now: number) => {
+      const p = Math.min((now - t0) / duration, 1);
+      const eased = 1 - Math.pow(1 - p, 3);
+      setDisplay(value * eased);
+      if (p < 1) rafRef.current = requestAnimationFrame(tick);
+    };
+    rafRef.current = requestAnimationFrame(tick);
+    return () => {
+      if (rafRef.current) cancelAnimationFrame(rafRef.current);
+    };
+  }, [value, start]);
+
+  return <>{display.toFixed(decimals)}</>;
+}
+
 export default function Home() {
   const [activeTab, setActiveTab] = useState<keyof typeof BENCHMARKS>("handoff");
+  const [tickerActive, setTickerActive] = useState(0);
+  const [benchVisible, setBenchVisible] = useState(false);
+  const benchRef = useRef<HTMLDivElement | null>(null);
 
   const currentBenchmark = BENCHMARKS[activeTab];
-  const maxVal = Math.max(...currentBenchmark.data.map(d => d.value));
+  const maxVal = Math.max(...currentBenchmark.data.map((d) => d.value));
 
+  // Ticker: advance active step every 1.5s
+  useEffect(() => {
+    const id = setInterval(() => {
+      setTickerActive((prev) => (prev + 1) % LC_STEPS.length);
+    }, 1500);
+    return () => clearInterval(id);
+  }, []);
+
+  // Scroll reveal + benchmark viewport trigger for count-up
   useEffect(() => {
     const observer = new IntersectionObserver(
       (entries) => {
@@ -126,125 +180,50 @@ export default function Home() {
       },
       { threshold: 0.1 }
     );
-
     const elements = document.querySelectorAll(".scroll-reveal");
     elements.forEach((el) => observer.observe(el));
 
-    return () => observer.disconnect();
+    let benchObserver: IntersectionObserver | null = null;
+    if (benchRef.current) {
+      benchObserver = new IntersectionObserver(
+        (entries) => {
+          entries.forEach((entry) => {
+            if (entry.isIntersecting) setBenchVisible(true);
+          });
+        },
+        { threshold: 0.3 }
+      );
+      benchObserver.observe(benchRef.current);
+    }
+
+    return () => {
+      observer.disconnect();
+      benchObserver?.disconnect();
+    };
   }, []);
+
+  const gridApps = NAV_APPS.filter((a) => a.href !== "/agent-invoke");
 
   return (
     <div className="min-h-screen bg-white text-slate-900 overflow-x-hidden">
-      {/* 3D A2A CTO Layers Animation Styles */}
+      {/* Conversation Hero Asset — animation styles */}
       <style jsx global>{`
-        @keyframes float-stack {
-          0% { transform: rotateX(55deg) rotateZ(-35deg) translateY(0px); }
-          50% { transform: rotateX(55deg) rotateZ(-35deg) translateY(-12px); }
-          100% { transform: rotateX(55deg) rotateZ(-35deg) translateY(0px); }
+        @keyframes float-soft {
+          0%, 100% { transform: translateY(0); }
+          50% { transform: translateY(-12px); }
         }
-        @keyframes packet-flow-down {
-          0% { transform: translateZ(90px) scale(1); opacity: 0; }
-          10% { opacity: 1; }
-          90% { opacity: 1; }
-          100% { transform: translateZ(-90px) scale(0.8); opacity: 0; }
+        @keyframes msg-in {
+          from { opacity: 0; transform: translateY(10px) scale(0.97); }
+          to { opacity: 1; transform: translateY(0) scale(1); }
         }
-        @keyframes packet-flow-up {
-          0% { transform: translateZ(-90px) scale(0.8); opacity: 0; }
-          10% { opacity: 1; }
-          90% { opacity: 1; }
-          100% { transform: translateZ(90px) scale(1); opacity: 0; }
+        @keyframes typing-bounce {
+          0%, 80%, 100% { transform: translateY(0); opacity: 0.35; }
+          40% { transform: translateY(-4px); opacity: 1; }
         }
-        .stack-container {
-          perspective: 1200px;
-          transform-style: preserve-3d;
-        }
-        .stack-wrapper {
-          transform-style: preserve-3d;
-          animation: float-stack 8s ease-in-out infinite;
-          width: 320px;
-          height: 300px;
-          display: flex;
-          align-items: center;
-          justify-content: center;
-          position: relative;
-        }
-        .stack-layer {
-          position: absolute;
-          width: 320px;
-          height: 85px;
-          background: rgba(255, 255, 255, 0.75);
-          backdrop-filter: blur(12px);
-          -webkit-backdrop-filter: blur(12px);
-          border: 1.5px solid rgba(226, 232, 240, 0.8);
-          border-radius: 16px;
-          box-shadow: 0 10px 30px -10px rgba(0, 0, 0, 0.08), inset 0 1px 0 rgba(255,255,255,0.6);
-          transition: all 0.3s cubic-bezier(0.16, 1, 0.3, 1);
-          transform-style: preserve-3d;
-          display: flex;
-          align-items: center;
-          padding: 16px;
-          cursor: pointer;
-        }
-        .stack-layer-1 {
-          transform: translateZ(90px);
-          border-color: rgba(168, 85, 247, 0.3); /* Purple */
-          box-shadow: 0 10px 30px -10px rgba(168, 85, 247, 0.1), inset 0 1px 0 rgba(255,255,255,0.6);
-        }
-        .stack-layer-2 {
-          transform: translateZ(0px);
-          border-color: rgba(59, 130, 246, 0.3); /* Blue */
-          box-shadow: 0 10px 30px -10px rgba(59, 130, 246, 0.1), inset 0 1px 0 rgba(255,255,255,0.6);
-        }
-        .stack-layer-3 {
-          transform: translateZ(-90px);
-          border-color: rgba(236, 72, 153, 0.3); /* Pink */
-          box-shadow: 0 10px 30px -10px rgba(236, 72, 153, 0.1), inset 0 1px 0 rgba(255,255,255,0.6);
-        }
-        .stack-layer:hover {
-          background: rgba(255, 255, 255, 0.85);
-          box-shadow: 0 20px 40px -5px rgba(0, 0, 0, 0.12);
-        }
-        .stack-layer-1:hover {
-          transform: translateZ(105px) scale(1.02);
-        }
-        .stack-layer-2:hover {
-          transform: translateZ(0px) scale(1.04);
-        }
-        .stack-layer-3:hover {
-          transform: translateZ(-105px) scale(1.02);
-        }
-        /* Flow line in center */
-        .flow-line {
-          position: absolute;
-          width: 2px;
-          height: 220px;
-          background: linear-gradient(to bottom, rgba(168, 85, 247, 0.4), rgba(59, 130, 246, 0.4), rgba(236, 72, 153, 0.4));
-          transform: translateZ(-100px);
-          z-index: 1;
-        }
-        /* Flow packets */
-        .flow-packet-down {
-          position: absolute;
-          width: 8px;
-          height: 8px;
-          border-radius: 50%;
-          background: #3b82f6;
-          box-shadow: 0 0 12px #3b82f6, 0 0 4px #3b82f6;
-          animation: packet-flow-down 3s infinite linear;
-          z-index: 2;
-        }
-        .flow-packet-up {
-          position: absolute;
-          width: 6px;
-          height: 6px;
-          border-radius: 50%;
-          background: #a855f7;
-          box-shadow: 0 0 10px #a855f7;
-          animation: packet-flow-up 4s infinite linear;
-          animation-delay: 2s;
-          z-index: 2;
-        }
-        /* Scroll-Reveal transition utilities */
+        .float-soft { animation: float-soft 7s ease-in-out infinite; }
+        .chat-msg { animation: msg-in 0.55s cubic-bezier(0.16, 1, 0.3, 1) both; }
+        .typing-dot { animation: typing-bounce 1.2s ease-in-out infinite; }
+
         .scroll-reveal {
           opacity: 0;
           transform: translateY(30px) scale(0.98);
@@ -256,323 +235,404 @@ export default function Home() {
         }
       `}</style>
 
-      {/* Top Banner */}
-      <div className="w-full bg-[#fafafa] border-b border-slate-100 py-2 text-center text-[11px] font-mono font-medium text-slate-500 flex items-center justify-center gap-2">
-        <span className="status-dot online animate-pulse" />
-        amadeus.a2a/1 — Enterprise Trade Finance Node Live
-      </div>
-
       {/* Header */}
-      <header className="h-16 border-b border-slate-100 bg-white/80 backdrop-blur-md sticky top-0 z-50">
+      <header className="h-16 border-b border-white/10 surface-dark sticky top-0 z-50">
         <div className="max-w-6xl mx-auto px-6 h-full flex items-center justify-between">
           <div className="flex items-center gap-3">
             <div className="w-8 h-8 rounded-lg flex items-center justify-center overflow-hidden relative">
               <div className="absolute inset-0 vibrant-rainbow-border animate-border-spin opacity-80" />
-              <div className="absolute inset-[2px] bg-white rounded-md flex items-center justify-center">
-                <img src="/amadeus.svg" alt="A" className="w-4.5 h-4.5 object-contain" />
+              <div className="absolute inset-[2px] bg-[#0a0a0a] rounded-md flex items-center justify-center">
+                <img src="/amadeus.svg" alt="A" className="w-4.5 h-4.5 object-contain invert" />
               </div>
             </div>
-            <span className="font-extrabold text-base tracking-tight text-slate-900">Amadeus</span>
+            <span className="font-extrabold text-base tracking-tight text-white">Amadeus</span>
           </div>
           <nav className="hidden md:flex items-center gap-8">
-            <Link href="/dashboard" className="text-sm font-semibold text-slate-600 hover:text-slate-900 transition-colors">Dashboard</Link>
-            <Link href="/agents" className="text-sm font-semibold text-slate-600 hover:text-slate-900 transition-colors">Agents</Link>
-            <Link href="/tools" className="text-sm font-semibold text-slate-600 hover:text-slate-900 transition-colors">Tools</Link>
-            <Link href="/docs" className="text-sm font-semibold text-slate-600 hover:text-slate-900 transition-colors">Docs</Link>
+            <Link href="/dashboard" className="text-sm font-medium text-white/60 hover:text-white transition-colors">Dashboard</Link>
+            <Link href="/agents" className="text-sm font-medium text-white/60 hover:text-white transition-colors">Agents</Link>
+            <Link href="/tools" className="text-sm font-medium text-white/60 hover:text-white transition-colors">Tools</Link>
+            <Link href="/docs" className="text-sm font-medium text-white/60 hover:text-white transition-colors">Docs</Link>
           </nav>
           <div className="flex items-center gap-3">
-            <Link href="/dashboard" className="btn-primary text-xs py-2 px-4 shadow-sm">
+            <Link href="/dashboard" className="inline-flex items-center gap-1.5 bg-white text-black text-xs font-semibold py-2 px-4 rounded-lg hover:bg-white/90 transition-colors">
               Open Console <ArrowRight className="w-3.5 h-3.5" />
             </Link>
           </div>
         </div>
       </header>
 
-      {/* Hero Section */}
-      <section className="relative py-20 md:py-28 overflow-hidden bg-gradient-to-b from-white to-[#fafafa]">
+      {/* Hero Section — full-bleed dark */}
+      <section className="surface-dark relative py-20 md:py-28 overflow-hidden">
         <div className="max-w-6xl mx-auto px-6 grid grid-cols-1 lg:grid-cols-12 gap-12 items-center">
-          
           {/* Left Text Column */}
           <div className="lg:col-span-6 space-y-8 text-left">
-            <div className="inline-flex items-center gap-2 px-3 py-1 bg-white border border-slate-200 rounded-full text-[10px] font-mono font-bold text-slate-500 tracking-wider uppercase shadow-sm">
-              <Cpu className="w-3.5 h-3.5 text-blue-500" /> agent-to-agent protocol
-            </div>
-            
-            <h1 className="text-4xl md:text-5xl lg:text-6xl font-black text-slate-900 tracking-tight leading-[1.05]">
-              Agentic Transaction Orchestration for{" "}
-              <span className="vibrant-rainbow-text">Trade Finance</span>
+            <p className="ui-label text-white/40">AMADEUS / CONVERSATIONAL ORCHESTRATION</p>
+
+            <h1 className="display-hero text-5xl md:text-6xl lg:text-7xl text-white">
+              Talk to Your Banking{" "}
+              <span className="rainbow-underline">Agents</span>!
             </h1>
 
-            <p className="text-base text-slate-500 leading-relaxed max-w-lg">
-              Coordinate autonomous agents and RPA robots through secure, immutable state transitions for Import LC and SKBDN settlements. Enforce strict step-flow compliance with automated ledger logging and zero database exposure.
+            <p className="text-[15px] text-slate-300 leading-relaxed max-w-lg">
+              More than just a chatbot, Amadeus is a conversational orchestration platform for your banking operations. We prioritize Human Context Protocol (HCP), over Model Context Protocol (MCP).
             </p>
 
             <div className="flex items-center gap-3 pt-2">
-              <Link href="/dashboard" className="btn-primary px-6 py-3 text-sm shadow-sm">
-                Get Started <ArrowRight className="w-4 h-4" />
+              <Link href="/agent-invoke" className="inline-flex items-center gap-2 bg-white text-black px-6 py-3 text-sm font-semibold rounded-lg hover:bg-white/90 transition-colors">
+                Talk to an Agent <ArrowRight className="w-4 h-4" />
               </Link>
-              <Link href="/docs" className="btn-secondary px-6 py-3 text-sm bg-white">
+              <Link href="/docs" className="inline-flex items-center gap-2 border border-white/20 text-white/70 px-6 py-3 text-sm font-medium rounded-lg hover:text-white hover:border-white/40 transition-colors">
                 Read Blueprint
               </Link>
             </div>
           </div>
 
-          {/* Right Column: 3D Layers Stack & Flow */}
-          <div className="lg:col-span-6 flex justify-center relative min-h-[400px] items-center">
-            {/* Column Background Graphic */}
-            <div className="absolute inset-0 flex items-center justify-center opacity-10 select-none pointer-events-none">
-              <div className="grid grid-cols-7 gap-2 items-end transform rotate-12 scale-110">
-                <div className="w-6 h-12 bg-amber-400 rounded-sm"></div>
-                <div className="w-6 h-20 bg-orange-400 rounded-sm"></div>
-                <div className="w-6 h-32 bg-pink-400 rounded-sm"></div>
-                <div className="w-6 h-40 bg-violet-400 rounded-sm"></div>
-                <div className="w-6 h-32 bg-blue-400 rounded-sm"></div>
-                <div className="w-6 h-20 bg-cyan-400 rounded-sm"></div>
-                <div className="w-6 h-12 bg-emerald-400 rounded-sm"></div>
+          {/* Right Column: Conversation with Banking Agents */}
+          <div className="lg:col-span-6 flex justify-center relative min-h-[440px] items-center">
+            {/* Ambient rainbow glow */}
+            <div className="absolute w-80 h-80 rounded-full vibrant-rainbow-border opacity-[0.16] blur-[90px] pointer-events-none" />
+
+            <div className="float-soft relative w-[380px] max-w-full">
+              {/* Floating orchestration badge */}
+              <div className="hidden lg:flex absolute -top-3 -right-3 z-20 items-center gap-2 surface-dark-elevated px-3 py-2 shadow-xl">
+                <span className="relative flex w-2 h-2">
+                  <span className="absolute inline-flex w-full h-full rounded-full bg-emerald-400 opacity-60 animate-ping" />
+                  <span className="relative inline-flex w-2 h-2 rounded-full bg-emerald-400" />
+                </span>
+                <span className="ui-label text-white/70">Orchestrating · 4 agents</span>
               </div>
-            </div>
 
-            {/* 3D CTO Layer Stack Container */}
-            <div className="stack-container relative w-96 h-96 flex items-center justify-center">
-              
-              <div className="stack-wrapper">
-                
-                {/* Center Flow Elements */}
-                <div className="flow-line"></div>
-                <div className="flow-packet-down"></div>
-                <div className="flow-packet-up"></div>
-
-                {/* Top Layer: Interaction */}
-                <div className="stack-layer stack-layer-1">
-                  <div className="w-10 h-10 bg-purple-50 rounded-xl flex items-center justify-center text-purple-600 border border-purple-100 flex-shrink-0 mr-4">
-                    <Bot className="w-5.5 h-5.5" />
-                  </div>
-                  <div className="text-left">
-                    <div className="flex items-center gap-2">
-                      <p className="text-xs font-bold text-slate-800">Interaction Layer</p>
-                      <span className="badge badge-blue text-[7px] px-1 py-0">VLM & Agent UI</span>
+              {/* Chat window */}
+              <div className="surface-dark-elevated overflow-hidden shadow-2xl">
+                {/* Header: agent roster */}
+                <div className="flex items-center justify-between px-5 py-4 border-b border-white/6">
+                  <div className="flex items-center gap-3">
+                    <div className="flex -space-x-2">
+                      {["🧾", "💳", "📡", "🛡️"].map((e, i) => (
+                        <span
+                          key={i}
+                          className="w-8 h-8 rounded-full bg-[#1f1f1f] border border-white/10 flex items-center justify-center text-sm"
+                        >
+                          {e}
+                        </span>
+                      ))}
                     </div>
-                    <p className="text-[10px] text-slate-400 font-mono mt-0.5">Qwen-14B / User Decision Gate</p>
+                    <div>
+                      <p className="text-sm font-bold text-white leading-tight">Banking Agents</p>
+                      <p className="ui-label text-emerald-400/80 flex items-center gap-1">
+                        <span className="w-1.5 h-1.5 rounded-full bg-emerald-400 inline-block" /> 4 online
+                      </p>
+                    </div>
+                  </div>
+                  <span className="ui-label text-white/30">A2A</span>
+                </div>
+
+                {/* Messages */}
+                <div className="p-5 space-y-4 bg-[#0d0d0d]">
+                  {/* User */}
+                  <div className="flex justify-end chat-msg" style={{ animationDelay: "0.15s" }}>
+                    <div className="relative rounded-2xl rounded-tr-sm p-[1.5px] overflow-hidden max-w-[82%]">
+                      <div className="absolute inset-0 vibrant-rainbow-border animate-border-spin opacity-80" />
+                      <div className="relative z-10 bg-[#0f0f0f] rounded-[13px] px-3.5 py-2.5">
+                        <p className="text-[13px] text-white leading-relaxed">
+                          Hi! Can you settle import LC #8F3A for me?
+                        </p>
+                      </div>
+                    </div>
+                  </div>
+
+                  {/* Agent: Doc Analyst */}
+                  <div className="flex items-start gap-2.5 chat-msg" style={{ animationDelay: "0.6s" }}>
+                    <span className="w-7 h-7 rounded-full bg-[#1f1f1f] border border-white/10 flex items-center justify-center text-sm flex-shrink-0">
+                      🧾
+                    </span>
+                    <div className="max-w-[80%]">
+                      <p className="ui-label text-white/40 mb-1">Doc Analyst</p>
+                      <div className="bg-[#171717] border border-white/8 rounded-2xl rounded-tl-sm px-3.5 py-2.5">
+                        <p className="text-[13px] text-slate-200 leading-relaxed">
+                          Documents examined — everything checks out. ✓
+                        </p>
+                      </div>
+                    </div>
+                  </div>
+
+                  {/* Agent: Settlement Clerk */}
+                  <div className="flex items-start gap-2.5 chat-msg" style={{ animationDelay: "1.0s" }}>
+                    <span className="w-7 h-7 rounded-full bg-[#1f1f1f] border border-white/10 flex items-center justify-center text-sm flex-shrink-0">
+                      💳
+                    </span>
+                    <div className="max-w-[80%]">
+                      <p className="ui-label text-white/40 mb-1">Settlement Clerk</p>
+                      <div className="bg-[#171717] border border-white/8 rounded-2xl rounded-tl-sm px-3.5 py-2.5">
+                        <p className="text-[13px] text-slate-200 leading-relaxed">
+                          MT202 drafted and{" "}
+                          <span className="font-mono text-emerald-300">HMAC-signed</span>.
+                        </p>
+                      </div>
+                    </div>
+                  </div>
+
+                  {/* Agent: SWIFT Agent — typing */}
+                  <div className="flex items-start gap-2.5 chat-msg" style={{ animationDelay: "1.4s" }}>
+                    <span className="w-7 h-7 rounded-full bg-[#1f1f1f] border border-white/10 flex items-center justify-center text-sm flex-shrink-0">
+                      📡
+                    </span>
+                    <div>
+                      <p className="ui-label text-white/40 mb-1">SWIFT Agent</p>
+                      <div className="bg-[#171717] border border-white/8 rounded-2xl rounded-tl-sm px-4 py-3 inline-flex items-center gap-1.5">
+                        <span className="typing-dot w-1.5 h-1.5 rounded-full bg-slate-400" style={{ animationDelay: "0s" }} />
+                        <span className="typing-dot w-1.5 h-1.5 rounded-full bg-slate-400" style={{ animationDelay: "0.15s" }} />
+                        <span className="typing-dot w-1.5 h-1.5 rounded-full bg-slate-400" style={{ animationDelay: "0.3s" }} />
+                      </div>
+                    </div>
                   </div>
                 </div>
 
-                {/* Middle Layer: Orchestration */}
-                <div className="stack-layer stack-layer-2">
-                  <div className="w-10 h-10 bg-blue-50 rounded-xl flex items-center justify-center text-blue-600 border border-blue-100 flex-shrink-0 mr-4">
-                    <Cpu className="w-5.5 h-5.5" />
+                {/* Faux input */}
+                <div className="flex items-center gap-2 px-4 py-3 border-t border-white/6 bg-[#0d0d0d]">
+                  <div className="flex-1 bg-[#1a1a1a] border border-white/8 rounded-full px-4 py-2 text-[13px] text-slate-500">
+                    Message your agents…
                   </div>
-                  <div className="text-left">
-                    <div className="flex items-center gap-2">
-                      <p className="text-xs font-bold text-slate-800">Orchestration Layer</p>
-                      <span className="badge badge-green text-[7px] px-1 py-0">Amadeus Core</span>
-                    </div>
-                    <p className="text-[10px] text-slate-400 font-mono mt-0.5">Immutable State Machine / PostgreSQL</p>
-                  </div>
+                  <button className="relative w-9 h-9 rounded-full overflow-hidden flex items-center justify-center flex-shrink-0">
+                    <div className="absolute inset-0 vibrant-rainbow-bg" />
+                    <Send className="relative z-10 w-4 h-4 text-white" />
+                  </button>
                 </div>
-
-                {/* Bottom Layer: Execution */}
-                <div className="stack-layer stack-layer-3">
-                  <div className="w-10 h-10 bg-pink-50 rounded-xl flex items-center justify-center text-pink-600 border border-pink-100 flex-shrink-0 mr-4">
-                    <Wrench className="w-5.5 h-5.5" />
-                  </div>
-                  <div className="text-left">
-                    <div className="flex items-center gap-2">
-                      <p className="text-xs font-bold text-slate-800">Execution Layer</p>
-                      <span className="badge badge-orange text-[7px] px-1 py-0">RPA Robot Handoff</span>
-                    </div>
-                    <p className="text-[10px] text-slate-400 font-mono mt-0.5">UiPath Trigger / SendGrid Mailer</p>
-                  </div>
-                </div>
-
               </div>
             </div>
           </div>
         </div>
       </section>
 
-      {/* Client Logos / Trust Badges */}
-      <section className="py-8 bg-white border-y border-slate-100">
+      {/* Section 2: Live Flow Ticker */}
+      <section className="bg-[#fafafa] border-b border-slate-100 py-14">
         <div className="max-w-6xl mx-auto px-6">
-          <div className="flex flex-wrap justify-between items-center gap-8">
-            <span className="text-[10px] font-mono uppercase tracking-widest text-slate-400">Compliance & Security Standards</span>
-            <div className="flex flex-wrap items-center gap-8">
-              {[
-                { icon: ShieldCheck, text: "ISO 27001 Ready" },
-                { icon: Lock, text: "HMAC-SHA512" },
-                { icon: Server, text: "Air-Gapped Node" },
-                { icon: FileCheck, text: "OJK / BI Compliant" },
-                { icon: Database, text: "Immutable Audit" },
-              ].map(({ icon: Icon, text }) => (
-                <div key={text} className="flex items-center gap-2 text-slate-400 text-xs font-semibold">
-                  <Icon className="w-4 h-4 text-slate-300" />
-                  {text}
+
+          <div className="flex flex-col md:flex-row md:items-end justify-between mb-8 gap-4">
+            <div>
+              <p className="ui-label text-slate-400 mb-2">Import LC State Machine</p>
+              <h2 className="text-3xl font-extrabold text-slate-900 tracking-tight">Your Enterprise-Grade Agent Laboratory.</h2>
+            </div>
+
+            <div className="bg-white border border-slate-200 shadow-[0_4px_20px_rgba(0,0,0,0.03)] rounded-2xl px-5 py-3 flex flex-col sm:flex-row items-center gap-4">
+              <span className="text-[10px] font-bold uppercase tracking-widest text-slate-400 text-center sm:text-left">We Support<br />A2A Communication</span>
+              <div className="hidden sm:block w-px h-8 bg-slate-100" />
+              <div className="flex items-center gap-5">
+                {/* Power Automate Logo */}
+                <div className="flex items-center gap-2 grayscale hover:grayscale-0 transition-all duration-300 opacity-80 hover:opacity-100 cursor-pointer" title="Microsoft Power Automate">
+                  <svg className="w-5 h-5" viewBox="0 0 32 32" fill="none" xmlns="http://www.w3.org/2000/svg">
+                    <path d="M11 2L2 11L11 20L20 11L11 2Z" fill="#0078D4" />
+                    <path d="M21 12L12 21L21 30L30 21L21 12Z" fill="#005A9E" />
+                  </svg>
+                  <span className="font-bold text-[14px] text-slate-800 tracking-tight">Power Automate</span>
                 </div>
-              ))}
+                {/* UiPath Logo */}
+                <div className="flex items-center gap-2 grayscale hover:grayscale-0 transition-all duration-300 opacity-80 hover:opacity-100 cursor-pointer" title="UiPath">
+                  <svg className="w-5 h-5" viewBox="0 0 32 32" fill="none" xmlns="http://www.w3.org/2000/svg">
+                    <path d="M5 13V24C5 26.2091 6.79086 28 9 28H19V19H12C10.3431 19 9 17.6569 9 16V13H5Z" fill="#141414" />
+                    <rect x="19" y="4" width="8" height="8" rx="2" fill="#FA4616" />
+                    <path d="M19 14H27V28H19V14Z" fill="#141414" />
+                  </svg>
+                  <span className="font-bold text-[14px] text-slate-800 tracking-tight">UiPath</span>
+                </div>
+              </div>
             </div>
           </div>
+
+          <div className="w-full h-[500px] bg-white border border-slate-200 rounded-2xl shadow-sm overflow-hidden relative">
+            <TransactionGraph
+              tx={{
+                current_step: LC_STEPS[tickerActive],
+                status: tickerActive === LC_STEPS.length - 1 ? 'completed' : 'pending'
+              }}
+              events={[]}
+            />
+          </div>
+          <p className="text-xs text-slate-400 mt-4 text-center">
+            Step transitions are append-only and cryptographically logged. Nodes are processed asynchronously by different MCP agents.
+          </p>
         </div>
       </section>
 
-      {/* Metrics Strip */}
-      <section className="py-16 bg-[#fafafa]">
-        <div className="max-w-6xl mx-auto px-6 grid grid-cols-1 md:grid-cols-3 gap-8 text-center">
-          <div className="space-y-2">
-            <p className="text-5xl font-black tracking-tight text-blue-600 bg-gradient-to-r from-blue-600 to-cyan-500 bg-clip-text text-transparent">50k+</p>
-            <p className="text-sm font-semibold text-slate-900">Transactions Orchestrated</p>
-            <p className="text-xs text-slate-400 leading-relaxed max-w-[200px] mx-auto">LC and SKBDN state machine transitions validated and locked.</p>
-          </div>
-          <div className="space-y-2">
-            <p className="text-5xl font-black tracking-tight text-violet-600 bg-gradient-to-r from-violet-600 to-pink-500 bg-clip-text text-transparent">99.9%</p>
-            <p className="text-sm font-semibold text-slate-900">SLA Compliance (Zero Drift)</p>
-            <p className="text-xs text-slate-400 leading-relaxed max-w-[200px] mx-auto">Deterministic execution paths prevent state machine deviations.</p>
-          </div>
-          <div className="space-y-2">
-            <p className="text-5xl font-black tracking-tight text-orange-600 bg-gradient-to-r from-orange-600 to-yellow-500 bg-clip-text text-transparent">15s</p>
-            <p className="text-sm font-semibold text-slate-900">End-to-End Latency</p>
-            <p className="text-xs text-slate-400 leading-relaxed max-w-[200px] mx-auto">From unstructured document receipt to verified RPA robot handoff.</p>
-          </div>
-        </div>
-      </section>
-
-      {/* Agentic Settlement Showcase */}
-      <section className="py-24 bg-white scroll-reveal">
-        <div className="max-w-6xl mx-auto px-6 space-y-12">
-          <div className="text-left space-y-2">
-            <span className="badge badge-blue">Feature Showcase</span>
-            <h2 className="text-3xl font-extrabold text-slate-900 tracking-tight">Agentic Settlement & Verification</h2>
-            <p className="text-slate-500 text-sm max-w-xl">
-              Turn complex layouts and documents into structured database state transitions without exposing mainframes.
+      {/* Section 3: App Grid */}
+      <section className="py-24 bg-[#fafafa] scroll-reveal">
+        <div className="max-w-6xl mx-auto px-6 space-y-10">
+          <div className="text-left space-y-2 max-w-xl">
+            <p className="ui-label text-slate-400">Our Features</p>
+            <h2 className="section-head text-3xl text-slate-900">
+              Where Robots, Agents, and Humans collaborates.
+            </h2>
+            <p className="text-[15px] text-slate-500 leading-relaxed">
+              Everything you need to orchestrate at scale
             </p>
           </div>
 
-          {/* Big Featured Card */}
-          <div className="relative group rounded-2xl border border-slate-200/60 bg-white/70 backdrop-blur-md p-8 md:p-12 overflow-hidden flex flex-col md:flex-row items-center justify-between gap-8 shadow-sm hover:shadow-md transition-all duration-500">
-            <div className="absolute -inset-0.5 bg-gradient-to-r from-indigo-500 via-pink-500 to-amber-500 rounded-2xl blur opacity-0 group-hover:opacity-10 transition duration-500 pointer-events-none"></div>
-            <div className="relative z-10 max-w-md space-y-4">
-              <h3 className="text-xl font-bold text-slate-900">Immutable State Verification</h3>
-              <p className="text-slate-500 text-sm leading-relaxed">
-                By tracking step transitions in an append-only transaction ledger, Amadeus ensures that VLM agents and RPA executables move through Import LC and SKBDN settlements deterministically and with auditable cryptographic proof.
-              </p>
-              <div className="inline-flex items-center gap-1.5 text-xs font-semibold text-blue-600">
-                Learn more in Docs <ArrowRight className="w-3.5 h-3.5" />
-              </div>
-            </div>
-            {/* Flat vector graphic representation */}
-            <div className="relative z-10 w-72 h-44 rounded-xl border border-slate-200 bg-white shadow-lg p-5 flex flex-col justify-between">
-              <div className="flex items-center justify-between border-b border-slate-100 pb-3">
-                <span className="text-[9px] font-mono text-slate-400 uppercase tracking-widest">Transaction State Machine</span>
-                <span className="status-dot online" />
-              </div>
-              <div className="space-y-2">
-                <div className="h-2 bg-slate-100 rounded w-3/4"></div>
-                <div className="h-2 bg-slate-100 rounded w-1/2"></div>
-                <div className="h-2 bg-slate-100 rounded w-5/6"></div>
-              </div>
-              <div className="flex items-center justify-between">
-                <span className="badge badge-slate text-[9px]">A2A Payload</span>
-                <span className="text-[10px] font-mono font-bold text-slate-800">{"{ step: 'verifying', status: 'authorized' }"}</span>
-              </div>
-            </div>
+          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6 relative z-0">
+            {gridApps.map(({ href, step, label, desc, icon: Icon, accent, bg }, index) => (
+              <Link
+                key={href}
+                href={href}
+                className="relative group rounded-2xl p-[1.5px] overflow-hidden transition-all duration-500 hover:-translate-y-1.5"
+              >
+                <div className="absolute inset-0 bg-gradient-to-br from-slate-200 to-slate-100 group-hover:from-indigo-500 group-hover:via-purple-500 group-hover:to-pink-500 transition-colors duration-500 opacity-60 group-hover:opacity-100" />
+                <div className="relative z-10 flex flex-col h-full bg-white rounded-[14px] p-6 shadow-sm hover:shadow-2xl hover:shadow-indigo-500/10 transition-all duration-500">
+                  <div className="flex justify-between items-start mb-6">
+                    <div className={`w-12 h-12 rounded-xl ${bg} flex items-center justify-center shadow-inner`}>
+                      <Icon className={`w-6 h-6 ${accent}`} />
+                    </div>
+                    <span className="text-[10px] font-bold uppercase tracking-widest text-slate-400 bg-slate-50 px-2.5 py-1 rounded-full border border-slate-100 group-hover:bg-indigo-50 group-hover:text-indigo-600 group-hover:border-indigo-100 transition-colors">
+                      {step}
+                    </span>
+                  </div>
+
+                  <h3 className="section-head text-[19px] text-slate-900 mb-2">{label}</h3>
+                  <p className="text-[14px] text-slate-500 leading-relaxed flex-1">{desc}</p>
+
+                  <div className={`mt-6 flex items-center gap-2 text-xs font-bold uppercase tracking-widest ${accent} opacity-70 group-hover:opacity-100 transition-opacity`}>
+                    Explore <ArrowRight className="w-3.5 h-3.5 transform group-hover:translate-x-1.5 transition-transform" />
+                  </div>
+                </div>
+              </Link>
+            ))}
           </div>
 
-          {/* Three columns layout */}
-          <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
-            <div className="relative group rounded-xl border border-slate-200/60 p-6 space-y-3 bg-white/70 backdrop-blur-md shadow-sm hover:shadow-md transition-all duration-500">
-              <div className="absolute -inset-0.5 bg-gradient-to-r from-indigo-500 via-pink-500 to-amber-500 rounded-xl blur opacity-0 group-hover:opacity-10 transition duration-500 pointer-events-none"></div>
-              <div className="relative z-10 space-y-3">
-                <div className="w-8 h-8 rounded-lg bg-blue-50 border border-blue-100 flex items-center justify-center text-blue-500">
-                  <Cpu className="w-4.5 h-4.5" />
-                </div>
-                <h4 className="font-bold text-slate-900 text-sm">Agent Orchestrator</h4>
-                <p className="text-xs text-slate-500 leading-relaxed">
-                  Let autonomous LLMs reason about document data, extract structured attributes, and recommend transitions.
+          {/* Agent Invoke — featured full-width dark */}
+          <div className="surface-dark rounded-2xl overflow-hidden border border-white/10">
+            <div className="flex flex-col lg:flex-row items-stretch">
+              <div className="flex-1 p-8 md:p-12 space-y-5">
+                <p className="ui-label text-white/40">Featured Surface</p>
+                <h3 className="section-head text-3xl text-white">Agent Invoke</h3>
+                <p className="text-[15px] text-slate-300 leading-relaxed max-w-md">
+                  Stream real-time agent reasoning over a selected transaction. Watch
+                  MCP tool calls, state transitions, and telemetry flow through a
+                  control panel built for ops — not a chat toy.
                 </p>
+                <Link href="/agent-invoke" className="inline-flex items-center gap-2 bg-white text-black px-5 py-2.5 text-sm font-semibold rounded-lg hover:bg-white/90 transition-colors">
+                  Launch Agent Console <ArrowRight className="w-4 h-4" />
+                </Link>
               </div>
-            </div>
-            <div className="relative group rounded-xl border border-slate-200/60 p-6 space-y-3 bg-white/70 backdrop-blur-md shadow-sm hover:shadow-md transition-all duration-500">
-              <div className="absolute -inset-0.5 bg-gradient-to-r from-indigo-500 via-pink-500 to-amber-500 rounded-xl blur opacity-0 group-hover:opacity-10 transition duration-500 pointer-events-none"></div>
-              <div className="relative z-10 space-y-3">
-                <div className="w-8 h-8 rounded-lg bg-violet-50 border border-violet-100 flex items-center justify-center text-violet-500">
-                  <Bot className="w-4.5 h-4.5" />
+
+              {/* Mini terminal preview */}
+              <div className="flex-1 p-8 md:p-12 flex items-center">
+                <div className="terminal-card w-full overflow-hidden shadow-2xl">
+                  <div className="terminal-card-header bg-[#111]">
+                    <span className="terminal-dot bg-red-500" />
+                    <span className="terminal-dot bg-yellow-500" />
+                    <span className="terminal-dot bg-green-500" />
+                    <span className="ui-label text-white/30 ml-2">Agent Invoke Console</span>
+                  </div>
+                  <div className="p-0 flex flex-col h-[320px] bg-[#0a0a0a]">
+                    <div className="flex-1 overflow-y-auto p-5 space-y-6 flex flex-col justify-end">
+                      {/* User */}
+                      <div className="flex justify-end stream-in" style={{ animationDelay: '0.1s' }}>
+                        <div className="bg-[#1a1a1a] border border-white/10 rounded-2xl rounded-tr-sm px-4 py-2.5">
+                          <p className="text-[13px] text-white">Execute settlement for LC #8F3A</p>
+                        </div>
+                      </div>
+
+                      {/* Agent */}
+                      <div className="flex items-start gap-3 stream-in" style={{ animationDelay: '0.3s' }}>
+                        <div className="w-8 h-8 rounded-full bg-gradient-to-br from-indigo-500 to-purple-600 flex items-center justify-center flex-shrink-0 shadow-lg shadow-indigo-500/20">
+                          <span className="text-white text-xs font-bold">AM</span>
+                        </div>
+                        <div className="space-y-3 w-full max-w-[85%]">
+                          <div className="flex items-center gap-2 mb-1">
+                            <span className="ui-label text-white/40">Amadeus Orchestrator</span>
+                            <span className="text-[9px] font-mono uppercase tracking-widest text-emerald-400 border border-emerald-500/30 bg-emerald-500/10 px-1.5 py-0.5 rounded-sm">system</span>
+                          </div>
+                          <div className="text-[13px] text-slate-300 leading-relaxed font-sans">
+                            I will now trigger the UiPath robot via MCP to execute the MT202 conversion.
+                          </div>
+
+                          {/* Tool Call Block */}
+                          <div className="bg-[#111] border border-white/10 rounded-xl overflow-hidden shadow-lg">
+                            <div className="px-3 py-2 border-b border-white/5 bg-[#171717] flex items-center justify-between">
+                              <div className="flex items-center gap-2">
+                                <span className="text-amber-400 text-xs">⚙</span>
+                                <span className="text-white/70 text-xs font-mono font-medium">execute_mcp_tool</span>
+                              </div>
+                              <span className="flex items-center gap-1.5 text-[10px] font-mono text-emerald-400">
+                                <span className="w-1.5 h-1.5 rounded-full bg-emerald-400 animate-pulse" /> Running...
+                              </span>
+                            </div>
+                            <div className="p-3 bg-[#0d0d0d] font-mono text-[11.5px] text-white/50 leading-loose overflow-x-auto">
+                              <span className="text-indigo-400">"server_name"</span>: <span className="text-amber-300">"mcp-uipath"</span>,<br />
+                              <span className="text-indigo-400">"tool_name"</span>: <span className="text-amber-300">"trigger_job"</span>,<br />
+                              <span className="text-indigo-400">"arguments"</span>: {"{"}<br />
+                              &nbsp;&nbsp;<span className="text-indigo-400">"processName"</span>: <span className="text-amber-300">"MT202_Converter"</span>,<br />
+                              &nbsp;&nbsp;<span className="text-indigo-400">"txId"</span>: <span className="text-amber-300">"8F3A"</span><br />
+                              {"}"}
+                            </div>
+                          </div>
+                        </div>
+                      </div>
+                    </div>
+                  </div>
                 </div>
-                <h4 className="font-bold text-slate-900 text-sm">RPA Handoff Gate</h4>
-                <p className="text-xs text-slate-500 leading-relaxed">
-                  Dispatch execution payloads directly to UiPath robot queues once compliance criteria are cryptographically met.
-                </p>
-              </div>
-            </div>
-            <div className="relative group rounded-xl border border-slate-200/60 p-6 space-y-3 bg-white/70 backdrop-blur-md shadow-sm hover:shadow-md transition-all duration-500">
-              <div className="absolute -inset-0.5 bg-gradient-to-r from-indigo-500 via-pink-500 to-amber-500 rounded-xl blur opacity-0 group-hover:opacity-10 transition duration-500 pointer-events-none"></div>
-              <div className="relative z-10 space-y-3">
-                <div className="w-8 h-8 rounded-lg bg-orange-50 border border-orange-100 flex items-center justify-center text-orange-500">
-                  <Lock className="w-4.5 h-4.5" />
-                </div>
-                <h4 className="font-bold text-slate-900 text-sm">CISO Compliance Gate</h4>
-                <p className="text-xs text-slate-500 leading-relaxed">
-                  Enforce service account checks, API request signing, and optimistic locking to guarantee total state protection.
-                </p>
               </div>
             </div>
           </div>
         </div>
       </section>
 
-      {/* Interactive Performance Benchmarks */}
-      <section className="py-24 bg-[#fafafa] border-y border-slate-100">
+      {/* Section 4: Benchmarks — dark */}
+      <section ref={benchRef} className="surface-dark py-24 border-y border-white/10">
         <div className="max-w-6xl mx-auto px-6 grid grid-cols-1 lg:grid-cols-12 gap-12">
-          
-          {/* Left Selector Tab Column */}
           <div className="lg:col-span-4 space-y-6">
             <div className="space-y-2">
-              <span className="badge badge-slate">Benchmarks</span>
-              <h3 className="text-2xl font-extrabold text-slate-900 tracking-tight">Unrivaled efficiency & compliance</h3>
-              <p className="text-slate-500 text-xs leading-relaxed">
-                We benchmarked Amadeus against legacy and pythonic orchestration solutions. Select a metric to visualize the delta.
+              <p className="ui-label text-white/40">Benchmarks</p>
+              <h3 className="section-head text-2xl text-white">Unrivaled efficiency &amp; compliance</h3>
+              <p className="text-slate-400 text-[15px] leading-relaxed">
+                We benchmarked Amadeus against legacy and pythonic orchestration
+                solutions. Select a metric to visualize the delta.
               </p>
             </div>
-            
-            <div className="flex flex-col gap-1.5">
-              {(Object.keys(BENCHMARKS) as Array<keyof typeof BENCHMARKS>).map(key => (
+
+            <div className="flex flex-col gap-1">
+              {(Object.keys(BENCHMARKS) as Array<keyof typeof BENCHMARKS>).map((key) => (
                 <button
                   key={key}
                   onClick={() => setActiveTab(key)}
-                  className={`w-full text-left px-4 py-3 rounded-lg text-xs font-semibold uppercase tracking-wider transition-all duration-150 ${
-                    activeTab === key
-                      ? "bg-white border border-slate-200 text-slate-900 shadow-sm"
-                      : "text-slate-400 hover:text-slate-700"
-                  }`}
+                  className={`w-full text-left px-4 py-3 rounded-lg ui-label transition-all duration-150 ${activeTab === key
+                    ? "text-white"
+                    : "text-white/40 hover:text-white/70"
+                    }`}
                 >
+                  {activeTab === key && <span className="nav-active-indicator" />}
                   {BENCHMARKS[key].title}
                 </button>
               ))}
             </div>
           </div>
 
-          {/* Right Bar Charts Column */}
-          <div className="lg:col-span-8 bg-white border border-slate-200 rounded-2xl p-8 space-y-6 shadow-sm">
+          <div className="lg:col-span-8 surface-dark-elevated p-8 space-y-6">
             <div>
-              <h4 className="font-bold text-slate-900 text-sm">{currentBenchmark.title}</h4>
-              <p className="text-slate-500 text-xs mt-1">{currentBenchmark.desc}</p>
+              <h4 className="section-head text-white text-base">{currentBenchmark.title}</h4>
+              <p className="text-slate-400 text-[13px] mt-1">{currentBenchmark.desc}</p>
             </div>
 
             <div className="space-y-5">
-              {currentBenchmark.data.map(d => (
+              {currentBenchmark.data.map((d) => (
                 <div key={d.label} className="space-y-1.5">
-                  <div className="flex items-center justify-between text-xs font-semibold text-slate-700">
-                    <span>{d.label}</span>
-                    <span className="font-mono">
-                      {d.value} {currentBenchmark.unit}
+                  <div className="flex items-center justify-between text-[13px]">
+                    <span className={d.active ? "text-white font-semibold" : "text-slate-400"}>{d.label}</span>
+                    <span className="metric-value text-white">
+                      <CountUp
+                        value={d.value}
+                        start={benchVisible}
+                        decimals={currentBenchmark.unit === "USD" ? 1 : 0}
+                      />{" "}
+                      <span className="text-white/40 text-[11px]">{currentBenchmark.unit}</span>
                     </span>
                   </div>
-                  <div className="w-full h-7 bg-slate-50 rounded-lg overflow-hidden border border-slate-100 p-0.5">
+                  <div className="w-full h-7 rounded-lg overflow-hidden bg-[#0a0a0a] border border-white/10 p-0.5">
                     <div
-                      className={`h-full rounded-md transition-all duration-500 flex items-center justify-end px-2 ${d.color}`}
+                      className={`h-full rounded-md transition-all duration-700 flex items-center justify-end px-2 ${d.active ? "vibrant-rainbow-bg" : "bg-[#2a2a2a] border border-white/10"
+                        }`}
                       style={{ width: `${(d.value / maxVal) * 100}%` }}
                     >
                       {d.active && (
-                        <span className="text-[9px] font-bold text-white uppercase tracking-wider animate-pulse">
-                          Active Stack
-                        </span>
+                        <span className="ui-label text-[8px] text-black/70">Active Stack</span>
                       )}
                     </div>
                   </div>
@@ -580,17 +640,50 @@ export default function Home() {
               ))}
             </div>
           </div>
+        </div>
+      </section>
 
+      {/* Section 5: Security / Compliance Strip — editorial spec sheet */}
+      <section className="bg-white py-20">
+        <div className="max-w-6xl mx-auto px-6">
+          <p className="ui-label text-slate-400 mb-8">Compliance &amp; Security Controls</p>
+          <div className="border-t border-slate-200">
+            {[
+              { icon: ShieldCheck, name: "ISO 27001 Ready", note: "Information security management aligned to certification controls." },
+              { icon: Lock, name: "HMAC-SHA512", note: "Financial step transitions are request-signed and tamper-evident." },
+              { icon: Server, name: "Air-Gapped Node", note: "On-premise deployment with zero outbound database exposure." },
+              { icon: FileCheck, name: "OJK / BI Compliant", note: "Meets Indonesian regulatory requirements for trade finance." },
+              { icon: Database, name: "Immutable Audit", note: "Append-only ledger with cryptographic proof of every mutation." },
+            ].map(({ icon: Icon, name, note }, i) => (
+              <div
+                key={name}
+                className="grid grid-cols-12 gap-4 items-center py-5 border-b border-slate-200"
+              >
+                <div className="col-span-2 md:col-span-1">
+                  <span className="metric-value text-slate-300 text-lg">
+                    {String(i + 1).padStart(2, "0")}
+                  </span>
+                </div>
+                <div className="col-span-10 md:col-span-4 flex items-center gap-2.5">
+                  <Icon className="w-4 h-4 text-slate-400 flex-shrink-0" />
+                  <span className="section-head text-[15px] text-slate-900">{name}</span>
+                </div>
+                <div className="col-span-12 md:col-span-7 text-[14px] text-slate-500 leading-relaxed">
+                  {note}
+                </div>
+              </div>
+            ))}
+          </div>
         </div>
       </section>
 
       {/* System Architecture at a Glance */}
-      <section className="py-24 bg-white border-y border-slate-100 scroll-reveal">
+      <section className="py-24 bg-[#fafafa] border-y border-slate-100 scroll-reveal">
         <div className="max-w-6xl mx-auto px-6 space-y-10">
-          <div className="text-center space-y-2">
-            <span className="badge badge-slate mx-auto">System Map</span>
-            <h2 className="text-3xl font-extrabold text-slate-900 tracking-tight">Architecture at a glance</h2>
-            <p className="text-slate-500 text-sm max-w-xl mx-auto">
+          <div className="text-left space-y-2 max-w-xl">
+            <p className="ui-label text-slate-400">System Map</p>
+            <h2 className="section-head text-3xl text-slate-900">Architecture at a glance</h2>
+            <p className="text-slate-500 text-[15px] leading-relaxed">
               Two systems live in this codebase: the actively-developed LC settlement
               stack, and a separate Supabase-backed agent platform it grew alongside.
             </p>
@@ -598,16 +691,13 @@ export default function Home() {
 
           <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
             {/* LC Settlement Stack */}
-            <div className="relative group rounded-2xl border border-slate-200/60 bg-white p-8 shadow-sm hover:shadow-md transition-all duration-500">
-              <div className="absolute -inset-0.5 bg-gradient-to-r from-blue-500 via-cyan-500 to-emerald-500 rounded-2xl blur opacity-0 group-hover:opacity-10 transition duration-500 pointer-events-none"></div>
-              <div className="relative z-10 space-y-4">
+            <div className="rounded-2xl border border-[#e5e7eb] bg-white p-8">
+              <div className="space-y-4">
                 <div className="flex items-center gap-2">
-                  <div className="w-8 h-8 rounded-lg bg-blue-50 border border-blue-100 flex items-center justify-center text-blue-600">
-                    <Cpu className="w-4.5 h-4.5" />
-                  </div>
-                  <h3 className="font-bold text-slate-900">LC Settlement Orchestrator Stack</h3>
+                  <Cpu className="w-5 h-5 text-blue-600" />
+                  <h3 className="section-head text-lg text-slate-900">LC Settlement Orchestrator Stack</h3>
                 </div>
-                <p className="text-sm text-slate-500 leading-relaxed">
+                <p className="text-[15px] text-slate-500 leading-relaxed">
                   A 9-step state machine for Import LC/SKBDN/SBLC settlement, with a
                   cost-aware router that picks the cheapest of an LLM, PAD, or UiPath
                   executor per step — and HMAC-signed financial steps.
@@ -625,18 +715,15 @@ export default function Home() {
             </div>
 
             {/* Legacy Agent Platform */}
-            <div className="relative group rounded-2xl border border-slate-200/60 bg-white p-8 shadow-sm hover:shadow-md transition-all duration-500">
-              <div className="absolute -inset-0.5 bg-gradient-to-r from-violet-500 via-pink-500 to-orange-500 rounded-2xl blur opacity-0 group-hover:opacity-10 transition duration-500 pointer-events-none"></div>
-              <div className="relative z-10 space-y-4">
+            <div className="rounded-2xl border border-[#e5e7eb] bg-white p-8">
+              <div className="space-y-4">
                 <div className="flex items-center gap-2">
-                  <div className="w-8 h-8 rounded-lg bg-violet-50 border border-violet-100 flex items-center justify-center text-violet-600">
-                    <Layers className="w-4.5 h-4.5" />
-                  </div>
-                  <h3 className="font-bold text-slate-900">Agent Platform (Legacy)</h3>
+                  <Layers className="w-5 h-5 text-violet-600" />
+                  <h3 className="section-head text-lg text-slate-900">Agent Platform (Legacy)</h3>
                 </div>
-                <p className="text-sm text-slate-500 leading-relaxed">
-                  A general-purpose "describe an agent in plain text, wire up MCP
-                  tools, run it" platform that predates the settlement stack, backed by
+                <p className="text-[15px] text-slate-500 leading-relaxed">
+                  A general-purpose &quot;describe an agent in plain text, wire up MCP
+                  tools, run it&quot; platform that predates the settlement stack, backed by
                   one shared Supabase project.
                 </p>
                 <ul className="space-y-1.5 text-xs font-mono text-slate-600">
@@ -652,7 +739,7 @@ export default function Home() {
             </div>
           </div>
 
-          <div className="flex justify-center">
+          <div className="flex justify-start">
             <Link href="/docs/architecture-overview" className="btn-secondary px-5 py-2.5 text-sm bg-white">
               <BookOpen className="w-4 h-4" /> Full architecture documentation
             </Link>
@@ -660,43 +747,12 @@ export default function Home() {
         </div>
       </section>
 
-      {/* Surface apps navigation grid */}
-      <section className="py-24 bg-white scroll-reveal">
-        <div className="max-w-6xl mx-auto px-6 space-y-12">
-          <div className="text-center space-y-2">
-            <h2 className="text-3xl font-extrabold text-slate-900 tracking-tight">Everything you need to orchestrate at scale</h2>
-            <p className="text-slate-500 text-sm max-w-sm mx-auto">Six integrated surfaces, one unified system.</p>
-          </div>
-
-          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
-            {NAV_APPS.map(({ href, label, desc, icon: Icon, accent, bg }) => (
-              <Link
-                key={href}
-                href={href}
-                className="relative group flex flex-col bg-white/70 backdrop-blur-md border border-slate-200/60 rounded-xl p-6 shadow-sm hover:shadow-md transition-all duration-500 overflow-hidden"
-              >
-                <div className="absolute -inset-0.5 bg-gradient-to-r from-indigo-500 via-pink-500 to-amber-500 rounded-xl blur opacity-0 group-hover:opacity-10 transition duration-500 pointer-events-none"></div>
-                <div className="relative z-10 flex flex-col h-full">
-                  <div className={`w-10 h-10 ${bg} rounded-lg flex items-center justify-center mb-4 transition-transform duration-300 group-hover:scale-110`}>
-                    <Icon className={`w-5 h-5 ${accent}`} />
-                  </div>
-                  <h3 className="font-semibold text-slate-900 mb-1">{label}</h3>
-                  <p className="text-sm text-slate-500 leading-relaxed flex-1">{desc}</p>
-                  <div className={`mt-4 flex items-center gap-1 text-xs font-semibold ${accent} opacity-0 group-hover:opacity-100 transition-opacity`}>
-                    Open <ArrowRight className="w-3 h-3" />
-                  </div>
-                </div>
-              </Link>
-            ))}
-          </div>
-        </div>
-      </section>
-
-      {/* Footer */}
-      <footer className="border-t border-slate-100 py-8 bg-[#fafafa]">
-        <div className="max-w-6xl mx-auto px-6 flex flex-col md:flex-row items-center justify-between text-xs text-slate-400 font-mono gap-4">
-          <span>Amadeus Orchestrator © 2026 — Bank Mandiri Internal</span>
-          <span>a2a/1 · OJK / BI Compliant · Air-Gapped Node</span>
+      {/* Section 6: Footer */}
+      <div className="rainbow-bar" />
+      <footer className="surface-dark py-8">
+        <div className="max-w-6xl mx-auto px-6 flex flex-col md:flex-row items-center justify-between text-xs font-mono gap-4">
+          <span className="text-white/50">Amadeus Orchestrator — Bank Mandiri Trade Finance Ops</span>
+          <Link href="/docs" className="text-white/50 hover:text-white transition-colors">Docs →</Link>
         </div>
       </footer>
     </div>

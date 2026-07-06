@@ -1,7 +1,9 @@
 "use client";
 
 import { useEffect, useState } from "react";
+import Link from "next/link";
 import { RainbowRibbonLoader } from "@/components/RainbowRibbonLoader";
+import { Select, MultiSelect } from "@/components/Select";
 import {
   RefreshCw,
   Plus,
@@ -110,10 +112,10 @@ export default function AgentsPage() {
 
   const filteredAgents = agents.filter(agent => {
     const matchesSearch = agent.agent_name?.toLowerCase().includes(searchQuery.toLowerCase()) ||
-                          agent.description?.toLowerCase().includes(searchQuery.toLowerCase());
-    const matchesStatus = statusFilter === "all" || 
-                          (statusFilter === "online" && agent.on_status) ||
-                          (statusFilter === "offline" && !agent.on_status);
+      agent.description?.toLowerCase().includes(searchQuery.toLowerCase());
+    const matchesStatus = statusFilter === "all" ||
+      (statusFilter === "online" && agent.on_status) ||
+      (statusFilter === "offline" && !agent.on_status);
     return matchesSearch && matchesStatus;
   });
 
@@ -122,7 +124,8 @@ export default function AgentsPage() {
       {/* Page Header */}
       <div className="page-header border-b border-slate-100 pb-6 mb-6">
         <div>
-          <h1 className="text-3xl font-extrabold text-slate-900 tracking-tight mb-1">Agent Garden</h1>
+          <p className="ui-label text-slate-400 mb-2">Agent Registry</p>
+          <h1 className="section-head text-3xl text-slate-900 mb-1">Agent Gallery</h1>
           <p className="text-sm text-slate-500">
             {agents.length} agent{agents.length !== 1 ? "s" : ""} registered ·{" "}
             {agents.filter(a => a.on_status).length} online and ready
@@ -161,11 +164,10 @@ export default function AgentsPage() {
               <button
                 key={tab.id}
                 onClick={() => setStatusFilter(tab.id)}
-                className={`text-xs font-semibold px-3 py-1.5 rounded-lg border transition-all ${
-                  statusFilter === tab.id
-                    ? "bg-violet-50 border-violet-200 text-violet-700 shadow-sm"
-                    : "bg-white border-slate-200 text-slate-500 hover:text-slate-700 hover:bg-slate-50"
-                }`}
+                className={`text-xs font-semibold px-3 py-1.5 rounded-lg border transition-all ${statusFilter === tab.id
+                  ? "bg-violet-50 border-violet-200 text-violet-700 shadow-sm"
+                  : "bg-white border-slate-200 text-slate-500 hover:text-slate-700 hover:bg-slate-50"
+                  }`}
               >
                 {tab.label}
               </button>
@@ -186,9 +188,11 @@ export default function AgentsPage() {
           <p className="text-red-500 text-xs font-mono">{error}</p>
         </div>
       ) : agents.length === 0 ? (
-        <div className="flex flex-col items-center justify-center py-24 text-slate-400">
-          <Bot className="w-10 h-10 mb-3 opacity-30 animate-pulse" />
-          <p className="text-sm font-medium">No agents registered yet.</p>
+        <div className="flex flex-col items-center justify-center py-24">
+          <p className="font-mono text-lg text-slate-400">
+            amadeus@a2a:~$ <span className="cursor-blink text-slate-700">_</span>
+          </p>
+          <p className="text-xs font-mono text-slate-400 mt-3">No agents registered yet.</p>
           <button onClick={openCreateModal} className="mt-4 btn-primary text-xs py-2 px-4">
             <Plus className="w-3.5 h-3.5" /> Create First Agent
           </button>
@@ -200,7 +204,7 @@ export default function AgentsPage() {
         </div>
       ) : (
         <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-          {filteredAgents.map((agent) => {
+          {filteredAgents.map((agent, index) => {
             const assignedTools = (agent.tools || []).map((tid: string) =>
               toolsList.find(t => t.tool_id === tid)
             ).filter(Boolean);
@@ -209,10 +213,19 @@ export default function AgentsPage() {
             return (
               <div
                 key={agent.agent_id}
-                className="bg-white border border-slate-200 rounded-2xl p-6 card-hover group relative flex flex-col hover:border-violet-200 hover:shadow-xl hover:shadow-violet-500/5 transition-all duration-300"
+                style={{ animationDelay: `${index * 0.05}s` }}
+                className="stream-in bg-white border border-slate-200 rounded-2xl p-6 card-hover group relative flex flex-col hover:border-violet-200 hover:shadow-xl hover:shadow-violet-500/5 transition-all duration-300"
               >
+                {/* Status badge — top-right corner, hides on hover to reveal actions */}
+                <div className="absolute top-4 right-4 opacity-100 group-hover:opacity-0 transition-opacity z-10 pointer-events-none">
+                  <span className={`badge text-[9px] px-2 py-0.5 rounded-full ${agent.on_status ? "badge-green" : "badge-slate"}`}>
+                    <span className={`w-1.5 h-1.5 rounded-full mr-1 inline-block ${agent.on_status ? "bg-green-500 animate-pulse" : "bg-slate-400"}`} />
+                    {agent.on_status ? "Online" : "Offline"}
+                  </span>
+                </div>
+
                 {/* Actions (visible on hover) */}
-                <div className="absolute top-4 right-4 flex gap-1 opacity-0 group-hover:opacity-100 transition-opacity z-10">
+                <div className="absolute top-4 right-4 flex gap-1 opacity-0 group-hover:opacity-100 transition-opacity z-20">
                   <button onClick={() => openEditModal(agent)} className="p-1.5 bg-white border border-slate-200 text-slate-400 hover:text-slate-700 hover:border-slate-300 rounded-lg shadow-sm transition-all">
                     <Edit2 className="w-3.5 h-3.5" />
                   </button>
@@ -228,12 +241,8 @@ export default function AgentsPage() {
                     <Bot className="w-6 h-6" />
                   </div>
                   <div className="min-w-0">
-                    <h3 className="font-bold text-slate-900 text-base truncate leading-snug">{agent.agent_name}</h3>
+                    <h3 className="section-head text-slate-900 text-base truncate leading-snug">{agent.agent_name}</h3>
                     <div className="flex items-center gap-2 mt-1">
-                      <span className={`badge text-[9px] px-2 py-0.5 rounded-full ${agent.on_status ? "badge-green" : "badge-slate"}`}>
-                        <span className={`w-1.5 h-1.5 rounded-full mr-1 inline-block ${agent.on_status ? "bg-green-500 animate-pulse" : "bg-slate-400"}`} />
-                        {agent.on_status ? "Online" : "Offline"}
-                      </span>
                       <span className="text-[10px] font-mono text-slate-400">ID: {agent.agent_id?.substring(0, 8)}</span>
                     </div>
                   </div>
@@ -294,6 +303,14 @@ export default function AgentsPage() {
                   ) : (
                     <p className="text-xs text-slate-400 italic">No tools assigned to this agent.</p>
                   )}
+                  <div className="mt-4 pt-3 border-t border-slate-100 flex justify-end">
+                    <Link
+                      href={`/agent-invoke?agent=${encodeURIComponent(agent.agent_name || "")}`}
+                      className="text-xs font-semibold text-violet-600 hover:underline"
+                    >
+                      → Invoke
+                    </Link>
+                  </div>
                 </div>
               </div>
             );
@@ -323,10 +340,15 @@ export default function AgentsPage() {
                   </div>
                   <div>
                     <label className="form-label">Garden Status</label>
-                    <select value={formData.on_status ? "true" : "false"} onChange={e => setFormData({ ...formData, on_status: e.target.value === "true" })} className="form-input rounded-xl border-slate-200">
-                      <option value="true">Online</option>
-                      <option value="false">Offline</option>
-                    </select>
+                    <Select
+                      value={formData.on_status ? "true" : "false"}
+                      onChange={(v) => setFormData({ ...formData, on_status: v === "true" })}
+                      options={[
+                        { value: "true", label: "Online" },
+                        { value: "false", label: "Offline" },
+                      ]}
+                      triggerClassName="rounded-xl"
+                    />
                   </div>
                 </div>
                 <div>
@@ -338,19 +360,18 @@ export default function AgentsPage() {
                   <textarea value={formData.agent_style} onChange={e => setFormData({ ...formData, agent_style: e.target.value })} className="form-input rounded-xl border-slate-200 h-28 resize-none font-mono text-xs" />
                 </div>
                 <div>
-                  <label className="form-label">Assign MCP Tools <span className="normal-case font-normal text-slate-400">(Ctrl/Cmd + click for multiple)</span></label>
-                  <select
-                    multiple
-                    value={formData.tools}
-                    onChange={e => setFormData({ ...formData, tools: Array.from(e.target.selectedOptions, o => o.value) })}
-                    className="form-input rounded-xl border-slate-200 h-28"
-                  >
-                    {toolsList.map(tool => (
-                      <option key={tool.tool_id} value={tool.tool_id}>
-                        {tool.name} ({tool.on_status || "Online"})
-                      </option>
-                    ))}
-                  </select>
+                  <label className="form-label">Assign MCP Tools <span className="normal-case font-normal text-slate-400">(select one or more)</span></label>
+                  <MultiSelect
+                    values={formData.tools}
+                    onChange={(vals) => setFormData({ ...formData, tools: vals })}
+                    options={toolsList.map((tool) => ({
+                      value: tool.tool_id,
+                      label: tool.name,
+                      hint: tool.on_status || "Online",
+                    }))}
+                    placeholder="Select MCP tools…"
+                    triggerClassName="rounded-xl"
+                  />
                 </div>
               </form>
             </div>

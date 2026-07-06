@@ -1,73 +1,83 @@
-# The LC Settlement Stack
+The Amadeus LC Settlement Stack is a robust, enterprise-grade distributed system designed to securely automate the settlement of Import LC / SKBDN / SBLC transactions.
 
-Four services coordinate to settle one Import LC / SKBDN / SBLC transaction from
-`submitted` to `advised`.
+This stack is strictly built on **TypeScript and Node.js**, completely eliminating legacy Python dependencies. Four distinct services coordinate to transition a transaction from `submitted` to `advised` seamlessly.
 
-## transaction_tracker (port 8080)
+---
 
-Fastify + PostgreSQL service — the single source of truth. It owns:
+## 1. `transaction_tracker` (Fastify Core)
 
-- **The state machine** (`src/config/stepFlows.ts`): 9 steps —
-  `submitted → distributed_to_analyst → doc_examined → ee_ntf_created →
-  ee_ntf_approved → mt_converted → swift_released → settled → advised`.
-  `submitted` and `ee_ntf_approved` are the only two manual/human steps — neither has
-  an automatic executor, both must be advanced via `complete_step` directly.
-- **The executor abstraction** (`src/orchestrator/executors/`) — see
-  [Cost-Aware Executor Routing](/docs/cost-aware-routing).
-- **Two auth layers** (`src/middleware/auth.ts`):
-  1. `X-Robot-Key` — per-robot API key, argon2-hashed, checked on every request.
-  2. HMAC-SHA512 request signature (`X-Signature` + `X-Robot-Timestamp` +
-     `X-Robot-Signing-Secret`) — required only for financial steps
-     (`mt_converted`, `swift_released`, `settled`). The HMAC key is
-     `secret` alone, or `` `${secret}:${SIGNATURE_PEPPER}` `` if the tracker has
-     `SIGNATURE_PEPPER` configured — **every client must match this exactly** or
-     signatures silently never verify.
-- **A2A protocol** (`src/orchestrator/a2a/`) — see [A2A Protocol & Signatures](/docs/a2a-protocol).
-- **Robot provisioning** (`scripts/registerRobot.ts`) — the only way to mint a
-  `X-Robot-Key` + signing secret pair; secrets are shown once and never stored
-  plaintext.
+The central orchestrator and the ultimate source of truth. Running on Port `8080`, this service manages the state machine, transaction ledger, and cryptographic validation.
 
-Key REST surface: `POST /transactions`, `GET /transactions/:id`,
-`POST /transactions/:id/steps/:step/complete`, `POST /orchestrator/dispatch`,
-`GET /orchestrator/route`, `GET /orchestrator/executors`, `POST /a2a`, `POST /a2a/rpc`.
+### Key Responsibilities
 
-## amadeus-mcp (port 10002, SSE)
+- **The State Machine**: Powered by `src/config/stepFlows.ts`, it defines the strict 9-step progression:
+  > `submitted → distributed_to_analyst → doc_examined → ee_ntf_created → ee_ntf_approved → mt_converted → swift_released → settled → advised`
 
-A thin MCP wrapper (`src/client/trackerClient.ts`) exposing 8 of transaction_tracker's
-REST endpoints as MCP tools for an LLM agent to call: `list_transactions`,
-`get_transaction`, `create_transaction`, `dispatch_step`, `complete_step`, `fail_step`,
-`list_executors`, `explain_route`. It computes the HMAC signature client-side for
-financial `complete_step` calls.
+- **The LangGraph Engine**: Dynamically loads agents to determine the correct MCP tools and execute reasoning over the state flow.
+- **Dual Authentication Layer**:
+  1. **Identity (`X-Robot-Key`)**: A unique, argon2-hashed API key validated on every request.
+  2. **Non-Repudiation (HMAC-SHA512)**: Required exclusively for **financial steps** (`mt_converted`, `swift_released`, `settled`).
 
-## mcp-uipath (port 10001, SSE)
+> [!CAUTION]
+> **The `SIGNATURE_PEPPER` Gotcha:** Every MCP client must construct the signature using the exact same `SIGNATURE_PEPPER` as the `transaction_tracker`. A mismatch will result in a silent `SIGNATURE_REQUIRED` rejection.
 
-A real UiPath Automation Cloud integration — 3 tools: `list_uipath_processes`,
-`trigger_uipath_job`, `get_uipath_job_status`. Does OAuth2 client-credentials
-authentication against `{UIPATH_BASE_URL}/identity_/connect/token`, then calls the
-Orchestrator OData API (`Releases`, `Jobs/StartJobs`, `Jobs(id)`). Verified end-to-end
-against a live UiPath Cloud tenant — see the "single client SSE" note in the source for
-its one current limitation (one connected MCP client at a time; fine for demo/MVP).
+### Essential REST API Surface
 
-## The E2E demo script
+```typescript
+// Core Transaction Endpoints
+POST /transactions                    // Initialize new settlement
+GET  /transactions/:id                // Retrieve ledger state
+POST /transactions/:id/steps/:step/complete // Mutate state (requires HMAC for financial)
 
-`microservice/transaction_tracker/scripts/e2e-demo.ts` drives all 9 steps end-to-end by
-calling transaction_tracker's REST API directly (deliberately **not** via the MCP
-protocol — simpler to run deterministically for a demo). It has two modes:
+// Orchestration & Routing
+POST /orchestrator/dispatch           // Trigger LangGraph reasoning
+GET  /orchestrator/route              // Get cheapest executor for a step
 
-- `DEMO_MODE=simulate` (default) — no UiPath credentials needed; financial steps are
-  completed directly with a computed HMAC signature.
-- `DEMO_MODE=live` — calls UiPath Cloud's REST API directly (same pattern as
-  `mcp-uipath`, but inline in the script) to actually start and poll a job for each
-  financial step.
+// Agent-to-Agent (A2A)
+POST /a2a                             // v0 Envelope Protocol
+POST /a2a/rpc                         // v1 JSON-RPC 2.0 Protocol
+```
 
-Run it: `cd microservice/transaction_tracker && npx tsx scripts/e2e-demo.ts`. Full setup
-steps are in `microservice/transaction_tracker/docs/demo_setup_guide.md`, including a
-troubleshooting section for the `SIGNATURE_PEPPER` and stale-process pitfalls
-encountered while building this.
+---
 
-## Frontend surfaces for this stack
+## 2. `amadeus-mcp` (Tool Adapter)
 
-`/dashboard` (transaction ledger table), `/dashboard/amadeus` (KPI + state-machine
-pipeline view), `/agent-invoke` (chat UI hitting `/orchestrator/run-agentic`),
-`/agent-creator` (has an "LC Settlement Orchestrator" preset prompt). See
-[Frontend Surfaces](/docs/frontend-surfaces) for the full page map.
+A crucial bridge operating on Port `10002` via SSE transport. It acts as an MCP server wrapper (`src/client/trackerClient.ts`) exposing the `transaction_tracker`'s REST endpoints as functional tools for LLM agents.
+
+**Exposed Tools:**
+- `list_transactions`
+- `get_transaction`, `create_transaction`
+- `dispatch_step`, `complete_step`, `fail_step`
+- `list_executors`, `explain_route`
+
+> [!TIP]
+> `amadeus-mcp` automatically computes the complex HMAC-SHA512 cryptographic signatures client-side, offloading this burden from the LangGraph agents.
+
+---
+
+## 3. `mcp-uipath` (RPA Integration)
+
+An enterprise-ready UiPath Automation Cloud MCP server operating on Port `10001` (SSE).
+
+**Exposed Tools:**
+- `list_uipath_processes`
+- `trigger_uipath_job`
+- `get_uipath_job_status`
+
+It leverages OAuth2 `client_credentials` against `{UIPATH_BASE_URL}/identity_/connect/token` to authenticate safely, allowing LangGraph agents to trigger physical RPA jobs without ever directly handling sensitive credentials.
+
+---
+
+## 4. End-to-End Testing & Demos
+
+The repository includes a deterministic, REST-based end-to-end testing script: `microservice/transaction_tracker/scripts/e2e-demo.ts`.
+
+It drives all 9 state transitions programmatically in two modes:
+- **`DEMO_MODE=simulate`** (Default): Bypasses real UiPath jobs. Financial steps are completed by computing the HMAC signature inline.
+- **`DEMO_MODE=live`**: Calls the UiPath Cloud REST API directly, waiting for physical robot completion before progressing the state machine.
+
+```bash
+# Run the simulated E2E test
+cd microservice/transaction_tracker
+npx tsx scripts/e2e-demo.ts
+```

@@ -1,10 +1,9 @@
 import fs from 'fs';
 import path from 'path';
 import { notFound } from 'next/navigation';
-import ReactMarkdown from 'react-markdown';
-import remarkGfm from 'remark-gfm';
 import { BookOpen } from 'lucide-react';
 import { findDocTitle } from '@/content/docsNav';
+import MarkdownViewer from '@/components/MarkdownViewer';
 
 export async function generateStaticParams() {
   const docsDir = path.join(process.cwd(), 'src/content/docs');
@@ -46,16 +45,7 @@ export default async function DocViewer(props: { params: Promise<{ slug: string 
             </h1>
           </div>
 
-          <div className="prose prose-slate prose-lg max-w-none
-            prose-headings:font-bold prose-headings:tracking-tight prose-headings:text-slate-900
-            prose-a:text-blue-600 hover:prose-a:text-blue-800
-            prose-code:text-pink-600 prose-code:bg-slate-50 prose-code:px-1 prose-code:rounded
-            prose-pre:bg-slate-900 prose-pre:text-slate-50
-          ">
-            <ReactMarkdown remarkPlugins={[remarkGfm]}>
-              {content}
-            </ReactMarkdown>
-          </div>
+          <MarkdownViewer content={content} />
         </article>
       </div>
     </div>

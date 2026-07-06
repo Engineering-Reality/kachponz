@@ -22,36 +22,12 @@ export const DOCS_NAV: DocNavGroup[] = [
     ],
   },
   {
-    title: "Agent Platform (Legacy)",
-    items: [
-      { slug: "agent-platform-legacy", title: "Platform Overview" },
-      { slug: "mcp-servers-reference", title: "MCP Servers Reference" },
-    ],
-  },
-  {
     title: "Frontend",
     items: [{ slug: "frontend-surfaces", title: "Frontend Surfaces" }],
   },
   {
     title: "Reference",
     items: [{ slug: "known-gaps", title: "Known Gaps & Caveats" }],
-  },
-  {
-    title: "API Flow References",
-    items: [
-      { slug: "main-app-flow", title: "Main App Flow" },
-      { slug: "server-flow", title: "Website Tester Server Flow" },
-      { slug: "agents-flow", title: "Agents Flow" },
-      { slug: "agent-logs-flow", title: "Agent Logs Flow" },
-      { slug: "agent-creator-flow", title: "Agent Creator Flow" },
-      { slug: "agent-invoke-flow", title: "Agent Invoke Flow" },
-      { slug: "agent-invoke-stream-flow", title: "Agent Invoke Stream Flow" },
-      { slug: "companies-flow", title: "Companies Flow" },
-      { slug: "roles-flow", title: "Roles Flow" },
-      { slug: "tools-flow", title: "Tools Flow" },
-      { slug: "user-info-flow", title: "User Info Flow" },
-      { slug: "feature-sharing-flow", title: "Feature Sharing Flow" },
-    ],
   },
 ];
 

@@ -1,19 +1,18 @@
 "use client";
 
 import { useState, useEffect, Suspense } from 'react';
-import Link from 'next/link';
 import { useSearchParams } from 'next/navigation';
 import {
-  ArrowLeft,
   Bot,
   Send,
   Settings2,
   Trash2,
-  Activity,
-  Image as ImageIcon,
   Search,
-  X
+  X,
+  Cpu,
+  AlertTriangle,
 } from 'lucide-react';
+import { Select } from '@/components/Select';
 
 interface Message {
   role: 'system' | 'bot' | 'user' | 'error';
@@ -53,14 +52,14 @@ function AgentInvokeInner() {
     const parts = content.split(/(\*\*.*?\*\*|\*.*?\*|`.*?`)/g);
     return parts.map((part, index) => {
       if (part.startsWith('**') && part.endsWith('**')) {
-        return <strong key={index} className="font-bold text-slate-950">{part.slice(2, -2)}</strong>;
+        return <strong key={index} className="font-semibold text-slate-900">{part.slice(2, -2)}</strong>;
       }
       if (part.startsWith('*') && part.endsWith('*')) {
-        return <strong key={index} className="font-bold text-slate-950">{part.slice(1, -1)}</strong>;
+        return <strong key={index} className="font-semibold text-slate-900">{part.slice(1, -1)}</strong>;
       }
       if (part.startsWith('`') && part.endsWith('`')) {
         return (
-          <code key={index} className="font-mono bg-slate-100 text-rose-600 border border-slate-200 px-1.5 py-0.5 rounded text-xs font-semibold mx-0.5 shadow-sm">
+          <code key={index} className="font-mono bg-slate-100 text-rose-600 border border-slate-200 px-1.5 py-0.5 rounded text-xs font-semibold mx-0.5">
             {part.slice(1, -1)}
           </code>
         );
@@ -129,7 +128,7 @@ function AgentInvokeInner() {
     setModelInit(null);
     setAgentInit(null);
     setResponseTime(null);
-    
+
     try {
       const res = await fetch(`${apiUrl}/orchestrator/run-agentic`, {
         method: 'POST',
@@ -151,7 +150,7 @@ function AgentInvokeInner() {
           stream: true
         })
       });
-      
+
       if (!res.ok) {
         const data = await res.json().catch(() => ({}));
         throw new Error(data.message || data.error?.message || `Server error: ${res.status}`);
@@ -187,7 +186,7 @@ function AgentInvokeInner() {
 
             try {
               const data = JSON.parse(dataStr);
-              
+
               if (currentEvent === 'metrics') {
                 if (data.modelInit !== undefined) setModelInit(`${data.modelInit.toFixed(3)}s`);
                 if (data.agentInit !== undefined) setAgentInit(`${data.agentInit.toFixed(3)}s`);
@@ -234,9 +233,9 @@ function AgentInvokeInner() {
       }
       setStatus('UPLINK: STABLE');
     } catch (err: any) {
-      setMessages(prev => [...prev, { 
-        role: 'error', 
-        content: `Error: ${err.message}` 
+      setMessages(prev => [...prev, {
+        role: 'error',
+        content: `Error: ${err.message}`
       }]);
       setStatus('UPLINK: ERROR');
     }
@@ -248,31 +247,38 @@ function AgentInvokeInner() {
   };
 
   return (
-    <div className="flex h-full text-slate-900 overflow-hidden">
+    <div className="flex h-full text-slate-900 overflow-hidden bg-[#FAFAFA]">
 
       {/* Main Split */}
       <div className="flex flex-1 overflow-hidden">
-        
-        {/* Sidebar Panel */}
+
+        {/* Sidebar Panel — Mission Control */}
         <aside className="w-80 bg-white border-r border-slate-200 flex flex-col overflow-y-auto">
+          {/* Header */}
+          <div className="px-6 py-4 border-b border-slate-200 flex items-center gap-2">
+            <span className="terminal-dot bg-red-400" />
+            <span className="terminal-dot bg-amber-400" />
+            <span className="terminal-dot bg-emerald-400" />
+            <span className="ui-label text-slate-500 ml-2">Amadeus Console</span>
+          </div>
+
           <div className="p-6 space-y-8">
-            
+
             {/* Agent Select */}
             <div>
-              <label className="block text-xs font-bold text-slate-500 uppercase tracking-wider mb-2">Active Node</label>
-              <select 
-                value={selectedAgent}
-                onChange={(e) => setSelectedAgent(e.target.value)}
-                className="w-full bg-slate-50 border border-slate-200 text-slate-900 rounded-lg p-2.5 text-sm mb-2 focus:ring-2 focus:ring-blue-500/20 focus:border-blue-500 outline-none transition-all"
-              >
-                <option value="">Select an agent</option>
-                {agents.map(agent => (
-                  <option key={agent.agent_id} value={agent.agent_id}>
-                    {agent.agent_name}
-                  </option>
-                ))}
-              </select>
-              <button 
+              <label className="ui-label text-slate-500 block mb-2">Active Node</label>
+              <div className="relative rounded-lg p-[1.5px] mb-2 overflow-hidden">
+                <div className={`absolute inset-0 vibrant-rainbow-border ${selectedAgent ? 'animate-border-spin opacity-70' : 'opacity-25'}`} />
+                <Select
+                  value={selectedAgent}
+                  onChange={setSelectedAgent}
+                  placeholder="Select an agent"
+                  options={agents.map((agent) => ({ value: agent.agent_id, label: agent.agent_name }))}
+                  className="relative z-10"
+                  triggerClassName="rounded-[7px] border-transparent"
+                />
+              </div>
+              <button
                 onClick={() => {
                   if (selectedAgent) {
                     setIsInspectOpen(true);
@@ -280,81 +286,91 @@ function AgentInvokeInner() {
                     alert("Select an agent first!");
                   }
                 }}
-                className="w-full bg-slate-100 text-slate-700 py-2.5 rounded-lg text-sm font-medium hover:bg-slate-200 transition-colors flex items-center justify-center gap-2"
+                className="inline-flex items-center gap-1.5 text-xs text-slate-500 hover:text-slate-900 hover:underline transition-colors"
               >
-                <Search className="w-4 h-4" /> Inspect Node
+                <Search className="w-3.5 h-3.5" /> Inspect Node
               </button>
             </div>
 
             {/* Session Settings */}
             <div>
-              <label className="block text-xs font-bold text-slate-500 uppercase tracking-wider mb-2">Environment</label>
-              
-              <div className="flex rounded-lg border border-slate-200 overflow-hidden mb-3">
-                <span className="bg-slate-50 border-r border-slate-200 text-slate-500 text-xs font-bold px-3 flex items-center">HASH</span>
-                <input 
-                  type="text" 
-                  placeholder="Transaction UUID" 
-                  value={transactionId} 
-                  onChange={(e) => setTransactionId(e.target.value)} 
-                  className="w-full p-2.5 text-sm outline-none" 
+              <label className="ui-label text-slate-500 block mb-2">Session</label>
+
+              <div className="flex rounded-lg border border-slate-200 overflow-hidden mb-3 bg-slate-50">
+                <span className="ui-label text-slate-400 border-r border-slate-200 px-3 flex items-center">Ref ID</span>
+                <input
+                  type="text"
+                  placeholder="Transaction UUID"
+                  value={transactionId}
+                  onChange={(e) => setTransactionId(e.target.value)}
+                  className="w-full p-2.5 text-xs font-mono text-slate-700 bg-transparent outline-none placeholder:text-slate-400"
                 />
               </div>
 
-              <select className="w-full bg-slate-50 border border-slate-200 text-slate-900 rounded-lg p-2.5 text-sm mb-4 outline-none">
-                <option value="custom-vlm">Auto Protocol</option>
-              </select>
-
-              <label className="flex items-center gap-2 text-sm text-slate-700 mb-2 cursor-pointer">
-                <input type="checkbox" className="rounded border-slate-300 text-blue-600 focus:ring-blue-500" />
-                Flush Memory
+              <label className="flex items-center justify-between gap-2 text-sm text-slate-700 mb-3 cursor-pointer">
+                <span>Flush Memory</span>
+                <span className="toggle-switch">
+                  <input type="checkbox" />
+                  <span className="toggle-track" />
+                  <span className="toggle-thumb" />
+                </span>
               </label>
-              <label className="flex items-center gap-2 text-sm text-slate-700 cursor-pointer">
-                <input type="checkbox" defaultChecked className="rounded border-slate-300 text-blue-600 focus:ring-blue-500" />
-                Load Context (JSON)
+              <label className="flex items-center justify-between gap-2 text-sm text-slate-700 cursor-pointer">
+                <span>Load Context</span>
+                <span className="toggle-switch">
+                  <input type="checkbox" defaultChecked />
+                  <span className="toggle-track" />
+                  <span className="toggle-thumb" />
+                </span>
               </label>
             </div>
 
-            {/* Metrics */}
+            {/* Metrics — Telemetry */}
             <div>
-              <label className="block text-xs font-bold text-slate-500 uppercase tracking-wider mb-2 flex justify-between">
-                Metrics
-                <span className="bg-blue-100 text-blue-700 px-1.5 py-0.5 rounded text-[10px]">LIVE</span>
+              <label className="ui-label text-slate-500 mb-2 flex justify-between items-center">
+                Telemetry
+                <span className="inline-flex items-center gap-1 px-1.5 py-0.5 rounded text-[8px] text-white vibrant-rainbow-bg">LIVE</span>
               </label>
-              <div className="bg-slate-50 border border-slate-200 rounded-xl p-4 space-y-2">
-                <div className="flex justify-between text-sm">
-                  <span className="text-slate-500">Model Init:</span>
-                  <span className="font-mono font-medium text-slate-900">{modelInit ?? '-'}</span>
+              <div className="bg-slate-50 border border-slate-200 rounded-xl p-4 space-y-3">
+                <div className="flex justify-between text-sm items-center">
+                  <span className="text-slate-500 text-[13px]">Model Init</span>
+                  <span key={`m-${modelInit}`} className={`metric-value text-slate-900 text-[13px] ${modelInit ? 'stream-in' : ''}`}>{modelInit ?? '—'}</span>
                 </div>
-                <div className="flex justify-between text-sm">
-                  <span className="text-slate-500">Agent Init:</span>
-                  <span className="font-mono font-medium text-slate-900">{agentInit ?? '-'}</span>
+                <div className="flex justify-between text-sm items-center">
+                  <span className="text-slate-500 text-[13px]">Agent Init</span>
+                  <span key={`a-${agentInit}`} className={`metric-value text-slate-900 text-[13px] ${agentInit ? 'stream-in' : ''}`}>{agentInit ?? '—'}</span>
                 </div>
-                <div className="flex justify-between text-sm">
-                  <span className="text-slate-500">Response Time:</span>
-                  <span className="font-mono font-medium text-slate-900">{responseTime ?? '-'}</span>
+                <div className="flex justify-between text-sm items-center">
+                  <span className="text-slate-500 text-[13px]">Response Time</span>
+                  <span key={`r-${responseTime}`} className={`metric-value text-slate-900 text-[13px] ${responseTime ? 'stream-in' : ''}`}>{responseTime ?? '—'}</span>
                 </div>
               </div>
             </div>
 
           </div>
-          
+
           <div className="mt-auto p-4 border-t border-slate-200">
-            <button className="w-full bg-black text-white py-3 rounded-xl text-sm font-medium flex items-center justify-center gap-2 hover:bg-slate-800 transition-colors">
-              <Settings2 className="w-4 h-4" /> Apply Config
+            <button className="relative w-full rounded-xl p-[1.5px] overflow-hidden group">
+              <div className="absolute inset-0 vibrant-rainbow-border animate-border-spin opacity-80" />
+              <span className="relative z-10 flex items-center justify-center gap-2 bg-white text-slate-900 py-3 rounded-[10px] text-sm font-semibold">
+                <Settings2 className="w-4 h-4" /> Apply Config
+              </span>
             </button>
           </div>
         </aside>
 
-        {/* Chat Area */}
+        {/* Chat Area — Stream Console */}
         <main className="flex-1 flex flex-col relative bg-[#FAFAFA]">
-          
+
           {/* Chat Header */}
-          <div className="h-14 border-b border-slate-200 bg-white/80 backdrop-blur flex items-center justify-between px-6 absolute top-0 left-0 w-full z-10">
+          <div className="h-14 border-b border-slate-200 bg-white flex items-center justify-between px-6 absolute top-0 left-0 w-full z-10">
             <div className="flex items-center gap-2">
-              <div className="w-2 h-2 rounded-full bg-blue-500 animate-pulse"></div>
-              <span className="text-xs font-bold text-slate-600 tracking-wider uppercase">{status}</span>
+              <div className="w-2 h-2 rounded-full bg-emerald-500 animate-pulse"></div>
+              <span className="ui-label text-slate-500">{status}</span>
             </div>
+            {selectedAgentObj && (
+              <span className="ui-label text-slate-500 truncate max-w-[40%]">{selectedAgentObj.agent_name}</span>
+            )}
             <button onClick={clearChat} className="p-2 text-slate-400 hover:text-red-500 transition-colors rounded-lg hover:bg-red-50">
               <Trash2 className="w-4 h-4" />
             </button>
@@ -363,9 +379,17 @@ function AgentInvokeInner() {
           {/* Messages */}
           <div className="flex-1 overflow-y-auto pt-20 p-6 space-y-6">
             {messages.length === 0 ? (
-              <div className="h-full flex flex-col items-center justify-center text-slate-300">
-                <Bot className="w-16 h-16 mb-4 opacity-50" />
-                <p className="text-xl font-light tracking-widest uppercase">Awaiting Data</p>
+              <div className="h-full flex flex-col items-center justify-center text-center px-6">
+                <div className="w-12 h-12 rounded-2xl flex items-center justify-center overflow-hidden relative mb-4">
+                  <div className="absolute inset-0 vibrant-rainbow-border animate-border-spin opacity-90" />
+                  <div className="absolute inset-[2px] bg-white rounded-[14px] flex items-center justify-center">
+                    <Bot className="w-5 h-5 text-slate-700" />
+                  </div>
+                </div>
+                <p className="text-lg font-semibold text-slate-800">Start a conversation</p>
+                <p className="text-sm text-slate-500 mt-1 max-w-xs">
+                  Select an agent and send a prompt to begin streaming its reasoning.
+                </p>
               </div>
             ) : (
               messages.map((msg, idx) => {
@@ -374,36 +398,35 @@ function AgentInvokeInner() {
                     const match = msg.content.match(/⚙️ \[Agent Call\] Using tool ([^(]+)\((.*)\)/);
                     const toolName = match ? match[1] : 'Unknown Tool';
                     const toolArgs = match ? match[2] : '';
-                    
+
                     return (
-                      <div key={idx} className="flex gap-4 max-w-3xl mx-auto justify-start w-full">
-                        <div className="w-full relative overflow-hidden rounded-2xl p-[1.5px] bg-gradient-to-r from-zinc-800 via-zinc-700 to-zinc-800 shadow-md">
-                          <div className="absolute inset-0 vibrant-rainbow-border opacity-20" />
-                          <div className="relative bg-zinc-950 text-white rounded-[14px] p-5 z-10 flex flex-col gap-3 font-sans border border-white/5">
-                            <div className="flex items-center justify-between border-b border-white/10 pb-2">
+                      <div key={idx} className="flex gap-4 max-w-3xl mx-auto justify-start w-full stream-in">
+                        <div className="w-full relative overflow-hidden rounded-xl bg-white border border-slate-200 shadow-sm">
+                          <div className="relative z-10 p-5 flex flex-col gap-3">
+                            <div className="flex items-center justify-between border-b border-slate-100 pb-2">
                               <div className="flex items-center gap-2.5">
                                 <span className="w-2 h-2 rounded-full bg-amber-500 animate-pulse" />
-                                <span className="text-[10px] font-mono uppercase tracking-widest text-zinc-400">Agent Call Execution</span>
+                                <span className="ui-label text-slate-500">Agent Call Execution</span>
                               </div>
-                              <span className="text-[10px] font-mono text-zinc-500">
+                              <span className="text-[11px] text-slate-400">
                                 {new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}
                               </span>
                             </div>
-                            
+
                             <div className="flex items-center gap-3">
-                              <div className="w-8 h-8 rounded-lg bg-white/5 flex items-center justify-center border border-white/10 text-base">
-                                ⚙️
+                              <div className="w-8 h-8 rounded-lg bg-amber-50 flex items-center justify-center border border-amber-100 text-amber-600">
+                                <Cpu className="w-4 h-4" />
                               </div>
                               <div>
-                                <span className="text-[9px] font-mono uppercase tracking-wider text-zinc-500 block">Invoking MCP Tool</span>
-                                <span className="font-mono text-xs text-amber-300 font-semibold">{toolName}</span>
+                                <span className="ui-label text-slate-400 block">Invoking MCP Tool</span>
+                                <span className="font-mono text-xs text-amber-700 font-semibold">{toolName}</span>
                               </div>
                             </div>
-                            
+
                             {toolArgs && (
-                              <div className="bg-zinc-900/50 border border-white/5 rounded-xl p-3">
-                                <span className="text-[9px] font-mono uppercase tracking-wider text-zinc-500 block mb-1">Parameters</span>
-                                <pre className="font-mono text-[11px] text-emerald-400 overflow-x-auto whitespace-pre-wrap break-all max-h-32">
+                              <div className="bg-slate-50 border border-slate-200 rounded-xl p-3">
+                                <span className="ui-label text-slate-400 block mb-1">Parameters</span>
+                                <pre className="font-mono text-[11px] text-slate-700 overflow-x-auto whitespace-pre-wrap break-all max-h-32">
                                   {toolArgs}
                                 </pre>
                               </div>
@@ -416,9 +439,9 @@ function AgentInvokeInner() {
 
                   return (
                     <div key={idx} className="flex gap-4 max-w-3xl mx-auto justify-start w-full">
-                      <div className="bg-slate-100 border border-slate-200 text-slate-500 font-mono text-[11px] p-3 rounded-lg w-full flex justify-between items-center shadow-sm">
+                      <div className="bg-slate-100 border border-slate-200 text-slate-500 text-xs p-3 rounded-lg w-full flex justify-between items-center">
                         <span>{msg.content}</span>
-                        <span className="text-[9px] text-slate-400">
+                        <span className="text-[10px] text-slate-400">
                           {new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}
                         </span>
                       </div>
@@ -428,8 +451,9 @@ function AgentInvokeInner() {
 
                 if (msg.role === 'error') {
                   return (
-                    <div key={idx} className="flex gap-4 max-w-3xl mx-auto justify-start w-full">
-                      <div className="w-full bg-red-950/20 border border-red-500/30 text-red-200 p-4 rounded-xl font-mono text-xs shadow-sm">
+                    <div key={idx} className="flex gap-4 max-w-3xl mx-auto justify-start w-full stream-in">
+                      <div className="w-full bg-red-50 border border-red-200 text-red-700 p-4 rounded-xl text-sm flex items-start gap-2.5">
+                        <AlertTriangle className="w-4 h-4 flex-shrink-0 mt-0.5 text-red-500" />
                         <p>{msg.content}</p>
                       </div>
                     </div>
@@ -439,13 +463,13 @@ function AgentInvokeInner() {
                 if (msg.role === 'user') {
                   return (
                     <div key={idx} className="flex gap-4 max-w-3xl mx-auto justify-end">
-                      <div className="relative rounded-2xl p-[2px] overflow-hidden max-w-[80%] rounded-tr-sm shadow-md">
+                      <div className="relative rounded-2xl p-[2px] overflow-hidden max-w-[80%] rounded-tr-sm shadow-sm">
                         <div className="absolute inset-0 vibrant-rainbow-border animate-border-spin opacity-80" />
-                        <div className="relative bg-white rounded-[14px] p-4 text-slate-800 z-10 flex flex-col">
-                          <span className="text-sm leading-relaxed whitespace-pre-wrap block">
+                        <div className="relative bg-white rounded-[14px] p-4 z-10 flex flex-col">
+                          <span className="text-sm leading-relaxed whitespace-pre-wrap block text-slate-800">
                             {formatMessageContent(msg.content)}
                           </span>
-                          <div className="text-[9px] text-slate-400 mt-2 font-mono text-right">
+                          <div className="text-[10px] text-slate-400 mt-2 text-right">
                             {new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}
                           </div>
                         </div>
@@ -456,19 +480,20 @@ function AgentInvokeInner() {
 
                 if (msg.role === 'bot') {
                   return (
-                    <div key={idx} className="flex gap-4 max-w-3xl mx-auto justify-start">
-                      <div className="w-8 h-8 rounded-full flex items-center justify-center flex-shrink-0 relative overflow-hidden p-[1px] bg-gradient-to-tr from-violet-500 to-indigo-600 shadow-md">
-                        <Bot className="w-4 h-4 text-white z-10" />
+                    <div key={idx} className="flex gap-3 max-w-3xl mx-auto justify-start stream-in">
+                      <div className="w-8 h-8 rounded-full flex items-center justify-center flex-shrink-0 mt-0.5 relative overflow-hidden p-[1.5px]">
+                        <div className="absolute inset-0 vibrant-rainbow-border animate-border-spin opacity-90" />
+                        <div className="relative z-10 w-full h-full rounded-full bg-white flex items-center justify-center">
+                          <Bot className="w-4 h-4 text-slate-700" />
+                        </div>
                       </div>
-                      <div className="relative rounded-2xl p-[2px] overflow-hidden max-w-[80%] rounded-tl-sm shadow-sm">
-                        <div className="absolute inset-0 vibrant-rainbow-border opacity-70" />
-                        <div className="relative bg-white/75 backdrop-blur-md rounded-[14px] p-4 text-slate-800 z-10 flex flex-col">
-                          <span className="text-sm leading-relaxed whitespace-pre-wrap block">
-                            {formatMessageContent(msg.content)}
-                          </span>
-                          <div className="text-[9px] text-slate-400 mt-2 font-mono">
-                            {new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}
-                          </div>
+                      <div className="flex flex-col min-w-0">
+                        <span className="text-xs font-semibold text-slate-500 mb-1">Amadeus</span>
+                        <span className="text-sm leading-relaxed whitespace-pre-wrap block text-slate-700">
+                          {formatMessageContent(msg.content)}
+                        </span>
+                        <div className="text-[10px] text-slate-400 mt-2">
+                          {new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}
                         </div>
                       </div>
                     </div>
@@ -481,43 +506,46 @@ function AgentInvokeInner() {
           </div>
 
           {/* Input */}
-          <div className="p-6 bg-white border-t border-slate-200">
-            <div className="max-w-3xl mx-auto relative flex items-center bg-slate-50 border border-slate-200 rounded-2xl focus-within:ring-2 focus-within:ring-blue-500/20 focus-within:border-blue-500 transition-all p-2">
-              
-              <button className="p-2 text-slate-400 hover:text-blue-600 transition-colors">
-                <ImageIcon className="w-5 h-5" />
-              </button>
-              
-              <input 
-                type="text" 
+          <div className="p-6 bg-[#FAFAFA] border-t border-slate-200">
+            <div className="max-w-3xl mx-auto relative flex items-end bg-white border border-slate-200 rounded-2xl focus-within:border-slate-400 focus-within:ring-2 focus-within:ring-slate-900/5 transition-all p-2 shadow-sm">
+              <textarea
+                rows={1}
                 value={input}
                 onChange={(e) => setInput(e.target.value)}
-                onKeyDown={(e) => e.key === 'Enter' && handleSend()}
-                placeholder="Type a message..."
-                className="flex-1 bg-transparent py-2 px-2 text-sm focus:outline-none"
+                onKeyDown={(e) => {
+                  if (e.key === 'Enter' && !e.shiftKey) {
+                    e.preventDefault();
+                    handleSend();
+                  }
+                }}
+                placeholder="Message the agent…"
+                className="flex-1 bg-transparent py-2 px-2 text-sm text-slate-900 focus:outline-none resize-none placeholder:text-slate-400 max-h-40"
               />
-              
-              <button 
+
+              <button
                 onClick={handleSend}
                 disabled={!input.trim()}
-                className="p-3 bg-blue-600 text-white rounded-xl hover:bg-blue-700 transition-colors disabled:opacity-50 ml-2"
+                className="relative p-3 rounded-xl overflow-hidden disabled:opacity-40 ml-2 group"
               >
-                <Send className="w-4 h-4" />
+                <div className="absolute inset-0 vibrant-rainbow-bg" />
+                <Send className="relative z-10 w-4 h-4 text-white" />
               </button>
             </div>
             <div className="text-center mt-3">
-              <span className="text-[10px] font-mono text-slate-400 uppercase tracking-widest">
-                Amadeus Quantum Stream v2.5 // Secure Uplink
+              <span className="ui-label text-slate-400">
+                ⏎ send · shift+⏎ newline
               </span>
             </div>
           </div>
+
           {isInspectOpen && selectedAgentObj && (
-            <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/20 backdrop-blur-sm p-4">
+            <div className="fixed inset-0 z-50 flex items-center justify-center bg-slate-900/30 backdrop-blur-sm p-4">
               <div className="bg-white border border-slate-200 rounded-2xl w-full max-w-2xl shadow-2xl flex flex-col max-h-[80vh] overflow-hidden">
-                <div className="flex justify-between items-center px-6 py-4 border-b border-slate-100 bg-slate-50/50">
-                  <h2 className="font-extrabold text-slate-900 text-base flex items-center gap-2">
-                    <Bot className="w-5 h-5 text-indigo-600 animate-pulse" /> Inspect Agent Node: {selectedAgentObj.agent_name}
-                  </h2>
+                <div className="flex items-center gap-2 px-6 py-4 border-b border-slate-100">
+                  <span className="terminal-dot bg-red-400" />
+                  <span className="terminal-dot bg-amber-400" />
+                  <span className="terminal-dot bg-emerald-400" />
+                  <span className="text-sm font-semibold text-slate-900 ml-2 flex-1 truncate">Inspect Node: {selectedAgentObj.agent_name}</span>
                   <button onClick={() => setIsInspectOpen(false)} className="p-1.5 text-slate-400 hover:text-slate-700 hover:bg-slate-100 rounded-lg transition-colors">
                     <X className="w-4 h-4" />
                   </button>
@@ -525,15 +553,15 @@ function AgentInvokeInner() {
 
                 <div className="p-6 overflow-y-auto space-y-6">
                   <div>
-                    <h4 className="text-xs font-bold text-slate-400 uppercase tracking-wider mb-2">Agent Details</h4>
-                    <div className="grid grid-cols-2 gap-4 bg-slate-50 border border-slate-150 rounded-xl p-4 text-xs">
+                    <h4 className="ui-label text-slate-400 mb-2">Agent Details</h4>
+                    <div className="grid grid-cols-2 gap-4 bg-slate-50 border border-slate-200 rounded-xl p-4 text-xs">
                       <div>
-                        <span className="text-slate-400 block uppercase font-mono tracking-wider">Agent ID</span>
-                        <span className="font-mono text-slate-800 font-medium break-all">{selectedAgentObj.agent_id}</span>
+                        <span className="ui-label text-slate-400 block">Agent ID</span>
+                        <span className="font-mono text-slate-700 font-medium break-all">{selectedAgentObj.agent_id}</span>
                       </div>
                       <div>
-                        <span className="text-slate-400 block uppercase font-mono tracking-wider">Status</span>
-                        <span className="font-mono text-slate-800 font-medium">
+                        <span className="ui-label text-slate-400 block">Status</span>
+                        <span className="text-slate-700 font-medium">
                           {selectedAgentObj.on_status ? '🟢 Online / Active' : '⚪ Offline'}
                         </span>
                       </div>
@@ -541,22 +569,22 @@ function AgentInvokeInner() {
                   </div>
 
                   <div>
-                    <h4 className="text-xs font-bold text-slate-400 uppercase tracking-wider mb-2">System Personality Prompt</h4>
-                    <div className="bg-slate-50 border border-slate-150 rounded-xl p-3 font-mono text-xs text-slate-600 max-h-32 overflow-y-auto whitespace-pre-wrap">
+                    <h4 className="ui-label text-slate-400 mb-2">System Personality Prompt</h4>
+                    <div className="bg-slate-50 border border-slate-200 rounded-xl p-3 text-sm text-slate-600 max-h-32 overflow-y-auto whitespace-pre-wrap leading-relaxed">
                       {selectedAgentObj.agent_style || "No personality style configured."}
                     </div>
                   </div>
 
                   <div>
-                    <h4 className="text-xs font-bold text-slate-400 uppercase tracking-wider mb-2">Connected Model Context Protocols (MCP)</h4>
+                    <h4 className="ui-label text-slate-400 mb-2">Connected Model Context Protocols (MCP)</h4>
                     {connectedTools.length === 0 ? (
-                      <p className="text-xs text-slate-400 italic bg-slate-50 border border-dashed rounded-xl p-4">No tools connected.</p>
+                      <p className="text-xs text-slate-500 italic bg-slate-50 border border-dashed border-slate-200 rounded-xl p-4">No tools connected.</p>
                     ) : (
-                      <div className="space-y-4">
+                      <div className="divide-y divide-slate-100 border-y border-slate-100">
                         {connectedTools.map((tool: any) => (
-                          <div key={tool.tool_id} className="border border-slate-150 rounded-xl p-4 bg-slate-50/50 shadow-sm space-y-3">
+                          <div key={tool.tool_id} className="py-4 space-y-3">
                             <div className="flex justify-between items-center">
-                              <span className="font-bold text-sm text-slate-800 flex items-center gap-1.5">
+                              <span className="font-semibold text-sm text-slate-800 flex items-center gap-1.5">
                                 <span className="w-1.5 h-1.5 rounded-full bg-blue-500" />
                                 {tool.name}
                               </span>
@@ -568,8 +596,8 @@ function AgentInvokeInner() {
                               <p className="text-xs text-slate-500 leading-relaxed">{tool.description}</p>
                             )}
                             <div>
-                              <span className="text-[9px] font-mono text-slate-400 uppercase tracking-wider block mb-1">MCP Connection Schema</span>
-                              <pre className="bg-slate-900 text-slate-100 rounded-lg p-3.5 font-mono text-[11px] overflow-x-auto max-h-40 border border-white/5 shadow-inner">
+                              <span className="ui-label text-slate-400 block mb-1">MCP Connection Schema</span>
+                              <pre className="bg-slate-900 text-slate-100 rounded-lg p-3.5 font-mono text-[11px] overflow-x-auto max-h-40 border border-slate-800">
                                 {JSON.stringify(tool.versions, null, 2)}
                               </pre>
                             </div>
@@ -581,7 +609,7 @@ function AgentInvokeInner() {
                 </div>
 
                 <div className="px-6 py-4 border-t border-slate-100 flex justify-end bg-slate-50/50">
-                  <button onClick={() => setIsInspectOpen(false)} className="btn-primary text-xs rounded-xl bg-slate-900 text-white hover:bg-slate-800 transition-colors py-2.5 px-4 shadow-md">
+                  <button onClick={() => setIsInspectOpen(false)} className="btn-primary text-xs rounded-xl py-2.5 px-4">
                     Close Inspector
                   </button>
                 </div>

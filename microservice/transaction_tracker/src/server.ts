@@ -56,6 +56,10 @@ export async function buildServer() {
     contentSecurityPolicy: {
       directives: {
         defaultSrc: ["'none'"],
+        connectSrc: ["'self'"],
+        scriptSrc: ["'self'", "'unsafe-inline'"],
+        styleSrc: ["'self'", "'unsafe-inline'"],
+        imgSrc: ["'self'", "data:", "validator.swagger.io"],
         frameAncestors: ["'none'"],
       },
     },

@@ -1,7 +1,6 @@
 "use client";
 
 import Link from "next/link";
-import Image from "next/image";
 import { usePathname } from "next/navigation";
 import {
   LayoutDashboard,
@@ -13,14 +12,24 @@ import {
   ArrowUpRight,
 } from "lucide-react";
 
-const NAV_ITEMS = [
-  { href: "/dashboard", label: "Dashboard", icon: LayoutDashboard },
-  { href: "/agents", label: "Agents", icon: Bot },
-  { href: "/tools", label: "Tools", icon: Wrench },
-  { href: "/agent-creator", label: "Creator", icon: Wand2 },
-  { href: "/agent-invoke", label: "Invoke", icon: Zap },
-  { href: "/docs", label: "Docs", icon: BookOpen },
+const NAV_SECTIONS = [
+  {
+    label: "Platform",
+    items: [
+      { href: "/dashboard", label: "Dashboard", icon: LayoutDashboard },
+      { href: "/agents", label: "Agents", icon: Bot },
+      { href: "/tools", label: "Tools", icon: Wrench },
+      { href: "/agent-creator", label: "Creator", icon: Wand2 },
+      { href: "/agent-invoke", label: "Invoke", icon: Zap },
+    ],
+  },
+  {
+    label: "Resources",
+    items: [{ href: "/docs", label: "Documentation", icon: BookOpen }],
+  },
 ];
+
+const ALL_ITEMS = NAV_SECTIONS.flatMap((s) => s.items);
 
 export function AppShell({ children }: { children: React.ReactNode }) {
   const pathname = usePathname();
@@ -28,55 +37,67 @@ export function AppShell({ children }: { children: React.ReactNode }) {
 
   if (isHome) return <>{children}</>;
 
+  const current = ALL_ITEMS.find((n) => pathname === n.href || pathname.startsWith(n.href + "/"));
+
   return (
     <div className="flex h-screen bg-white overflow-hidden">
-      {/* Left Sidebar */}
-      <aside className="w-56 flex-shrink-0 bg-white border-r border-slate-100 flex flex-col">
+      {/* Left Rail — enterprise dark console */}
+      <aside className="w-60 flex-shrink-0 surface-dark flex flex-col border-r border-white/8">
         {/* Logo */}
-        <div className="h-14 flex items-center px-5 border-b border-slate-100">
-          <Link href="/" className="flex items-center gap-2 group">
+        <div className="h-14 flex items-center px-5 border-b border-white/8">
+          <Link href="/" className="flex items-center gap-2.5 group">
             <div className="w-7 h-7 rounded-lg flex items-center justify-center overflow-hidden relative">
-              <div className="absolute inset-0 vibrant-rainbow-border animate-border-spin opacity-80" />
-              <div className="absolute inset-[2px] bg-white rounded-md flex items-center justify-center">
-                <img src="/amadeus.svg" alt="A" className="w-4 h-4 object-contain" />
+              <div className="absolute inset-0 vibrant-rainbow-border animate-border-spin opacity-90" />
+              <div className="absolute inset-[2px] bg-[#0a0a0a] rounded-md flex items-center justify-center">
+                <img src="/amadeus.svg" alt="A" className="w-4 h-4 object-contain invert" />
               </div>
             </div>
-            <span className="font-bold text-sm text-slate-900 tracking-tight">Amadeus</span>
+            <span className="font-bold text-sm text-white tracking-tight">Amadeus</span>
+            <span className="ui-label text-[8px] text-white/40 border border-white/15 rounded px-1.5 py-0.5">A2A</span>
           </Link>
         </div>
 
         {/* Nav */}
-        <nav className="flex-1 px-3 py-4 space-y-0.5 overflow-y-auto">
-          <p className="px-2 text-[10px] font-semibold text-slate-400 uppercase tracking-widest mb-3 mt-1">
-            Platform
-          </p>
-          {NAV_ITEMS.map(({ href, label, icon: Icon }) => {
-            const isActive = pathname === href || pathname.startsWith(href + "/");
-            return (
-              <Link
-                key={href}
-                href={href}
-                className={`flex items-center gap-2.5 px-2.5 py-2 rounded-lg text-sm font-medium transition-all duration-150 ${
-                  isActive
-                    ? "bg-slate-100 text-slate-900"
-                    : "text-slate-500 hover:bg-slate-50 hover:text-slate-800"
-                }`}
-              >
-                <Icon className={`w-4 h-4 flex-shrink-0 ${isActive ? "text-slate-900" : "text-slate-400"}`} />
-                {label}
-              </Link>
-            );
-          })}
+        <nav className="flex-1 px-3 py-5 space-y-6 overflow-y-auto">
+          {NAV_SECTIONS.map((section) => (
+            <div key={section.label}>
+              <p className="ui-label text-white/30 px-2.5 mb-2">{section.label}</p>
+              <div className="space-y-0.5">
+                {section.items.map(({ href, label, icon: Icon }) => {
+                  const isActive = pathname === href || pathname.startsWith(href + "/");
+                  return (
+                    <Link
+                      key={href}
+                      href={href}
+                      className={`relative flex items-center gap-2.5 px-2.5 py-2 rounded-lg text-sm font-medium transition-all duration-150 ${
+                        isActive
+                          ? "bg-white/8 text-white"
+                          : "text-white/50 hover:bg-white/5 hover:text-white/90"
+                      }`}
+                    >
+                      {isActive && (
+                        <span className="absolute left-0 top-1/2 -translate-y-1/2 h-5 w-[3px] rounded-full vibrant-rainbow-bg" />
+                      )}
+                      <Icon className={`w-4 h-4 flex-shrink-0 ${isActive ? "text-white" : "text-white/40"}`} />
+                      {label}
+                    </Link>
+                  );
+                })}
+              </div>
+            </div>
+          ))}
         </nav>
 
-        {/* Bottom: Version / Env */}
-        <div className="p-4 border-t border-slate-100">
-          <div className="bg-slate-50 rounded-lg p-3 border border-slate-100">
-            <div className="flex items-center justify-between mb-1">
-              <span className="text-[10px] font-mono font-bold text-slate-500 uppercase tracking-wider">amadeus.a2a/1</span>
-              <span className="badge badge-green">Live</span>
+        {/* Bottom: Env card */}
+        <div className="p-4 border-t border-white/8">
+          <div className="surface-dark-elevated p-3">
+            <div className="flex items-center justify-between mb-1.5">
+              <span className="ui-label text-white/50">amadeus.a2a/1</span>
+              <span className="inline-flex items-center gap-1 ui-label text-[8px] text-emerald-300">
+                <span className="w-1.5 h-1.5 rounded-full bg-emerald-400 animate-pulse" /> Live
+              </span>
             </div>
-            <p className="text-[10px] text-slate-400 leading-relaxed">Air-gapped on-prem. OJK / BI compliant.</p>
+            <p className="text-[11px] text-white/40 leading-relaxed">Air-gapped on-prem · OJK / BI compliant</p>
           </div>
         </div>
       </aside>
@@ -84,14 +105,20 @@ export function AppShell({ children }: { children: React.ReactNode }) {
       {/* Main Area */}
       <main className="flex-1 flex flex-col overflow-hidden bg-[#FAFAFA]">
         {/* Top Bar */}
-        <header className="h-14 bg-white border-b border-slate-100 flex items-center justify-between px-6 flex-shrink-0">
-          <div>
-            <h1 className="text-sm font-bold text-slate-900 capitalize">
-              {NAV_ITEMS.find(n => pathname.startsWith(n.href))?.label || "Amadeus"}
-            </h1>
-            <p className="text-[11px] text-slate-400 font-mono">{pathname}</p>
-          </div>
+        <header className="h-14 bg-white border-b border-slate-200/80 flex items-center justify-between px-6 flex-shrink-0">
           <div className="flex items-center gap-3">
+            <div>
+              <h1 className="text-sm font-semibold text-slate-900 leading-tight">
+                {current?.label || "Amadeus"}
+              </h1>
+              <p className="text-[11px] text-slate-400 font-mono leading-tight">{pathname}</p>
+            </div>
+          </div>
+          <div className="flex items-center gap-4">
+            <span className="hidden md:inline-flex items-center gap-1.5 text-[11px] text-slate-500">
+              <span className="w-1.5 h-1.5 rounded-full bg-emerald-500" />
+              All systems operational
+            </span>
             <a
               href="http://localhost:8080/docs"
               target="_blank"
