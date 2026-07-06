@@ -13,6 +13,8 @@ const server = new McpServer({
 // Register all 8 Amadeus tools
 registerTools(server);
 
+// TODO: Support multi-client SSE — use Map<sessionId, SSEServerTransport>
+// Current: single client only (sufficient for MVP testing)
 let transport: SSEServerTransport;
 
 app.get("/sse", async (_req, res) => {

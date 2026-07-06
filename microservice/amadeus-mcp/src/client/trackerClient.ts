@@ -8,7 +8,15 @@
  * All requests include X-Robot-Key header.
  * Financial step requests (completeStep with signature) also include
  * X-Robot-Timestamp, X-Robot-Signing-Secret, X-Signature.
+ *
+ * X-Signature is HMAC-SHA512 over `METHOD\nPATH\nTIMESTAMP\nsha256(body)`,
+ * matching transaction_tracker's verifyFinancialSignature (see
+ * transaction_tracker/src/middleware/auth.ts + lib/crypto.ts). The signing
+ * secret is still sent via X-Robot-Signing-Secret because the server verifies
+ * it against the stored argon2 hash and uses it as the HMAC key — this is the
+ * server's current 2FA design, not an oversight.
  */
+import { createHmac, createHash } from "node:crypto";
 
 export interface ListTransactionsParams {
   status?: "in_progress" | "completed" | "failed";
@@ -49,10 +57,11 @@ export interface ExplainRouteParams {
   type: string;
 }
 
-function getConfig(): { apiBase: string; robotKey: string } {
+function getConfig(): { apiBase: string; robotKey: string; signaturePepper: string } {
   const apiBase = process.env["AMADEUS_API_BASE"] ?? "http://127.0.0.1:8080";
   const robotKey = process.env["AMADEUS_ROBOT_KEY"] ?? "";
-  return { apiBase, robotKey };
+  const signaturePepper = process.env["AMADEUS_SIGNATURE_PEPPER"] ?? "";
+  return { apiBase, robotKey, signaturePepper };
 }
 
 async function apiRequest(
@@ -116,22 +125,29 @@ export async function createTransaction(
 
 export async function completeStep(params: CompleteStepParams): Promise<unknown> {
   const extraHeaders: Record<string, string> = {};
+  const path = `/transactions/${encodeURIComponent(params.transactionId)}/steps/${encodeURIComponent(params.step)}/complete`;
+  const body = {
+    idempotencyKey: params.idempotencyKey,
+    payload: params.payload ?? {},
+  };
+
   if (params.signature) {
-    extraHeaders["X-Robot-Timestamp"] = params.signature.timestamp;
+    const { signaturePepper } = getConfig();
+    const method = "POST";
+    const timestamp = params.signature.timestamp;
+    const bodySha = createHash("sha256").update(JSON.stringify(body)).digest("hex");
+    const signaturePayload = `${method}\n${path}\n${timestamp}\n${bodySha}`;
+    const hmacKey = signaturePepper
+      ? `${params.signature.secret}:${signaturePepper}`
+      : params.signature.secret;
+    const hmac = createHmac("sha512", hmacKey).update(signaturePayload).digest("hex");
+
+    extraHeaders["X-Robot-Timestamp"] = timestamp;
     extraHeaders["X-Robot-Signing-Secret"] = params.signature.secret;
-    // Signature header value is computed server-side from HMAC — pass timestamp for 2FA gate
-    extraHeaders["X-Signature"] = params.signature.secret;
+    extraHeaders["X-Signature"] = hmac;
   }
 
-  return apiRequest(
-    "POST",
-    `/transactions/${encodeURIComponent(params.transactionId)}/steps/${encodeURIComponent(params.step)}/complete`,
-    {
-      idempotencyKey: params.idempotencyKey,
-      payload: params.payload ?? {},
-    },
-    extraHeaders
-  );
+  return apiRequest("POST", path, body, extraHeaders);
 }
 
 export async function failStep(params: FailStepParams): Promise<unknown> {
