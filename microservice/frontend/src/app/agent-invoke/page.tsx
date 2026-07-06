@@ -50,10 +50,20 @@ function AgentInvokeInner() {
 
   const formatMessageContent = (content: string) => {
     if (!content) return null;
-    const parts = content.split(/(\*\*.*?\*\*)/g);
+    const parts = content.split(/(\*\*.*?\*\*|\*.*?\*|`.*?`)/g);
     return parts.map((part, index) => {
       if (part.startsWith('**') && part.endsWith('**')) {
         return <strong key={index} className="font-bold text-slate-950">{part.slice(2, -2)}</strong>;
+      }
+      if (part.startsWith('*') && part.endsWith('*')) {
+        return <strong key={index} className="font-bold text-slate-950">{part.slice(1, -1)}</strong>;
+      }
+      if (part.startsWith('`') && part.endsWith('`')) {
+        return (
+          <code key={index} className="font-mono bg-slate-100 text-rose-600 border border-slate-200 px-1.5 py-0.5 rounded text-xs font-semibold mx-0.5 shadow-sm">
+            {part.slice(1, -1)}
+          </code>
+        );
       }
       return part;
     });
