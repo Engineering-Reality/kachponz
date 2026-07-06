@@ -11,7 +11,8 @@ import {
   Trash2,
   Activity,
   Image as ImageIcon,
-  Search
+  Search,
+  X
 } from 'lucide-react';
 
 interface Message {
@@ -35,10 +36,28 @@ function AgentInvokeInner() {
   const [status, setStatus] = useState('UPLINK: STABLE');
   const [transactionId, setTransactionId] = useState('');
   const [agents, setAgents] = useState<any[]>([]);
+  const [toolsList, setToolsList] = useState<any[]>([]);
   const [selectedAgent, setSelectedAgent] = useState<string>('');
+  const [isInspectOpen, setIsInspectOpen] = useState(false);
   const [modelInit, setModelInit] = useState<string | null>(null);
   const [agentInit, setAgentInit] = useState<string | null>(null);
   const [responseTime, setResponseTime] = useState<string | null>(null);
+
+  const selectedAgentObj = agents.find(a => a.agent_id === selectedAgent);
+  const connectedTools = selectedAgentObj
+    ? (selectedAgentObj.tools || []).map((tid: string) => toolsList.find(t => t.tool_id === tid)).filter(Boolean)
+    : [];
+
+  const formatMessageContent = (content: string) => {
+    if (!content) return null;
+    const parts = content.split(/(\*\*.*?\*\*)/g);
+    return parts.map((part, index) => {
+      if (part.startsWith('**') && part.endsWith('**')) {
+        return <strong key={index} className="font-bold text-slate-950">{part.slice(2, -2)}</strong>;
+      }
+      return part;
+    });
+  };
 
   const apiUrl = process.env.NEXT_PUBLIC_API_URL ?? "http://localhost:8080";
   const robotKey = process.env.NEXT_PUBLIC_ROBOT_KEY ?? "amadeus_local_dev";
@@ -58,18 +77,25 @@ function AgentInvokeInner() {
   }, [transactionId]);
 
   useEffect(() => {
-    const fetchAgents = async () => {
+    const fetchAgentsAndTools = async () => {
       try {
-        const res = await fetch(`${apiUrl}/agents`, { headers: { "x-robot-key": robotKey } });
-        if (res.ok) {
-          const data = await res.json();
+        const [agentsRes, toolsRes] = await Promise.all([
+          fetch(`${apiUrl}/agents`, { headers: { "x-robot-key": robotKey } }),
+          fetch(`${apiUrl}/tools`, { headers: { "x-robot-key": robotKey } }),
+        ]);
+        if (agentsRes.ok) {
+          const data = await agentsRes.json();
           setAgents(data || []);
         }
+        if (toolsRes.ok) {
+          const data = await toolsRes.json();
+          setToolsList(data || []);
+        }
       } catch (err) {
-        console.error("Failed to load agents", err);
+        console.error("Failed to load agents or tools", err);
       }
     };
-    fetchAgents();
+    fetchAgentsAndTools();
   }, [apiUrl, robotKey]);
 
   // Pre-select agent from ?agent= query param (e.g. /agent-invoke?agent=orchestrator)
@@ -236,7 +262,16 @@ function AgentInvokeInner() {
                   </option>
                 ))}
               </select>
-              <button className="w-full bg-slate-100 text-slate-700 py-2.5 rounded-lg text-sm font-medium hover:bg-slate-200 transition-colors flex items-center justify-center gap-2">
+              <button 
+                onClick={() => {
+                  if (selectedAgent) {
+                    setIsInspectOpen(true);
+                  } else {
+                    alert("Select an agent first!");
+                  }
+                }}
+                className="w-full bg-slate-100 text-slate-700 py-2.5 rounded-lg text-sm font-medium hover:bg-slate-200 transition-colors flex items-center justify-center gap-2"
+              >
                 <Search className="w-4 h-4" /> Inspect Node
               </button>
             </div>
@@ -323,29 +358,115 @@ function AgentInvokeInner() {
                 <p className="text-xl font-light tracking-widest uppercase">Awaiting Data</p>
               </div>
             ) : (
-              messages.map((msg, idx) => (
-                <div key={idx} className={`flex gap-4 max-w-3xl mx-auto ${msg.role === 'user' ? 'justify-end' : 'justify-start'}`}>
-                  {msg.role === 'bot' && (
-                    <div className="w-8 h-8 bg-blue-100 rounded-full flex items-center justify-center flex-shrink-0">
-                      <Bot className="w-4 h-4 text-blue-600" />
+              messages.map((msg, idx) => {
+                if (msg.role === 'system') {
+                  if (msg.content.startsWith('⚙️ [Agent Call]')) {
+                    const match = msg.content.match(/⚙️ \[Agent Call\] Using tool ([^(]+)\((.*)\)/);
+                    const toolName = match ? match[1] : 'Unknown Tool';
+                    const toolArgs = match ? match[2] : '';
+                    
+                    return (
+                      <div key={idx} className="flex gap-4 max-w-3xl mx-auto justify-start w-full">
+                        <div className="w-full relative overflow-hidden rounded-2xl p-[1.5px] bg-gradient-to-r from-zinc-800 via-zinc-700 to-zinc-800 shadow-md">
+                          <div className="absolute inset-0 vibrant-rainbow-border opacity-20" />
+                          <div className="relative bg-zinc-950 text-white rounded-[14px] p-5 z-10 flex flex-col gap-3 font-sans border border-white/5">
+                            <div className="flex items-center justify-between border-b border-white/10 pb-2">
+                              <div className="flex items-center gap-2.5">
+                                <span className="w-2 h-2 rounded-full bg-amber-500 animate-pulse" />
+                                <span className="text-[10px] font-mono uppercase tracking-widest text-zinc-400">Agent Call Execution</span>
+                              </div>
+                              <span className="text-[10px] font-mono text-zinc-500">
+                                {new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}
+                              </span>
+                            </div>
+                            
+                            <div className="flex items-center gap-3">
+                              <div className="w-8 h-8 rounded-lg bg-white/5 flex items-center justify-center border border-white/10 text-base">
+                                ⚙️
+                              </div>
+                              <div>
+                                <span className="text-[9px] font-mono uppercase tracking-wider text-zinc-500 block">Invoking MCP Tool</span>
+                                <span className="font-mono text-xs text-amber-300 font-semibold">{toolName}</span>
+                              </div>
+                            </div>
+                            
+                            {toolArgs && (
+                              <div className="bg-zinc-900/50 border border-white/5 rounded-xl p-3">
+                                <span className="text-[9px] font-mono uppercase tracking-wider text-zinc-500 block mb-1">Parameters</span>
+                                <pre className="font-mono text-[11px] text-emerald-400 overflow-x-auto whitespace-pre-wrap break-all max-h-32">
+                                  {toolArgs}
+                                </pre>
+                              </div>
+                            )}
+                          </div>
+                        </div>
+                      </div>
+                    );
+                  }
+
+                  return (
+                    <div key={idx} className="flex gap-4 max-w-3xl mx-auto justify-start w-full">
+                      <div className="bg-slate-100 border border-slate-200 text-slate-500 font-mono text-[11px] p-3 rounded-lg w-full flex justify-between items-center shadow-sm">
+                        <span>{msg.content}</span>
+                        <span className="text-[9px] text-slate-400">
+                          {new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}
+                        </span>
+                      </div>
                     </div>
-                  )}
-                  <div className={`p-4 rounded-2xl ${msg.role === 'system' ? 'w-full' : 'max-w-[80%]'} ${
-                    msg.role === 'user' 
-                      ? 'bg-blue-600 text-white shadow-md rounded-tr-sm' 
-                      : msg.role === 'system'
-                        ? 'bg-slate-50 border border-slate-200 text-slate-500 font-mono text-xs w-full rounded-lg'
-                        : msg.role === 'error'
-                          ? 'bg-red-50 border border-red-200 text-red-800 w-full rounded-md'
-                          : 'bg-white border border-slate-200 text-slate-800 rounded-tl-sm shadow-sm'
-                  }`}>
-                    <p className="text-sm leading-relaxed whitespace-pre-wrap">{msg.content}</p>
-                    <div className="text-[10px] opacity-50 mt-2 font-mono">
-                      {new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}
+                  );
+                }
+
+                if (msg.role === 'error') {
+                  return (
+                    <div key={idx} className="flex gap-4 max-w-3xl mx-auto justify-start w-full">
+                      <div className="w-full bg-red-950/20 border border-red-500/30 text-red-200 p-4 rounded-xl font-mono text-xs shadow-sm">
+                        <p>{msg.content}</p>
+                      </div>
                     </div>
-                  </div>
-                </div>
-              ))
+                  );
+                }
+
+                if (msg.role === 'user') {
+                  return (
+                    <div key={idx} className="flex gap-4 max-w-3xl mx-auto justify-end">
+                      <div className="relative rounded-2xl p-[2px] overflow-hidden max-w-[80%] rounded-tr-sm shadow-md">
+                        <div className="absolute inset-0 vibrant-rainbow-border animate-border-spin opacity-80" />
+                        <div className="relative bg-white rounded-[14px] p-4 text-slate-800 z-10 flex flex-col">
+                          <span className="text-sm leading-relaxed whitespace-pre-wrap block">
+                            {formatMessageContent(msg.content)}
+                          </span>
+                          <div className="text-[9px] text-slate-400 mt-2 font-mono text-right">
+                            {new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}
+                          </div>
+                        </div>
+                      </div>
+                    </div>
+                  );
+                }
+
+                if (msg.role === 'bot') {
+                  return (
+                    <div key={idx} className="flex gap-4 max-w-3xl mx-auto justify-start">
+                      <div className="w-8 h-8 rounded-full flex items-center justify-center flex-shrink-0 relative overflow-hidden p-[1px] bg-gradient-to-tr from-violet-500 to-indigo-600 shadow-md">
+                        <Bot className="w-4 h-4 text-white z-10" />
+                      </div>
+                      <div className="relative rounded-2xl p-[2px] overflow-hidden max-w-[80%] rounded-tl-sm shadow-sm">
+                        <div className="absolute inset-0 vibrant-rainbow-border opacity-70" />
+                        <div className="relative bg-white/75 backdrop-blur-md rounded-[14px] p-4 text-slate-800 z-10 flex flex-col">
+                          <span className="text-sm leading-relaxed whitespace-pre-wrap block">
+                            {formatMessageContent(msg.content)}
+                          </span>
+                          <div className="text-[9px] text-slate-400 mt-2 font-mono">
+                            {new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}
+                          </div>
+                        </div>
+                      </div>
+                    </div>
+                  );
+                }
+
+                return null;
+              })
             )}
           </div>
 
@@ -380,6 +501,83 @@ function AgentInvokeInner() {
               </span>
             </div>
           </div>
+          {isInspectOpen && selectedAgentObj && (
+            <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/20 backdrop-blur-sm p-4">
+              <div className="bg-white border border-slate-200 rounded-2xl w-full max-w-2xl shadow-2xl flex flex-col max-h-[80vh] overflow-hidden">
+                <div className="flex justify-between items-center px-6 py-4 border-b border-slate-100 bg-slate-50/50">
+                  <h2 className="font-extrabold text-slate-900 text-base flex items-center gap-2">
+                    <Bot className="w-5 h-5 text-indigo-600 animate-pulse" /> Inspect Agent Node: {selectedAgentObj.agent_name}
+                  </h2>
+                  <button onClick={() => setIsInspectOpen(false)} className="p-1.5 text-slate-400 hover:text-slate-700 hover:bg-slate-100 rounded-lg transition-colors">
+                    <X className="w-4 h-4" />
+                  </button>
+                </div>
+
+                <div className="p-6 overflow-y-auto space-y-6">
+                  <div>
+                    <h4 className="text-xs font-bold text-slate-400 uppercase tracking-wider mb-2">Agent Details</h4>
+                    <div className="grid grid-cols-2 gap-4 bg-slate-50 border border-slate-150 rounded-xl p-4 text-xs">
+                      <div>
+                        <span className="text-slate-400 block uppercase font-mono tracking-wider">Agent ID</span>
+                        <span className="font-mono text-slate-800 font-medium break-all">{selectedAgentObj.agent_id}</span>
+                      </div>
+                      <div>
+                        <span className="text-slate-400 block uppercase font-mono tracking-wider">Status</span>
+                        <span className="font-mono text-slate-800 font-medium">
+                          {selectedAgentObj.on_status ? '🟢 Online / Active' : '⚪ Offline'}
+                        </span>
+                      </div>
+                    </div>
+                  </div>
+
+                  <div>
+                    <h4 className="text-xs font-bold text-slate-400 uppercase tracking-wider mb-2">System Personality Prompt</h4>
+                    <div className="bg-slate-50 border border-slate-150 rounded-xl p-3 font-mono text-xs text-slate-600 max-h-32 overflow-y-auto whitespace-pre-wrap">
+                      {selectedAgentObj.agent_style || "No personality style configured."}
+                    </div>
+                  </div>
+
+                  <div>
+                    <h4 className="text-xs font-bold text-slate-400 uppercase tracking-wider mb-2">Connected Model Context Protocols (MCP)</h4>
+                    {connectedTools.length === 0 ? (
+                      <p className="text-xs text-slate-400 italic bg-slate-50 border border-dashed rounded-xl p-4">No tools connected.</p>
+                    ) : (
+                      <div className="space-y-4">
+                        {connectedTools.map((tool: any) => (
+                          <div key={tool.tool_id} className="border border-slate-150 rounded-xl p-4 bg-slate-50/50 shadow-sm space-y-3">
+                            <div className="flex justify-between items-center">
+                              <span className="font-bold text-sm text-slate-800 flex items-center gap-1.5">
+                                <span className="w-1.5 h-1.5 rounded-full bg-blue-500" />
+                                {tool.name}
+                              </span>
+                              <span className={`badge text-[9px] px-2 py-0.5 rounded-full ${tool.on_status === 'Online' ? 'badge-green' : 'badge-slate'}`}>
+                                {tool.on_status || 'Offline'}
+                              </span>
+                            </div>
+                            {tool.description && (
+                              <p className="text-xs text-slate-500 leading-relaxed">{tool.description}</p>
+                            )}
+                            <div>
+                              <span className="text-[9px] font-mono text-slate-400 uppercase tracking-wider block mb-1">MCP Connection Schema</span>
+                              <pre className="bg-slate-900 text-slate-100 rounded-lg p-3.5 font-mono text-[11px] overflow-x-auto max-h-40 border border-white/5 shadow-inner">
+                                {JSON.stringify(tool.versions, null, 2)}
+                              </pre>
+                            </div>
+                          </div>
+                        ))}
+                      </div>
+                    )}
+                  </div>
+                </div>
+
+                <div className="px-6 py-4 border-t border-slate-100 flex justify-end bg-slate-50/50">
+                  <button onClick={() => setIsInspectOpen(false)} className="btn-primary text-xs rounded-xl bg-slate-900 text-white hover:bg-slate-800 transition-colors py-2.5 px-4 shadow-md">
+                    Close Inspector
+                  </button>
+                </div>
+              </div>
+            </div>
+          )}
 
         </main>
       </div>
