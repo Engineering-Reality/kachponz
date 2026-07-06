@@ -1,9 +1,29 @@
 import { McpServer } from "@modelcontextprotocol/sdk/server/mcp.js";
 import { SSEServerTransport } from "@modelcontextprotocol/sdk/server/sse.js";
+import { StdioServerTransport } from "@modelcontextprotocol/sdk/server/stdio.js";
 import express from "express";
 import { z } from "zod";
 
 const app = express();
+
+const rawArg = process.argv[2];
+if (rawArg && rawArg.trim().startsWith('{')) {
+  try {
+    const config = JSON.parse(rawArg);
+    // If the config matches the multi-account format provided earlier
+    const account = config.accounts?.[0] || config;
+    if (account.clientId) process.env.UIPATH_CLIENT_ID = account.clientId;
+    if (account.clientSecret) process.env.UIPATH_CLIENT_SECRET = account.clientSecret;
+    if (account.baseUrl) process.env.UIPATH_BASE_URL = account.baseUrl;
+    if (account.org) process.env.UIPATH_ORG = account.org;
+    if (account.tenant) process.env.UIPATH_TENANT = account.tenant;
+    if (account.folderId) process.env.UIPATH_FOLDER_ID = account.folderId;
+    if (account.scopes) process.env.UIPATH_SCOPES = account.scopes;
+    console.log("Loaded UiPath credentials dynamically from JSON argument.");
+  } catch (e) {
+    console.error("Failed to parse JSON argument:", e);
+  }
+}
 
 const server = new McpServer({
   name: "UiPath MCP Server",
@@ -214,25 +234,33 @@ server.tool(
   }
 );
 
-// TODO: Support multi-client SSE — use Map<sessionId, SSEServerTransport>
-// Current: single client only (sufficient for MVP testing)
-let transport: SSEServerTransport;
+const isStdio = process.argv.includes("--stdio");
 
-app.get("/sse", async (_req, res) => {
-  transport = new SSEServerTransport("/messages", res);
-  await server.connect(transport);
-});
+if (isStdio) {
+  const runStdio = async () => {
+    const transport = new StdioServerTransport();
+    await server.connect(transport);
+    process.stderr.write(`[mcp-uipath] UiPath MCP Server running on STDIO\n`);
+  };
+  runStdio();
+} else {
+  let transport: SSEServerTransport;
 
-app.post("/messages", async (req, res) => {
-  if (transport) {
-    await transport.handlePostMessage(req, res);
-  } else {
-    res.status(500).send("Transport not initialized");
-  }
-});
+  app.get("/sse", async (_req, res) => {
+    transport = new SSEServerTransport("/messages", res);
+    await server.connect(transport);
+  });
 
-const PORT = process.env.PORT || 10001;
+  app.post("/messages", async (req, res) => {
+    if (transport) {
+      await transport.handlePostMessage(req, res);
+    } else {
+      res.status(500).send("Transport not initialized");
+    }
+  });
 
-app.listen(PORT, () => {
-  process.stderr.write(`[mcp-uipath] UiPath MCP Server running on SSE at http://localhost:${PORT}/sse\n`);
-});
+  const PORT = process.env.PORT || 10001;
+  app.listen(PORT, () => {
+    process.stderr.write(`[mcp-uipath] UiPath MCP Server running on SSE at http://localhost:${PORT}/sse\n`);
+  });
+}

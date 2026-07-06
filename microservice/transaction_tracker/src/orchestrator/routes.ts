@@ -2,7 +2,7 @@ import type { FastifyInstance } from 'fastify';
 import type { ZodTypeProvider } from 'fastify-type-provider-zod';
 import { z } from 'zod';
 import { authenticateRobot, verifyFinancialSignature } from '../middleware/auth.js';
-import { handleA2A, runAgenticStep } from './engine.js';
+import { handleA2A, runAgenticStep, runAgenticStepStream } from './engine.js';
 import { registry } from './agents/base.js';
 import { docExamAgent } from './agents/docExamAgent.js';
 import { executorRegistry } from './executors/base.js';
@@ -46,6 +46,11 @@ const RunAgenticSchema = z
     agentId: z.string().uuid().optional(),
     idempotencyKey: IDEM,
     prompt: z.string().optional(),
+    messages: z.array(z.object({
+      role: z.enum(['user', 'assistant', 'system', 'tool']),
+      content: z.string()
+    })).optional(),
+    stream: z.boolean().optional(),
   })
   .strict();
 
@@ -87,8 +92,13 @@ export async function registerOrchestratorRoutes(app: FastifyInstance): Promise<
     typedSecured.post('/orchestrator/run-agentic', {
       schema: { body: RunAgenticSchema }
     }, async (req, reply) => {
-      const body = req.body as { transactionId?: string; agentId?: string; idempotencyKey: string; prompt?: string };
-      const result = await runAgenticStep(req.auth!, body.transactionId, body.idempotencyKey, body.prompt, body.agentId);
+      const body = req.body as { transactionId?: string; agentId?: string; idempotencyKey: string; prompt?: string; messages?: any[]; stream?: boolean };
+      if (body.stream) {
+        reply.hijack();
+        await runAgenticStepStream(req.auth!, body.transactionId, body.idempotencyKey, body.prompt, body.messages, body.agentId, reply);
+        return;
+      }
+      const result = await runAgenticStep(req.auth!, body.transactionId, body.idempotencyKey, body.prompt, body.messages, body.agentId);
       return reply.send(result);
     });
 

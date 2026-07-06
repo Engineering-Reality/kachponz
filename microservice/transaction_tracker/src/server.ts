@@ -120,10 +120,19 @@ export async function buildServer() {
   return app;
 }
 
+import { spawn, ChildProcess } from 'child_process';
+import path from 'path';
+import { fileURLToPath } from 'url';
+
+let mcpManager: ChildProcess | null = null;
+
 async function main() {
   const app = await buildServer();
   const shutdown = async (sig: string) => {
     app.log.info({ sig }, 'shutting down');
+    if (mcpManager) {
+      mcpManager.kill('SIGTERM');
+    }
     await app.close();
     await closePool();
     process.exit(0);
@@ -133,6 +142,18 @@ async function main() {
 
   try {
     await app.listen({ host: env.HOST, port: env.PORT });
+    
+    // Spawn MCP Auto Manager automatically in development
+    if (process.env.NODE_ENV === 'development' && !process.env.MCP_MANAGER_STARTED) {
+      process.env.MCP_MANAGER_STARTED = '1';
+      const __dirname = path.dirname(fileURLToPath(import.meta.url));
+      
+      mcpManager = spawn('tsx', [path.join(__dirname, '../scripts/mcpAutoManager.ts')], {
+        stdio: 'inherit',
+        env: process.env
+      });
+    }
+
   } catch (err) {
     app.log.error({ err }, 'gagal start server');
     process.exit(1);

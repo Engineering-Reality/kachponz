@@ -5,6 +5,8 @@ import type { AuthContext } from '../types/domain.js';
 import type { A2AEnvelope, A2AResult } from './a2a/protocol.js';
 import { txLogger } from '../lib/logger.js';
 import { query } from '../db/pool.js';
+import type { FastifyReply } from 'fastify';
+
 
 // LangGraph & MCP Imports
 import { ChatOpenAI } from "@langchain/openai";
@@ -259,6 +261,7 @@ export async function runAgenticStep(
   transactionId: string | undefined,
   idempotencyKey: string,
   prompt?: string,
+  messagesHistory?: any[],
   agentId?: string,
 ): Promise<A2AResult> {
   let txId: string;
@@ -340,9 +343,13 @@ export async function runAgenticStep(
       stateModifier: agentConfig.agent_style || "You are a helpful assistant.",
     });
 
+    const inputMessages = messagesHistory && messagesHistory.length > 0 
+      ? messagesHistory 
+      : [{ role: "user", content: prompt || `Execute step ${step} for transaction ${txId}` }];
+
     // 5. Invoke LangGraph
     const result = await agent.invoke({
-      messages: [{ role: "user", content: prompt || `Execute step ${step} for transaction ${txId}` }]
+      messages: inputMessages
     });
 
     const finalMessage = result.messages[result.messages.length - 1] as BaseMessage;
@@ -392,3 +399,205 @@ export async function runAgenticStep(
     }
   }
 }
+
+/**
+ * Universal LangGraph Streaming Engine.
+ * Streams node execution and agent updates chunk-by-chunk to the client using SSE.
+ */
+export async function runAgenticStepStream(
+  auth: AuthContext,
+  transactionId: string | undefined,
+  idempotencyKey: string,
+  prompt: string | undefined,
+  messagesHistory: any[] | undefined,
+  agentId: string | undefined,
+  reply: FastifyReply,
+): Promise<void> {
+  let txId = transactionId || `test-${Date.now()}`;
+  let step = "test_step";
+  let transaction: any = null;
+  
+  if (transactionId && !transactionId.startsWith('invoke-')) {
+    try {
+      const res = await query("SELECT current_step FROM transactions WHERE id = $1", [txId]);
+      if (res.rows[0]) step = res.rows[0].current_step;
+    } catch (e) {}
+  }
+
+  const log = txLogger(txId);
+  log.info("Starting Universal LangGraph Engine in STREAMING mode");
+
+  reply.raw.setHeader('Content-Type', 'text/event-stream');
+  reply.raw.setHeader('Cache-Control', 'no-cache');
+  reply.raw.setHeader('Connection', 'keep-alive');
+  reply.raw.setHeader('Access-Control-Allow-Origin', '*');
+  reply.raw.flushHeaders();
+
+  let agentConfig;
+  if (agentId) {
+    const agentRes = await query("SELECT * FROM agents WHERE agent_id = $1 LIMIT 1", [agentId]);
+    agentConfig = agentRes.rows[0];
+  } else {
+    const isUuid = /^[0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{12}$/.test(step);
+    if (isUuid) {
+      const agentRes = await query("SELECT * FROM agents WHERE agent_id = $1 LIMIT 1", [step]);
+      agentConfig = agentRes.rows[0];
+    } else {
+      const agentRes = await query("SELECT * FROM agents WHERE agent_name ILIKE $1 OR description ILIKE $1 LIMIT 1", [`%${step}%`]);
+      agentConfig = agentRes.rows[0];
+    }
+  }
+
+  if (!agentConfig) {
+    const errPayload = JSON.stringify({ error: `Agent not found for ${agentId || step}` });
+    reply.raw.write(`event: error\ndata: ${errPayload}\n\n`);
+    reply.raw.end();
+    return;
+  }
+
+  let toolConfigs: any[] = [];
+  if (agentConfig.tools && agentConfig.tools.length > 0) {
+    const toolsRes = await query("SELECT * FROM tools WHERE tool_id = ANY($1::uuid[])", [agentConfig.tools]);
+    toolConfigs = toolsRes.rows;
+  }
+
+  const { tools, clients } = await loadMcpTools(toolConfigs, log);
+
+  try {
+    const modelInitStart = Date.now();
+    const llm = new ChatOpenAI({
+      modelName: agentConfig.model && agentConfig.model !== "gpt-4o" 
+        ? agentConfig.model 
+        : process.env.QWEN_LLM_MODEL || "qwen-max",
+      temperature: 0,
+      apiKey: process.env.QWEN_API_KEY,
+      configuration: {
+        baseURL: process.env.QWEN_BASE_URL || "https://dashscope-intl.aliyuncs.com/compatible-mode/v1",
+      },
+      streaming: true
+    });
+    const modelInitTime = (Date.now() - modelInitStart) / 1000;
+
+    const agentInitStart = Date.now();
+    const agent = createReactAgent({
+      llm,
+      tools,
+      stateModifier: agentConfig.agent_style || "You are a helpful assistant.",
+    });
+    const agentInitTime = (Date.now() - agentInitStart) / 1000;
+
+    reply.raw.write(`event: metrics\ndata: ${JSON.stringify({ modelInit: modelInitTime, agentInit: agentInitTime })}\n\n`);
+    if ((reply.raw as any).flush) {
+      (reply.raw as any).flush();
+    }
+
+    const responseStart = Date.now();
+    const inputMessages = messagesHistory && messagesHistory.length > 0 
+      ? messagesHistory 
+      : [{ role: "user", content: prompt || `Execute step ${step} for transaction ${txId}` }];
+
+    const stream = await agent.stream({
+      messages: inputMessages
+    });
+
+    let finalAgentOutput = "";
+
+    for await (const chunk of stream) {
+      const isAgent = !!chunk.agent;
+      const isTools = !!chunk.tools;
+      const messages = (chunk.agent?.messages || chunk.tools?.messages || []) as any[];
+      const lastMsg = messages[messages.length - 1];
+
+      let payload: any = {
+        node: isAgent ? 'agent' : isTools ? 'tools' : 'unknown',
+      };
+
+      if (lastMsg) {
+        payload.message = {
+          role: lastMsg._getType() === 'ai' ? 'assistant' : lastMsg._getType() === 'tool' ? 'tool' : 'user',
+          content: lastMsg.content,
+          name: lastMsg.name,
+        };
+
+        if (isAgent && lastMsg._getType() === 'ai') {
+          finalAgentOutput = lastMsg.content;
+        }
+
+        if (lastMsg.tool_calls && lastMsg.tool_calls.length > 0) {
+          payload.toolCalls = lastMsg.tool_calls;
+        }
+      }
+
+      reply.raw.write(`event: update\ndata: ${JSON.stringify(payload)}\n\n`);
+      if ((reply.raw as any).flush) {
+        (reply.raw as any).flush();
+      }
+    }
+
+    // Complete step in the DB if not a test transaction
+    const isTest = txId.startsWith('test-') || txId.startsWith('invoke-');
+    if (!isTest) {
+      try {
+        await completeAndHandoff(
+          auth,
+          {
+            protocol: 'amadeus.a2a/0',
+            type: 'task.complete',
+            transactionId: txId,
+            step,
+            idempotencyKey,
+            correlationId: `agentic:${agentConfig?.agent_id || step}`,
+            reason: "LangGraph streaming execution successful",
+            targetStep: undefined,
+            data: {
+              agent_output: finalAgentOutput
+            },
+            sentAt: new Date().toISOString(),
+          },
+          log,
+        );
+      } catch (dbErr: any) {
+        log.warn({ err: dbErr }, "Failed to complete transaction in DB, but stream succeeded");
+        // We do not throw here, so the stream can finish cleanly
+      }
+    }
+
+    const responseTime = (Date.now() - responseStart) / 1000;
+    reply.raw.write(`event: metrics\ndata: ${JSON.stringify({ modelInit: modelInitTime, agentInit: agentInitTime, responseTime })}\n\n`);
+    reply.raw.write(`event: complete\ndata: ${JSON.stringify({ output: finalAgentOutput })}\n\n`);
+    reply.raw.end();
+  } catch (err: any) {
+    log.error({ err }, "LangGraph streaming execution failed");
+    
+    const isTest = txId.startsWith('test-') || txId.startsWith('invoke-');
+    if (!isTest) {
+      try {
+        await failStep(
+          auth,
+          {
+            protocol: 'amadeus.a2a/0',
+            type: 'task.failed',
+            transactionId: txId,
+            step,
+            idempotencyKey,
+            correlationId: `agentic:${agentConfig?.agent_id || step}`,
+            reason: err.message || "Unknown LangGraph streaming execution failure",
+            data: {},
+            sentAt: new Date().toISOString(),
+          },
+          log,
+        );
+      } catch (e) {
+        log.error({ err: e }, "Failed to record failStep for LangGraph stream");
+      }
+    }
+
+    reply.raw.write(`event: error\ndata: ${JSON.stringify({ message: err.message })}\n\n`);
+    reply.raw.end();
+  } finally {
+    for (const client of clients) {
+      try { await client.close(); } catch(e) {}
+    }
+  }
+}
+

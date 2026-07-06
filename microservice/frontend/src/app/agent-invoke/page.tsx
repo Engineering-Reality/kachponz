@@ -15,7 +15,7 @@ import {
 } from 'lucide-react';
 
 interface Message {
-  role: 'system' | 'bot' | 'user';
+  role: 'system' | 'bot' | 'user' | 'error';
   content: string;
 }
 
@@ -36,6 +36,9 @@ function AgentInvokeInner() {
   const [transactionId, setTransactionId] = useState('');
   const [agents, setAgents] = useState<any[]>([]);
   const [selectedAgent, setSelectedAgent] = useState<string>('');
+  const [modelInit, setModelInit] = useState<string | null>(null);
+  const [agentInit, setAgentInit] = useState<string | null>(null);
+  const [responseTime, setResponseTime] = useState<string | null>(null);
 
   const apiUrl = process.env.NEXT_PUBLIC_API_URL ?? "http://localhost:8080";
   const robotKey = process.env.NEXT_PUBLIC_ROBOT_KEY ?? "amadeus_local_dev";
@@ -87,6 +90,9 @@ function AgentInvokeInner() {
     setMessages(prev => [...prev, { role: 'user', content: currentInput }]);
     setInput('');
     setStatus('Processing...');
+    setModelInit(null);
+    setAgentInit(null);
+    setResponseTime(null);
     
     try {
       const res = await fetch(`${apiUrl}/orchestrator/run-agentic`, {
@@ -99,24 +105,101 @@ function AgentInvokeInner() {
           transactionId: transactionId.trim() || undefined,
           agentId: selectedAgent || undefined,
           idempotencyKey: `invoke-${Date.now()}`,
-          prompt: currentInput
+          prompt: currentInput,
+          messages: [...messages, { role: 'user', content: currentInput }]
+            .filter(m => m.role === 'user' || m.role === 'bot')
+            .map(m => ({
+              role: m.role === 'bot' ? 'assistant' : 'user',
+              content: m.content
+            })),
+          stream: true
         })
       });
       
-      const data = await res.json();
-      
       if (!res.ok) {
-        throw new Error(data.message || data.error?.message || 'API Error');
+        const data = await res.json().catch(() => ({}));
+        throw new Error(data.message || data.error?.message || `Server error: ${res.status}`);
       }
-      
-      setMessages(prev => [...prev, { 
-        role: 'bot', 
-        content: data.data?.agent_output || "Agent execution completed. (Check orchestrator logs or dashboard for state changes)" 
-      }]);
-      setStatus('Stream Complete');
+
+      const reader = res.body?.getReader();
+      const decoder = new TextDecoder('utf-8');
+      if (!reader) {
+        throw new Error('Readable stream not supported on response.');
+      }
+
+      // Add a temporary bot message that we will append to
+      setMessages(prev => [...prev, { role: 'bot', content: '' }]);
+
+      let accumulatedResponse = '';
+      let buffer = '';
+      let currentEvent = 'update';
+
+      while (true) {
+        const { value, done } = await reader.read();
+        if (done) break;
+
+        buffer += decoder.decode(value, { stream: true });
+        const lines = buffer.split('\n');
+        buffer = lines.pop() || ''; // Keep the last incomplete line in the buffer
+
+        for (const line of lines) {
+          if (line.startsWith('event: ')) {
+            currentEvent = line.slice(7).trim();
+          } else if (line.startsWith('data: ')) {
+            const dataStr = line.slice(6).trim();
+            if (!dataStr) continue;
+
+            try {
+              const data = JSON.parse(dataStr);
+              
+              if (currentEvent === 'metrics') {
+                if (data.modelInit !== undefined) setModelInit(`${data.modelInit.toFixed(3)}s`);
+                if (data.agentInit !== undefined) setAgentInit(`${data.agentInit.toFixed(3)}s`);
+                if (data.responseTime !== undefined) setResponseTime(`${data.responseTime.toFixed(3)}s`);
+              } else if (currentEvent === 'complete') {
+                setStatus('Stream Complete');
+              } else if (currentEvent === 'error') {
+                throw new Error(data.message || data.error || 'Stream processing error');
+              } else {
+                if (data.message && data.message.content) {
+                  if (data.node === 'agent' && data.message.role === 'assistant') {
+                    accumulatedResponse = data.message.content;
+                    setMessages(prev => {
+                      const next = [...prev];
+                      if (next.length > 0) {
+                        next[next.length - 1] = {
+                          role: 'bot',
+                          content: accumulatedResponse
+                        };
+                      }
+                      return next;
+                    });
+                  }
+                }
+                // If there are tool calls, show a system thinking log
+                if (data.toolCalls && data.toolCalls.length > 0) {
+                  const toolsCalled = data.toolCalls.map((t: any) => `${t.name}(${JSON.stringify(t.args)})`).join(', ');
+                  setStatus(`Running tool: ${data.toolCalls[0].name}...`);
+                  setMessages(prev => {
+                    const next = [...prev];
+                    const botMsg = next.pop(); // temporary remove bot message
+                    next.push({ role: 'system', content: `⚙️ [Agent Call] Using tool ${toolsCalled}` });
+                    if (botMsg) next.push(botMsg); // restore bot message
+                    return next;
+                  });
+                }
+              }
+            } catch (e: any) {
+              if (currentEvent === 'error') throw new Error(e.message || 'Stream execution failed');
+              console.error('Failed to parse SSE data', e);
+            }
+          }
+        }
+      }
+      setStatus('UPLINK: STABLE');
     } catch (err: any) {
       setMessages(prev => [...prev, { 
-        role: 'system', 
+        role: 'error', 
         content: `Error: ${err.message}` 
       }]);
       setStatus('UPLINK: ERROR');
@@ -196,15 +279,15 @@ function AgentInvokeInner() {
               <div className="bg-slate-50 border border-slate-200 rounded-xl p-4 space-y-2">
                 <div className="flex justify-between text-sm">
                   <span className="text-slate-500">Model Init:</span>
-                  <span className="font-mono font-medium text-slate-900">-</span>
+                  <span className="font-mono font-medium text-slate-900">{modelInit ?? '-'}</span>
                 </div>
                 <div className="flex justify-between text-sm">
                   <span className="text-slate-500">Agent Init:</span>
-                  <span className="font-mono font-medium text-slate-900">-</span>
+                  <span className="font-mono font-medium text-slate-900">{agentInit ?? '-'}</span>
                 </div>
                 <div className="flex justify-between text-sm">
                   <span className="text-slate-500">Response Time:</span>
-                  <span className="font-mono font-medium text-slate-900">-</span>
+                  <span className="font-mono font-medium text-slate-900">{responseTime ?? '-'}</span>
                 </div>
               </div>
             </div>
@@ -247,12 +330,14 @@ function AgentInvokeInner() {
                       <Bot className="w-4 h-4 text-blue-600" />
                     </div>
                   )}
-                  <div className={`p-4 rounded-2xl max-w-[80%] ${
+                  <div className={`p-4 rounded-2xl ${msg.role === 'system' ? 'w-full' : 'max-w-[80%]'} ${
                     msg.role === 'user' 
                       ? 'bg-blue-600 text-white shadow-md rounded-tr-sm' 
                       : msg.role === 'system'
-                        ? 'bg-red-50 border border-red-200 text-red-800 w-full rounded-md'
-                        : 'bg-white border border-slate-200 text-slate-800 rounded-tl-sm shadow-sm'
+                        ? 'bg-slate-50 border border-slate-200 text-slate-500 font-mono text-xs w-full rounded-lg'
+                        : msg.role === 'error'
+                          ? 'bg-red-50 border border-red-200 text-red-800 w-full rounded-md'
+                          : 'bg-white border border-slate-200 text-slate-800 rounded-tl-sm shadow-sm'
                   }`}>
                     <p className="text-sm leading-relaxed whitespace-pre-wrap">{msg.content}</p>
                     <div className="text-[10px] opacity-50 mt-2 font-mono">
