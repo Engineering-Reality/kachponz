@@ -13,6 +13,9 @@ import {
   X,
   ChevronRight,
   Server,
+  Copy,
+  Check,
+  Zap,
 } from "lucide-react";
 
 export default function ToolsPage() {
@@ -23,6 +26,10 @@ export default function ToolsPage() {
   const [modalMode, setModalMode] = useState<"create" | "edit">("create");
   const [currentTool, setCurrentTool] = useState<any>(null);
   const [formData, setFormData] = useState({ name: "", description: "", on_status: "Online", port: "", args: "", method: "sse" });
+  
+  const [searchQuery, setSearchQuery] = useState("");
+  const [methodFilter, setMethodFilter] = useState("all");
+  const [copiedId, setCopiedId] = useState<string | null>(null);
 
   const apiUrl = process.env.NEXT_PUBLIC_API_URL || "http://127.0.0.1:8080";
   const robotKey = process.env.NEXT_PUBLIC_ROBOT_KEY || "";
@@ -100,49 +107,129 @@ export default function ToolsPage() {
     } catch (err: any) { alert(err.message); }
   };
 
+  const copyToClipboard = (text: string, id: string) => {
+    navigator.clipboard.writeText(text);
+    setCopiedId(id);
+    setTimeout(() => setCopiedId(null), 2000);
+  };
+
+  const getJsonSnippet = (tool: any, port: string, args: string, method: string) => {
+    const serverName = tool.name?.toLowerCase().replace(/\s+/g, "-") || "mcp-server";
+    if (method === "sse") {
+      return JSON.stringify({
+        mcpServers: {
+          [serverName]: {
+            command: "npx",
+            args: ["-y", "@modelcontextprotocol/client-sse", `http://localhost:${port}/sse`]
+          }
+        }
+      }, null, 2);
+    } else {
+      const parts = args.split(" ");
+      const cmd = parts[0] || "node";
+      const cmdArgs = parts.slice(1);
+      return JSON.stringify({
+        mcpServers: {
+          [serverName]: {
+            command: cmd,
+            args: cmdArgs
+          }
+        }
+      }, null, 2);
+    }
+  };
+
+  const filteredTools = tools.filter(t => {
+    const { method } = parseVersions(t);
+    const matchesSearch = t.name?.toLowerCase().includes(searchQuery.toLowerCase()) ||
+                          t.description?.toLowerCase().includes(searchQuery.toLowerCase());
+    const matchesMethod = methodFilter === "all" || method === methodFilter;
+    return matchesSearch && matchesMethod;
+  });
+
   return (
     <div className="p-8 max-w-6xl mx-auto">
       {/* Page Header */}
-      <div className="page-header">
+      <div className="page-header border-b border-slate-100 pb-6 mb-6">
         <div>
-          <h1 className="text-2xl font-bold text-slate-900 mb-1">MCP Tool Registry</h1>
+          <h1 className="text-3xl font-extrabold text-slate-900 tracking-tight mb-1">Smithery Registry</h1>
           <p className="text-sm text-slate-500">
-            {tools.length} server{tools.length !== 1 ? "s" : ""} registered ·{" "}
-            {tools.filter(t => !t.on_status?.toLowerCase().includes("offline")).length} online
+            {tools.length} MCP server{tools.length !== 1 ? "s" : ""} registered ·{" "}
+            {tools.filter(t => !t.on_status?.toLowerCase().includes("offline")).length} active & running
           </p>
         </div>
-        <div className="flex items-center gap-2">
-          <button onClick={fetchTools} className="btn-secondary text-xs py-2 px-3">
+        <div className="flex items-center gap-3">
+          <button onClick={fetchTools} className="btn-secondary text-xs py-2.5 px-4 rounded-xl shadow-sm bg-white hover:bg-slate-50 transition-all">
             <RefreshCw className="w-3.5 h-3.5" /> Refresh
           </button>
-          <button onClick={openCreateModal} className="btn-primary text-xs py-2 px-3">
-            <Plus className="w-3.5 h-3.5" /> Register MCP
+          <button onClick={openCreateModal} className="btn-primary text-xs py-2.5 px-4 rounded-xl shadow-md bg-slate-900 text-white hover:bg-slate-800 transition-all flex items-center gap-1.5">
+            <Plus className="w-4 h-4" /> Register MCP
           </button>
         </div>
       </div>
 
-      {/* Quick Presets */}
-      <div className="flex gap-2 mb-6 flex-wrap">
-        {[
-          { label: "UiPath MCP", color: "badge-orange", preset: { name: "mcp-uipath", description: "UiPath MCP — RPA trigger and monitoring", on_status: "Online", port: "10001", args: "node /path/to/mcp-uipath/build/index.js", method: "sse" } },
-          { label: "Amadeus MCP", color: "badge-blue", preset: { name: "amadeus-mcp", description: "Amadeus Orchestrator MCP — transaction tracker & step dispatcher", on_status: "Online", port: "10002", args: "node /path/to/amadeus-mcp/build/index.js", method: "sse" } },
-          { label: "SendGrid MCP", color: "badge-green", preset: { name: "sendgrid-mcp", description: "SendGrid MCP — email sending and campaign automation", on_status: "Online", port: "10003", args: "node /path/to/sendgrid_mcp/build/index.js", method: "sse" } },
-        ].map(({ label, color, preset }) => (
-          <button
-            key={label}
-            onClick={() => { setModalMode("create"); setCurrentTool(null); setFormData(preset); setIsModalOpen(true); }}
-            className={`badge ${color} cursor-pointer hover:opacity-80 transition-opacity`}
-          >
-            + {label}
-          </button>
-        ))}
+      {/* Quick Presets Grid */}
+      <div className="mb-8">
+        <h2 className="text-xs font-mono uppercase tracking-wider text-slate-400 mb-3 flex items-center gap-1.5"><Zap className="w-3.5 h-3.5 text-amber-500" /> Quick-install presets</h2>
+        <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+          {[
+            { label: "UiPath MCP Integration", desc: "Trigger RPA settlement robot queues", color: "border-orange-200 hover:border-orange-300 bg-orange-50/20 text-orange-700", preset: { name: "mcp-uipath", description: "UiPath MCP — RPA trigger and monitoring", on_status: "Online", port: "10001", args: "node /path/to/mcp-uipath/build/index.js", method: "sse" } },
+            { label: "Amadeus MCP Core", desc: "Verify LC steps & append transitions", color: "border-blue-200 hover:border-blue-300 bg-blue-50/20 text-blue-700", preset: { name: "amadeus-mcp", description: "Amadeus Orchestrator MCP — transaction tracker & step dispatcher", on_status: "Online", port: "10002", args: "node /path/to/amadeus-mcp/build/index.js", method: "sse" } },
+            { label: "SendGrid MCP Mailer", desc: "Dispatch payment receipts to clients", color: "border-emerald-200 hover:border-emerald-300 bg-emerald-50/20 text-emerald-700", preset: { name: "sendgrid-mcp", description: "SendGrid MCP — email sending and campaign automation", on_status: "Online", port: "10003", args: "node /path/to/sendgrid_mcp/build/index.js", method: "sse" } },
+          ].map(({ label, desc, color, preset }) => (
+            <button
+              key={label}
+              onClick={() => { setModalMode("create"); setCurrentTool(null); setFormData(preset); setIsModalOpen(true); }}
+              className={`border p-4 rounded-2xl text-left hover:shadow-md transition-all duration-200 ${color}`}
+            >
+              <div className="font-bold text-xs">{label}</div>
+              <div className="text-[10px] opacity-80 mt-1">{desc}</div>
+            </button>
+          ))}
+        </div>
       </div>
 
-      {/* Content */}
+      {/* Toolbar: Search and Filters */}
+      {!loading && !error && tools.length > 0 && (
+        <div className="flex flex-col md:flex-row gap-4 justify-between items-center mb-8 bg-white border border-slate-100 p-4 rounded-2xl shadow-sm">
+          <div className="relative w-full md:w-80">
+            <input
+              type="text"
+              placeholder="Search MCP servers..."
+              value={searchQuery}
+              onChange={e => setSearchQuery(e.target.value)}
+              className="w-full pl-9 pr-4 py-2 border border-slate-200 rounded-xl text-sm focus:outline-none focus:ring-2 focus:ring-slate-500/20 focus:border-slate-500"
+            />
+            <Server className="w-4 h-4 text-slate-400 absolute left-3 top-3" />
+          </div>
+          <div className="flex items-center gap-2 w-full md:w-auto overflow-x-auto pb-1 md:pb-0">
+            <span className="text-xs font-mono uppercase tracking-wider text-slate-400 mr-2 flex-shrink-0">Transport:</span>
+            {[
+              { id: "all", label: "All Methods" },
+              { id: "sse", label: "SSE (HTTP)" },
+              { id: "stdio", label: "STDIO" },
+            ].map(tab => (
+              <button
+                key={tab.id}
+                onClick={() => setMethodFilter(tab.id)}
+                className={`text-xs font-semibold px-3 py-1.5 rounded-lg border transition-all ${
+                  methodFilter === tab.id
+                    ? "bg-slate-900 border-slate-950 text-white shadow-sm"
+                    : "bg-white border-slate-200 text-slate-500 hover:text-slate-700 hover:bg-slate-50"
+                }`}
+              >
+                {tab.label}
+              </button>
+            ))}
+          </div>
+        </div>
+      )}
+
+      {/* Content Grid */}
       {loading ? (
         <div className="flex flex-col items-center justify-center py-24">
           <RainbowRibbonLoader />
-          <p className="mt-4 text-xs font-mono text-slate-400 uppercase tracking-widest">Loading registry…</p>
+          <p className="mt-4 text-xs font-mono text-slate-400 uppercase tracking-widest">Loading Smithery Registry…</p>
         </div>
       ) : error ? (
         <div className="rounded-xl border border-red-100 bg-red-50 p-6 text-sm text-red-700">
@@ -151,64 +238,130 @@ export default function ToolsPage() {
         </div>
       ) : tools.length === 0 ? (
         <div className="flex flex-col items-center justify-center py-24 text-slate-400">
-          <Server className="w-10 h-10 mb-3 opacity-30" />
+          <Server className="w-10 h-10 mb-3 opacity-30 animate-pulse" />
           <p className="text-sm font-medium">No MCP servers registered yet.</p>
           <button onClick={openCreateModal} className="mt-4 btn-primary text-xs py-2 px-4">
             <Plus className="w-3.5 h-3.5" /> Register First Server
           </button>
         </div>
+      ) : filteredTools.length === 0 ? (
+        <div className="flex flex-col items-center justify-center py-24 text-slate-400 bg-white border border-slate-100 rounded-2xl">
+          <Server className="w-8 h-8 mb-2 opacity-30" />
+          <p className="text-sm font-medium">No servers match your filters.</p>
+        </div>
       ) : (
-        <div className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-3 gap-4">
-          {tools.map((tool) => {
+        <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
+          {filteredTools.map((tool) => {
             const isActive = !tool.on_status?.toLowerCase().includes("offline");
             const { port, args, method } = parseVersions(tool);
+            const jsonSnippet = getJsonSnippet(tool, port, args, method);
+
             return (
-              <div key={tool.tool_id} className="bg-white border border-slate-200 rounded-xl p-5 card-hover group relative flex flex-col">
-                <div className="absolute top-4 right-4 flex gap-1 opacity-0 group-hover:opacity-100 transition-opacity">
-                  <button onClick={() => openEditModal(tool)} className="p-1.5 text-slate-400 hover:text-slate-700 hover:bg-slate-100 rounded-md">
+              <div
+                key={tool.tool_id}
+                className="bg-white border border-slate-200 rounded-2xl p-6 card-hover group relative flex flex-col hover:border-slate-300 hover:shadow-xl hover:shadow-slate-500/5 transition-all duration-300"
+              >
+                {/* Actions */}
+                <div className="absolute top-4 right-4 flex gap-1 opacity-0 group-hover:opacity-100 transition-opacity z-10">
+                  <button onClick={() => openEditModal(tool)} className="p-1.5 bg-white border border-slate-200 text-slate-400 hover:text-slate-700 hover:border-slate-300 rounded-lg shadow-sm transition-all">
                     <Edit2 className="w-3.5 h-3.5" />
                   </button>
-                  <button onClick={() => deleteTool(tool.tool_id)} className="p-1.5 text-slate-400 hover:text-red-600 hover:bg-red-50 rounded-md">
+                  <button onClick={() => deleteTool(tool.tool_id)} className="p-1.5 bg-white border border-slate-200 text-slate-400 hover:text-red-600 hover:border-red-200 hover:bg-red-50 rounded-lg shadow-sm transition-all">
                     <Trash2 className="w-3.5 h-3.5" />
                   </button>
                 </div>
 
-                <div className="flex items-start gap-3 mb-4 pr-14">
-                  <div className={`w-9 h-9 ${isActive ? "bg-orange-50" : "bg-slate-50"} rounded-lg flex items-center justify-center flex-shrink-0`}>
-                    <Server className={`w-4.5 h-4.5 ${isActive ? "text-orange-500" : "text-slate-400"}`} />
+                {/* Header */}
+                <div className="flex items-start gap-4 mb-4 pr-16">
+                  <div className={`w-12 h-12 rounded-2xl ${isActive ? "bg-orange-50 border border-orange-100 text-orange-600" : "bg-slate-50 border border-slate-100 text-slate-400"} flex items-center justify-center flex-shrink-0 shadow-sm`}>
+                    <Server className="w-6 h-6" />
                   </div>
                   <div>
-                    <h3 className="font-semibold text-slate-900 leading-tight">{tool.name}</h3>
+                    <h3 className="font-extrabold text-slate-900 text-base leading-snug">{tool.name}</h3>
                     <div className="flex items-center gap-2 mt-1">
-                      {isActive ? (
-                        <span className="badge badge-green"><CheckCircle className="w-2.5 h-2.5" /> Online</span>
-                      ) : (
-                        <span className="badge badge-slate"><XCircle className="w-2.5 h-2.5" /> Offline</span>
-                      )}
-                      <span className="text-[10px] font-mono text-slate-400">{tool.tool_id?.substring(0, 8)}</span>
+                      <span className={`badge text-[9px] px-2 py-0.5 rounded-full ${isActive ? "badge-green" : "badge-slate"}`}>
+                        <span className={`w-1.5 h-1.5 rounded-full mr-1 inline-block ${isActive ? "bg-green-500 animate-pulse" : "bg-slate-400"}`} />
+                        {isActive ? "Active" : "Offline"}
+                      </span>
+                      <span className="text-[10px] font-mono text-slate-400">Transport: <span className="uppercase font-bold text-slate-600">{method}</span></span>
                     </div>
                   </div>
                 </div>
 
-                <p className="text-sm text-slate-600 mb-4 leading-relaxed flex-1">
-                  {tool.description || "No description."}
+                {/* Description */}
+                <p className="text-sm text-slate-600 mb-4 leading-relaxed line-clamp-2">
+                  {tool.description || "No description provided."}
                 </p>
 
-                <div className="mt-auto pt-4 border-t border-slate-100 space-y-2">
-                  <div className="flex justify-between text-xs font-mono">
-                    <span className="text-slate-400">Transport</span>
-                    <span className="text-slate-700 uppercase font-semibold">{method}</span>
-                  </div>
-                  <div className="flex justify-between text-xs font-mono">
-                    <span className="text-slate-400">Port / URL</span>
-                    <span className="text-slate-700">{port}</span>
-                  </div>
+                {/* Copyable Console blocks */}
+                <div className="space-y-3 mt-auto">
+                  
+                  {/* CLI Command */}
                   {args && (
-                    <div className="pt-1">
-                      <p className="text-[10px] font-mono text-slate-400 flex items-center gap-1 mb-1"><Terminal className="w-3 h-3" /> Command</p>
-                      <code className="block text-[10px] font-mono bg-slate-50 border border-slate-100 rounded-md p-2 text-slate-600 truncate">{args}</code>
+                    <div className="space-y-1">
+                      <div className="flex justify-between items-center text-[10px] font-mono uppercase tracking-wider text-slate-400">
+                        <span className="flex items-center gap-1"><Terminal className="w-3 h-3" /> Command Line Args</span>
+                        <button
+                          onClick={() => copyToClipboard(args, `${tool.tool_id}-args`)}
+                          className="flex items-center gap-1 text-slate-400 hover:text-slate-600 transition-colors"
+                        >
+                          {copiedId === `${tool.tool_id}-args` ? (
+                            <>
+                              <Check className="w-3 h-3 text-green-500" />
+                              <span className="text-green-500">Copied</span>
+                            </>
+                          ) : (
+                            <>
+                              <Copy className="w-3 h-3" />
+                              <span>Copy</span>
+                            </>
+                          )}
+                        </button>
+                      </div>
+                      <code className="block text-[10px] font-mono bg-slate-900 border border-slate-950 rounded-xl p-3 text-slate-100 overflow-x-auto whitespace-nowrap shadow-inner">
+                        {args}
+                      </code>
                     </div>
                   )}
+
+                  {/* JSON Config Box */}
+                  <div className="space-y-1">
+                    <div className="flex justify-between items-center text-[10px] font-mono uppercase tracking-wider text-slate-400">
+                      <span>Claude Desktop Configuration</span>
+                      <button
+                        onClick={() => copyToClipboard(jsonSnippet, `${tool.tool_id}-json`)}
+                        className="flex items-center gap-1 text-slate-400 hover:text-slate-600 transition-colors"
+                      >
+                        {copiedId === `${tool.tool_id}-json` ? (
+                          <>
+                            <Check className="w-3 h-3 text-green-500" />
+                            <span className="text-green-500">Copied</span>
+                          </>
+                        ) : (
+                          <>
+                            <Copy className="w-3 h-3" />
+                            <span>Copy</span>
+                          </>
+                        )}
+                      </button>
+                    </div>
+                    <pre className="text-[10px] font-mono bg-slate-900 border border-slate-950 rounded-xl p-3 text-slate-200 overflow-x-auto max-h-36 scrollbar-thin shadow-inner">
+                      {jsonSnippet}
+                    </pre>
+                  </div>
+
+                  {/* Port / Connection parameters */}
+                  <div className="grid grid-cols-2 gap-2 pt-2 border-t border-slate-100 text-xs font-mono">
+                    <div className="flex justify-between border-r border-slate-100 pr-2">
+                      <span className="text-slate-400">Port / Host</span>
+                      <span className="text-slate-700 font-semibold">{port}</span>
+                    </div>
+                    <div className="flex justify-between pl-2">
+                      <span className="text-slate-400">Node ID</span>
+                      <span className="text-slate-700 font-semibold">{tool.tool_id?.substring(0, 8)}</span>
+                    </div>
+                  </div>
+
                 </div>
               </div>
             );
@@ -218,54 +371,54 @@ export default function ToolsPage() {
 
       {/* Modal */}
       {isModalOpen && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/20 backdrop-blur-sm p-4">
-          <div className="bg-white border border-slate-200 rounded-xl w-full max-w-lg shadow-2xl flex flex-col max-h-[90vh]">
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/25 backdrop-blur-sm p-4 animate-in fade-in duration-200">
+          <div className="bg-white border border-slate-200 rounded-2xl w-full max-w-lg shadow-2xl flex flex-col max-h-[90vh]">
             <div className="flex justify-between items-center px-6 py-4 border-b border-slate-100">
-              <h2 className="font-semibold text-slate-900">
+              <h2 className="font-extrabold text-slate-900 text-lg">
                 {modalMode === "create" ? "Register MCP Server" : "Edit MCP Server"}
               </h2>
-              <button onClick={() => setIsModalOpen(false)} className="p-1.5 text-slate-400 hover:text-slate-700 hover:bg-slate-100 rounded-md">
+              <button onClick={() => setIsModalOpen(false)} className="p-1.5 text-slate-400 hover:text-slate-700 hover:bg-slate-100 rounded-lg">
                 <X className="w-4 h-4" />
               </button>
             </div>
             <div className="p-6 overflow-y-auto flex-1 space-y-4">
               <div>
                 <label className="form-label">Server Name</label>
-                <input required value={formData.name} onChange={e => setFormData({ ...formData, name: e.target.value })} className="form-input" placeholder="e.g. amadeus-mcp" />
+                <input required value={formData.name} onChange={e => setFormData({ ...formData, name: e.target.value })} className="form-input rounded-xl border-slate-200" placeholder="e.g. amadeus-mcp" />
               </div>
               <div>
-                <label className="form-label">Description</label>
-                <textarea value={formData.description} onChange={e => setFormData({ ...formData, description: e.target.value })} className="form-input h-20 resize-none" />
+                <label className="form-label">Description / Capabilities</label>
+                <textarea value={formData.description} onChange={e => setFormData({ ...formData, description: e.target.value })} className="form-input rounded-xl border-slate-200 h-20 resize-none" placeholder="What tools and operations does this server expose..." />
               </div>
               <div className="grid grid-cols-2 gap-4">
                 <div>
                   <label className="form-label">Status</label>
-                  <select value={formData.on_status} onChange={e => setFormData({ ...formData, on_status: e.target.value })} className="form-input">
+                  <select value={formData.on_status} onChange={e => setFormData({ ...formData, on_status: e.target.value })} className="form-input rounded-xl border-slate-200">
                     <option>Online</option>
                     <option>Offline</option>
                   </select>
                 </div>
                 <div>
-                  <label className="form-label">Transport</label>
-                  <select value={formData.method} onChange={e => setFormData({ ...formData, method: e.target.value })} className="form-input">
+                  <label className="form-label">Transport Protocol</label>
+                  <select value={formData.method} onChange={e => setFormData({ ...formData, method: e.target.value })} className="form-input rounded-xl border-slate-200">
                     <option value="sse">SSE (HTTP)</option>
                     <option value="stdio">STDIO</option>
                   </select>
                 </div>
               </div>
               <div>
-                <label className="form-label">Port / URL</label>
-                <input value={formData.port} onChange={e => setFormData({ ...formData, port: e.target.value })} className="form-input" placeholder="10001" />
+                <label className="form-label">Port / Connection URL</label>
+                <input value={formData.port} onChange={e => setFormData({ ...formData, port: e.target.value })} className="form-input rounded-xl border-slate-200" placeholder="e.g. 10002" />
               </div>
               <div>
                 <label className="form-label">Command Args (STDIO)</label>
-                <input value={formData.args} onChange={e => setFormData({ ...formData, args: e.target.value })} className="form-input" placeholder="node build/index.js" />
+                <input value={formData.args} onChange={e => setFormData({ ...formData, args: e.target.value })} className="form-input rounded-xl border-slate-200" placeholder="e.g. node build/index.js" />
               </div>
             </div>
-            <div className="px-6 py-4 border-t border-slate-100 flex justify-end gap-3">
-              <button onClick={() => setIsModalOpen(false)} className="btn-secondary text-sm">Cancel</button>
-              <button onClick={handleSave} className="btn-primary text-sm">
-                {modalMode === "create" ? "Register" : "Save Changes"} <ChevronRight className="w-4 h-4" />
+            <div className="px-6 py-4 border-t border-slate-100 flex justify-end gap-3 bg-slate-50/50 rounded-b-2xl">
+              <button onClick={() => setIsModalOpen(false)} className="btn-secondary text-sm rounded-xl">Cancel</button>
+              <button onClick={handleSave} className="btn-primary text-sm rounded-xl bg-slate-900 text-white hover:bg-slate-800">
+                {modalMode === "create" ? "Register Server" : "Save Changes"} <ChevronRight className="w-4 h-4" />
               </button>
             </div>
           </div>

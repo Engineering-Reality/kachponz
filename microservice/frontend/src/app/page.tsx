@@ -135,85 +135,115 @@ export default function Home() {
 
   return (
     <div className="min-h-screen bg-white text-slate-900 overflow-x-hidden">
-      {/* 3D Tesseract & Orbit Animations */}
+      {/* 3D A2A CTO Layers Animation Styles */}
       <style jsx global>{`
-        @keyframes rotate-outer {
-          0% { transform: rotateX(0deg) rotateY(0deg) rotateZ(0deg); }
-          100% { transform: rotateX(360deg) rotateY(360deg) rotateZ(180deg); }
+        @keyframes float-stack {
+          0% { transform: rotateX(55deg) rotateZ(-35deg) translateY(0px); }
+          50% { transform: rotateX(55deg) rotateZ(-35deg) translateY(-12px); }
+          100% { transform: rotateX(55deg) rotateZ(-35deg) translateY(0px); }
         }
-        @keyframes rotate-inner {
-          0% { transform: rotateX(360deg) rotateY(0deg) rotateZ(360deg); }
-          100% { transform: rotateX(0deg) rotateY(360deg) rotateZ(0deg); }
+        @keyframes packet-flow-down {
+          0% { transform: translateZ(90px) scale(1); opacity: 0; }
+          10% { opacity: 1; }
+          90% { opacity: 1; }
+          100% { transform: translateZ(-90px) scale(0.8); opacity: 0; }
         }
-        @keyframes orbit-cw {
-          0% { transform: rotate(0deg) translateX(120px) rotate(0deg); }
-          100% { transform: rotate(360deg) translateX(120px) rotate(-360deg); }
+        @keyframes packet-flow-up {
+          0% { transform: translateZ(-90px) scale(0.8); opacity: 0; }
+          10% { opacity: 1; }
+          90% { opacity: 1; }
+          100% { transform: translateZ(90px) scale(1); opacity: 0; }
         }
-        @keyframes orbit-ccw {
-          0% { transform: rotate(180deg) translateX(140px) rotate(-180deg); }
-          100% { transform: rotate(-180deg) translateX(140px) rotate(180deg); }
-        }
-        .cube-container {
+        .stack-container {
           perspective: 1200px;
           transform-style: preserve-3d;
         }
-        .cube-wrapper {
+        .stack-wrapper {
           transform-style: preserve-3d;
+          animation: float-stack 8s ease-in-out infinite;
+          width: 320px;
+          height: 300px;
+          display: flex;
+          align-items: center;
+          justify-content: center;
+          position: relative;
         }
-        .cube {
+        .stack-layer {
           position: absolute;
+          width: 320px;
+          height: 85px;
+          background: rgba(255, 255, 255, 0.75);
+          backdrop-filter: blur(12px);
+          -webkit-backdrop-filter: blur(12px);
+          border: 1.5px solid rgba(226, 232, 240, 0.8);
+          border-radius: 16px;
+          box-shadow: 0 10px 30px -10px rgba(0, 0, 0, 0.08), inset 0 1px 0 rgba(255,255,255,0.6);
+          transition: all 0.3s cubic-bezier(0.16, 1, 0.3, 1);
           transform-style: preserve-3d;
+          display: flex;
+          align-items: center;
+          padding: 16px;
+          cursor: pointer;
         }
-        .cube-outer {
-          width: 140px;
-          height: 140px;
-          animation: rotate-outer 25s linear infinite;
+        .stack-layer-1 {
+          transform: translateZ(90px);
+          border-color: rgba(168, 85, 247, 0.3); /* Purple */
+          box-shadow: 0 10px 30px -10px rgba(168, 85, 247, 0.1), inset 0 1px 0 rgba(255,255,255,0.6);
         }
-        .cube-inner {
-          width: 70px;
-          height: 70px;
-          animation: rotate-inner 12s linear infinite;
+        .stack-layer-2 {
+          transform: translateZ(0px);
+          border-color: rgba(59, 130, 246, 0.3); /* Blue */
+          box-shadow: 0 10px 30px -10px rgba(59, 130, 246, 0.1), inset 0 1px 0 rgba(255,255,255,0.6);
         }
-        .cube-face {
+        .stack-layer-3 {
+          transform: translateZ(-90px);
+          border-color: rgba(236, 72, 153, 0.3); /* Pink */
+          box-shadow: 0 10px 30px -10px rgba(236, 72, 153, 0.1), inset 0 1px 0 rgba(255,255,255,0.6);
+        }
+        .stack-layer:hover {
+          background: rgba(255, 255, 255, 0.85);
+          box-shadow: 0 20px 40px -5px rgba(0, 0, 0, 0.12);
+        }
+        .stack-layer-1:hover {
+          transform: translateZ(105px) scale(1.02);
+        }
+        .stack-layer-2:hover {
+          transform: translateZ(0px) scale(1.04);
+        }
+        .stack-layer-3:hover {
+          transform: translateZ(-105px) scale(1.02);
+        }
+        /* Flow line in center */
+        .flow-line {
           position: absolute;
-          background: rgba(255, 255, 255, 0.03);
-          border: 1.5px solid rgba(168, 85, 247, 0.3); /* Translucent Purple */
-          border-radius: 6px;
-          box-shadow: 0 0 15px rgba(168, 85, 247, 0.1);
+          width: 2px;
+          height: 220px;
+          background: linear-gradient(to bottom, rgba(168, 85, 247, 0.4), rgba(59, 130, 246, 0.4), rgba(236, 72, 153, 0.4));
+          transform: translateZ(-100px);
+          z-index: 1;
         }
-        .cube-outer .cube-face {
-          width: 140px;
-          height: 140px;
+        /* Flow packets */
+        .flow-packet-down {
+          position: absolute;
+          width: 8px;
+          height: 8px;
+          border-radius: 50%;
+          background: #3b82f6;
+          box-shadow: 0 0 12px #3b82f6, 0 0 4px #3b82f6;
+          animation: packet-flow-down 3s infinite linear;
+          z-index: 2;
         }
-        .cube-inner .cube-face {
-          width: 70px;
-          height: 70px;
-          border-color: rgba(236, 72, 153, 0.45); /* Pink */
-          box-shadow: 0 0 15px rgba(236, 72, 153, 0.15);
+        .flow-packet-up {
+          position: absolute;
+          width: 6px;
+          height: 6px;
+          border-radius: 50%;
+          background: #a855f7;
+          box-shadow: 0 0 10px #a855f7;
+          animation: packet-flow-up 4s infinite linear;
+          animation-delay: 2s;
+          z-index: 2;
         }
-        /* Face translations */
-        .face-front  { transform: translateZ(70px); }
-        .face-back   { transform: rotateY(180deg) translateZ(70px); }
-        .face-left   { transform: rotateY(-90deg) translateZ(70px); }
-        .face-right  { transform: rotateY(90deg) translateZ(70px); }
-        .face-top    { transform: rotateX(90deg) translateZ(70px); }
-        .face-bottom { transform: rotateX(-90deg) translateZ(70px); }
-
-        .face-inner-front  { transform: translateZ(35px); }
-        .face-inner-back   { transform: rotateY(180deg) translateZ(35px); }
-        .face-inner-left   { transform: rotateY(-90deg) translateZ(35px); }
-        .face-inner-right  { transform: rotateY(90deg) translateZ(35px); }
-        .face-inner-top    { transform: rotateX(90deg) translateZ(35px); }
-        .face-inner-bottom { transform: rotateX(-90deg) translateZ(35px); }
-
-        /* Orbiting Doc plates */
-        .orbit-plate-1 {
-          animation: orbit-cw 20s linear infinite;
-        }
-        .orbit-plate-2 {
-          animation: orbit-ccw 22s linear infinite;
-        }
-
         /* Scroll-Reveal transition utilities */
         .scroll-reveal {
           opacity: 0;
@@ -269,13 +299,12 @@ export default function Home() {
             </div>
             
             <h1 className="text-4xl md:text-5xl lg:text-6xl font-black text-slate-900 tracking-tight leading-[1.05]">
-              Document OCR for the{" "}
-              <span className="vibrant-rainbow-text">agentic stack</span>
+              Agentic Transaction Orchestration for{" "}
+              <span className="vibrant-rainbow-text">Trade Finance</span>
             </h1>
 
             <p className="text-base text-slate-500 leading-relaxed max-w-lg">
-              Amadeus turns hours of manual document review into seconds of secure automation.
-              Integrates with VLM-powered agents, legacy RPA executors, and air-gapped mainframes.
+              Coordinate autonomous agents and RPA robots through secure, immutable state transitions for Import LC and SKBDN settlements. Enforce strict step-flow compliance with automated ledger logging and zero database exposure.
             </p>
 
             <div className="flex items-center gap-3 pt-2">
@@ -288,10 +317,10 @@ export default function Home() {
             </div>
           </div>
 
-          {/* Right Column: 3D Tesseract & Orbiting Documents */}
-          <div className="lg:col-span-6 flex justify-center relative min-h-[360px] items-center">
-            {/* Column Background */}
-            <div className="absolute inset-0 flex items-center justify-center opacity-25 select-none pointer-events-none">
+          {/* Right Column: 3D Layers Stack & Flow */}
+          <div className="lg:col-span-6 flex justify-center relative min-h-[400px] items-center">
+            {/* Column Background Graphic */}
+            <div className="absolute inset-0 flex items-center justify-center opacity-10 select-none pointer-events-none">
               <div className="grid grid-cols-7 gap-2 items-end transform rotate-12 scale-110">
                 <div className="w-6 h-12 bg-amber-400 rounded-sm"></div>
                 <div className="w-6 h-20 bg-orange-400 rounded-sm"></div>
@@ -303,75 +332,59 @@ export default function Home() {
               </div>
             </div>
 
-            {/* Interactive 3D Cube Container */}
-            <div className="cube-container relative w-80 h-80 flex items-center justify-center">
+            {/* 3D CTO Layer Stack Container */}
+            <div className="stack-container relative w-96 h-96 flex items-center justify-center">
               
-              {/* Outer Wireframe Cube */}
-              <div className="cube cube-outer cube-wrapper">
-                <div className="cube-face face-front"></div>
-                <div className="cube-face face-back"></div>
-                <div className="cube-face face-left"></div>
-                <div className="cube-face face-right"></div>
-                <div className="cube-face face-top"></div>
-                <div className="cube-face face-bottom"></div>
-              </div>
+              <div className="stack-wrapper">
+                
+                {/* Center Flow Elements */}
+                <div className="flow-line"></div>
+                <div className="flow-packet-down"></div>
+                <div className="flow-packet-up"></div>
 
-              {/* Inner Wireframe Cube */}
-              <div className="cube cube-inner cube-wrapper">
-                <div className="cube-face face-inner-front"></div>
-                <div className="cube-face face-inner-back"></div>
-                <div className="cube-face face-inner-left"></div>
-                <div className="cube-face face-inner-right"></div>
-                <div className="cube-face face-inner-top"></div>
-                <div className="cube-face face-inner-bottom"></div>
-              </div>
-
-              {/* Central Nucleus (Rotating Amadeus Logo) */}
-              <div className="absolute w-12 h-12 rounded-xl flex items-center justify-center overflow-hidden z-20 shadow-2xl transition-transform duration-300 hover:scale-110">
-                <div className="absolute inset-0 vibrant-rainbow-border animate-border-spin opacity-90" />
-                <div className="absolute inset-[2.5px] bg-white rounded-lg flex items-center justify-center">
-                  <img src="/amadeus.svg" alt="Amadeus Nucleus" className="w-6 h-6 object-contain animate-spin" style={{ animationDuration: "12s" }} />
-                </div>
-              </div>
-
-              {/* Orbiting Document Plate 1 (LC Document) */}
-              <div className="absolute orbit-plate-1 z-30">
-                <div className="w-40 h-24 border border-slate-200 bg-white/95 backdrop-blur-sm rounded-xl p-3 shadow-lg flex flex-col justify-between -translate-x-1/2 -translate-y-1/2">
-                  <div className="flex items-center justify-between border-b border-slate-100 pb-1.5">
-                    <span className="text-[8px] font-mono uppercase tracking-wider text-slate-400">OCR Source</span>
-                    <span className="status-dot online" />
+                {/* Top Layer: Interaction */}
+                <div className="stack-layer stack-layer-1">
+                  <div className="w-10 h-10 bg-purple-50 rounded-xl flex items-center justify-center text-purple-600 border border-purple-100 flex-shrink-0 mr-4">
+                    <Bot className="w-5.5 h-5.5" />
                   </div>
-                  <div className="flex items-center gap-2">
-                    <div className="w-6 h-6 rounded-md bg-blue-50 border border-blue-100 flex items-center justify-center text-blue-500">
-                      <Layers className="w-3.5 h-3.5" />
+                  <div className="text-left">
+                    <div className="flex items-center gap-2">
+                      <p className="text-xs font-bold text-slate-800">Interaction Layer</p>
+                      <span className="badge badge-blue text-[7px] px-1 py-0">VLM & Agent UI</span>
                     </div>
-                    <div>
-                      <p className="text-[10px] font-bold text-slate-800">LC_DOC_982.pdf</p>
-                      <p className="text-[8px] font-mono text-slate-400">OCR Confidence: 99.4%</p>
-                    </div>
+                    <p className="text-[10px] text-slate-400 font-mono mt-0.5">Qwen-14B / User Decision Gate</p>
                   </div>
                 </div>
-              </div>
 
-              {/* Orbiting Document Plate 2 (Transaction State) */}
-              <div className="absolute orbit-plate-2 z-10">
-                <div className="w-40 h-24 border border-slate-200 bg-white/95 backdrop-blur-sm rounded-xl p-3 shadow-lg flex flex-col justify-between -translate-x-1/2 -translate-y-1/2">
-                  <div className="flex items-center justify-between border-b border-slate-100 pb-1.5">
-                    <span className="text-[8px] font-mono uppercase tracking-wider text-slate-400">A2A State Machine</span>
-                    <span className="badge badge-blue text-[8px] px-1 py-0">Pending Exec</span>
+                {/* Middle Layer: Orchestration */}
+                <div className="stack-layer stack-layer-2">
+                  <div className="w-10 h-10 bg-blue-50 rounded-xl flex items-center justify-center text-blue-600 border border-blue-100 flex-shrink-0 mr-4">
+                    <Cpu className="w-5.5 h-5.5" />
                   </div>
-                  <div className="flex items-center gap-2">
-                    <div className="w-6 h-6 rounded-md bg-purple-50 border border-purple-100 flex items-center justify-center text-purple-500">
-                      <FileSignature className="w-3.5 h-3.5" />
+                  <div className="text-left">
+                    <div className="flex items-center gap-2">
+                      <p className="text-xs font-bold text-slate-800">Orchestration Layer</p>
+                      <span className="badge badge-green text-[7px] px-1 py-0">Amadeus Core</span>
                     </div>
-                    <div>
-                      <p className="text-[10px] font-bold text-slate-800">Dispatch UIPath</p>
-                      <p className="text-[8px] font-mono text-slate-400">state: step_verifying</p>
-                    </div>
+                    <p className="text-[10px] text-slate-400 font-mono mt-0.5">Immutable State Machine / PostgreSQL</p>
                   </div>
                 </div>
-              </div>
 
+                {/* Bottom Layer: Execution */}
+                <div className="stack-layer stack-layer-3">
+                  <div className="w-10 h-10 bg-pink-50 rounded-xl flex items-center justify-center text-pink-600 border border-pink-100 flex-shrink-0 mr-4">
+                    <Wrench className="w-5.5 h-5.5" />
+                  </div>
+                  <div className="text-left">
+                    <div className="flex items-center gap-2">
+                      <p className="text-xs font-bold text-slate-800">Execution Layer</p>
+                      <span className="badge badge-orange text-[7px] px-1 py-0">RPA Robot Handoff</span>
+                    </div>
+                    <p className="text-[10px] text-slate-400 font-mono mt-0.5">UiPath Trigger / SendGrid Mailer</p>
+                  </div>
+                </div>
+
+              </div>
             </div>
           </div>
         </div>
@@ -381,7 +394,7 @@ export default function Home() {
       <section className="py-8 bg-white border-y border-slate-100">
         <div className="max-w-6xl mx-auto px-6">
           <div className="flex flex-wrap justify-between items-center gap-8">
-            <span className="text-[10px] font-mono uppercase tracking-widest text-slate-400">Compliance & Security Standard</span>
+            <span className="text-[10px] font-mono uppercase tracking-widest text-slate-400">Compliance & Security Standards</span>
             <div className="flex flex-wrap items-center gap-8">
               {[
                 { icon: ShieldCheck, text: "ISO 27001 Ready" },
@@ -405,18 +418,18 @@ export default function Home() {
         <div className="max-w-6xl mx-auto px-6 grid grid-cols-1 md:grid-cols-3 gap-8 text-center">
           <div className="space-y-2">
             <p className="text-5xl font-black tracking-tight text-blue-600 bg-gradient-to-r from-blue-600 to-cyan-500 bg-clip-text text-transparent">50k+</p>
-            <p className="text-sm font-semibold text-slate-900">Transactions Tracked</p>
-            <p className="text-xs text-slate-400 leading-relaxed max-w-[200px] mx-auto">LC and SKBDN state machine handoffs validated locally.</p>
+            <p className="text-sm font-semibold text-slate-900">Transactions Orchestrated</p>
+            <p className="text-xs text-slate-400 leading-relaxed max-w-[200px] mx-auto">LC and SKBDN state machine transitions validated and locked.</p>
           </div>
           <div className="space-y-2">
             <p className="text-5xl font-black tracking-tight text-violet-600 bg-gradient-to-r from-violet-600 to-pink-500 bg-clip-text text-transparent">99.9%</p>
-            <p className="text-sm font-semibold text-slate-900">Compliance Handoff SLA</p>
-            <p className="text-xs text-slate-400 leading-relaxed max-w-[200px] mx-auto">Deterministic execution paths prevent state machine drift.</p>
+            <p className="text-sm font-semibold text-slate-900">SLA Compliance (Zero Drift)</p>
+            <p className="text-xs text-slate-400 leading-relaxed max-w-[200px] mx-auto">Deterministic execution paths prevent state machine deviations.</p>
           </div>
           <div className="space-y-2">
             <p className="text-5xl font-black tracking-tight text-orange-600 bg-gradient-to-r from-orange-600 to-yellow-500 bg-clip-text text-transparent">15s</p>
-            <p className="text-sm font-semibold text-slate-900">Average Processing Time</p>
-            <p className="text-xs text-slate-400 leading-relaxed max-w-[200px] mx-auto">From unstructured document receipt to RPA bot dispatch.</p>
+            <p className="text-sm font-semibold text-slate-900">End-to-End Latency</p>
+            <p className="text-xs text-slate-400 leading-relaxed max-w-[200px] mx-auto">From unstructured document receipt to verified RPA robot handoff.</p>
           </div>
         </div>
       </section>
@@ -436,9 +449,9 @@ export default function Home() {
           <div className="relative group rounded-2xl border border-slate-200/60 bg-white/70 backdrop-blur-md p-8 md:p-12 overflow-hidden flex flex-col md:flex-row items-center justify-between gap-8 shadow-sm hover:shadow-md transition-all duration-500">
             <div className="absolute -inset-0.5 bg-gradient-to-r from-indigo-500 via-pink-500 to-amber-500 rounded-2xl blur opacity-0 group-hover:opacity-10 transition duration-500 pointer-events-none"></div>
             <div className="relative z-10 max-w-md space-y-4">
-              <h3 className="text-xl font-bold text-slate-900">Stateless Pipeline Integration</h3>
+              <h3 className="text-xl font-bold text-slate-900">Immutable State Verification</h3>
               <p className="text-slate-500 text-sm leading-relaxed">
-                By packaging OCR models, core banking transactions, and state trackers into standalone MCP tools, agents reason about the next action without holding backend database credentials.
+                By tracking step transitions in an append-only transaction ledger, Amadeus ensures that VLM agents and RPA executables move through Import LC and SKBDN settlements deterministically and with auditable cryptographic proof.
               </p>
               <div className="inline-flex items-center gap-1.5 text-xs font-semibold text-blue-600">
                 Learn more in Docs <ArrowRight className="w-3.5 h-3.5" />
@@ -447,7 +460,7 @@ export default function Home() {
             {/* Flat vector graphic representation */}
             <div className="relative z-10 w-72 h-44 rounded-xl border border-slate-200 bg-white shadow-lg p-5 flex flex-col justify-between">
               <div className="flex items-center justify-between border-b border-slate-100 pb-3">
-                <span className="text-[9px] font-mono text-slate-400 uppercase tracking-widest">Document OCR Pipeline</span>
+                <span className="text-[9px] font-mono text-slate-400 uppercase tracking-widest">Transaction State Machine</span>
                 <span className="status-dot online" />
               </div>
               <div className="space-y-2">
@@ -456,8 +469,8 @@ export default function Home() {
                 <div className="h-2 bg-slate-100 rounded w-5/6"></div>
               </div>
               <div className="flex items-center justify-between">
-                <span className="badge badge-slate text-[9px]">JSON Result</span>
-                <span className="text-[10px] font-mono font-bold text-slate-800">{"{ LC_amount: '1.2M' }"}</span>
+                <span className="badge badge-slate text-[9px]">A2A Payload</span>
+                <span className="text-[10px] font-mono font-bold text-slate-800">{"{ step: 'verifying', status: 'authorized' }"}</span>
               </div>
             </div>
           </div>
@@ -468,11 +481,11 @@ export default function Home() {
               <div className="absolute -inset-0.5 bg-gradient-to-r from-indigo-500 via-pink-500 to-amber-500 rounded-xl blur opacity-0 group-hover:opacity-10 transition duration-500 pointer-events-none"></div>
               <div className="relative z-10 space-y-3">
                 <div className="w-8 h-8 rounded-lg bg-blue-50 border border-blue-100 flex items-center justify-center text-blue-500">
-                  <Clock className="w-4.5 h-4.5" />
+                  <Cpu className="w-4.5 h-4.5" />
                 </div>
-                <h4 className="font-bold text-slate-900 text-sm">Document Analysis</h4>
+                <h4 className="font-bold text-slate-900 text-sm">Agent Orchestrator</h4>
                 <p className="text-xs text-slate-500 leading-relaxed">
-                  Parse complex, messy trade documents. extract structure, and make it ready for downstream validation.
+                  Let autonomous LLMs reason about document data, extract structured attributes, and recommend transitions.
                 </p>
               </div>
             </div>
@@ -480,11 +493,11 @@ export default function Home() {
               <div className="absolute -inset-0.5 bg-gradient-to-r from-indigo-500 via-pink-500 to-amber-500 rounded-xl blur opacity-0 group-hover:opacity-10 transition duration-500 pointer-events-none"></div>
               <div className="relative z-10 space-y-3">
                 <div className="w-8 h-8 rounded-lg bg-violet-50 border border-violet-100 flex items-center justify-center text-violet-500">
-                  <Coins className="w-4.5 h-4.5" />
+                  <Bot className="w-4.5 h-4.5" />
                 </div>
-                <h4 className="font-bold text-slate-900 text-sm">RPA Dispatcher</h4>
+                <h4 className="font-bold text-slate-900 text-sm">RPA Handoff Gate</h4>
                 <p className="text-xs text-slate-500 leading-relaxed">
-                  Seamlessly dispatch RPA execution commands to legacy UiPath jobs when state transitions validate.
+                  Dispatch execution payloads directly to UiPath robot queues once compliance criteria are cryptographically met.
                 </p>
               </div>
             </div>
@@ -492,11 +505,11 @@ export default function Home() {
               <div className="absolute -inset-0.5 bg-gradient-to-r from-indigo-500 via-pink-500 to-amber-500 rounded-xl blur opacity-0 group-hover:opacity-10 transition duration-500 pointer-events-none"></div>
               <div className="relative z-10 space-y-3">
                 <div className="w-8 h-8 rounded-lg bg-orange-50 border border-orange-100 flex items-center justify-center text-orange-500">
-                  <FileSignature className="w-4.5 h-4.5" />
+                  <Lock className="w-4.5 h-4.5" />
                 </div>
                 <h4 className="font-bold text-slate-900 text-sm">CISO Compliance Gate</h4>
                 <p className="text-xs text-slate-500 leading-relaxed">
-                  Ensure state ledger modifications are fully protected by optimistic locking and HMAC payload signing.
+                  Enforce service account checks, API request signing, and optimistic locking to guarantee total state protection.
                 </p>
               </div>
             </div>
