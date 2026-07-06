@@ -31,6 +31,7 @@
 :root {
   --background: #ffffff;
   --foreground: #0f172a;
+  --rainbow: linear-gradient(90deg, #22d3ee, #3b82f6, #d946ef, #ec4899, #fb923c, #facc15, #22d3ee);
 }
 
 @keyframes wave {
@@ -49,20 +50,56 @@
   100% { transform: scaleX(1.5); opacity: 1; }
 }
 
+@keyframes shimmer {
+  0% { background-position: -200% 0; }
+  100% { background-position: 200% 0; }
+}
+
 body {
   background: var(--background);
   color: var(--foreground);
+  font-family: var(--font-sans), system-ui, -apple-system, sans-serif;
 }
 
-.glass-panel {
-  background: rgba(255, 255, 255, 0.7);
-  backdrop-filter: blur(12px);
-  -webkit-backdrop-filter: blur(12px);
-  border: 1px solid rgba(255, 255, 255, 0.4);
-  box-shadow: 0 4px 6px -1px rgba(0, 0, 0, 0.05), 0 2px 4px -1px rgba(0, 0, 0, 0.03);
+/* === SHARED LAYOUT COMPONENTS === */
+
+.amadeus-header {
+  position: sticky;
+  top: 0;
+  z-index: 50;
+  width: 100%;
+  background: rgba(255, 255, 255, 0.9);
+  backdrop-filter: blur(16px);
+  -webkit-backdrop-filter: blur(16px);
+  border-bottom: 1px solid #e5e7eb;
 }
 
-/* The vibrant rainbow gradient for rotating borders */
+.amadeus-nav-link {
+  font-size: 0.875rem;
+  font-weight: 500;
+  color: #6b7280;
+  transition: color 0.15s ease;
+  text-decoration: none;
+}
+
+.amadeus-nav-link:hover {
+  color: #111827;
+}
+
+.amadeus-nav-link.active {
+  color: #111827;
+  font-weight: 600;
+}
+
+/* === RAINBOW ACCENT SYSTEM === */
+
+.rainbow-bar {
+  height: 3px;
+  background: linear-gradient(90deg, #22d3ee, #3b82f6, #d946ef, #ec4899, #fb923c, #facc15, #22d3ee);
+  background-size: 200% 100%;
+  animation: border-spin 4s linear infinite;
+}
+
 .vibrant-rainbow-border {
   background: linear-gradient(
     90deg,
@@ -75,6 +112,10 @@ body {
     #22d3ee
   );
   background-size: 200% 200%;
+}
+
+.animate-border-spin {
+  animation: border-spin 4s linear infinite;
 }
 
 .vibrant-rainbow-text {
@@ -92,4 +133,143 @@ body {
   color: transparent;
   -webkit-background-clip: text;
   background-clip: text;
+  animation: border-spin 4s linear infinite;
 }
+
+/* === CARD SYSTEM === */
+
+.glass-panel {
+  background: rgba(255, 255, 255, 0.7);
+  backdrop-filter: blur(12px);
+  -webkit-backdrop-filter: blur(12px);
+  border: 1px solid rgba(255, 255, 255, 0.4);
+  box-shadow: 0 4px 6px -1px rgba(0, 0, 0, 0.05), 0 2px 4px -1px rgba(0, 0, 0, 0.03);
+}
+
+.card-hover {
+  transition: transform 0.2s ease, box-shadow 0.2s ease;
+}
+
+.card-hover:hover {
+  transform: translateY(-2px);
+  box-shadow: 0 8px 24px rgba(0, 0, 0, 0.08);
+}
+
+/* === PILL / BADGE === */
+.badge {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.25rem;
+  padding: 0.2rem 0.6rem;
+  border-radius: 9999px;
+  font-size: 0.7rem;
+  font-weight: 600;
+  letter-spacing: 0.04em;
+  text-transform: uppercase;
+  font-family: var(--font-mono), monospace;
+}
+
+.badge-green { background: #f0fdf4; color: #16a34a; border: 1px solid #bbf7d0; }
+.badge-red { background: #fef2f2; color: #dc2626; border: 1px solid #fecaca; }
+.badge-blue { background: #eff6ff; color: #2563eb; border: 1px solid #bfdbfe; }
+.badge-orange { background: #fff7ed; color: #c2410c; border: 1px solid #fed7aa; }
+.badge-slate { background: #f8fafc; color: #475569; border: 1px solid #e2e8f0; }
+
+/* === FORM ELEMENTS === */
+.form-input {
+  width: 100%;
+  background: #fafafa;
+  border: 1px solid #e5e7eb;
+  border-radius: 0.5rem;
+  padding: 0.625rem 0.875rem;
+  font-size: 0.875rem;
+  color: #111827;
+  transition: border-color 0.15s ease, box-shadow 0.15s ease;
+  outline: none;
+}
+
+.form-input:focus {
+  border-color: #6366f1;
+  box-shadow: 0 0 0 3px rgba(99, 102, 241, 0.1);
+}
+
+.form-label {
+  display: block;
+  font-size: 0.75rem;
+  font-weight: 600;
+  letter-spacing: 0.05em;
+  text-transform: uppercase;
+  color: #6b7280;
+  margin-bottom: 0.375rem;
+  font-family: var(--font-mono), monospace;
+}
+
+/* === BUTTON SYSTEM === */
+.btn-primary {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.5rem;
+  padding: 0.625rem 1.25rem;
+  background: #0f172a;
+  color: white;
+  border-radius: 0.5rem;
+  font-size: 0.875rem;
+  font-weight: 600;
+  border: none;
+  cursor: pointer;
+  transition: background 0.15s ease, transform 0.1s ease;
+  text-decoration: none;
+}
+
+.btn-primary:hover {
+  background: #1e293b;
+  transform: translateY(-1px);
+}
+
+.btn-secondary {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.5rem;
+  padding: 0.625rem 1.25rem;
+  background: white;
+  color: #374151;
+  border-radius: 0.5rem;
+  font-size: 0.875rem;
+  font-weight: 500;
+  border: 1px solid #e5e7eb;
+  cursor: pointer;
+  transition: background 0.15s ease, border-color 0.15s ease;
+  text-decoration: none;
+}
+
+.btn-secondary:hover {
+  background: #f9fafb;
+  border-color: #d1d5db;
+}
+
+/* === PAGE SHELL === */
+.page-shell {
+  min-height: 100vh;
+  background: #fafafa;
+}
+
+.page-header {
+  display: flex;
+  align-items: flex-end;
+  justify-content: space-between;
+  margin-bottom: 2rem;
+  padding-bottom: 1.5rem;
+  border-bottom: 1px solid #f1f5f9;
+}
+
+/* === STATUS DOT === */
+.status-dot {
+  width: 6px;
+  height: 6px;
+  border-radius: 50%;
+  display: inline-block;
+}
+
+.status-dot.online { background: #22c55e; box-shadow: 0 0 0 2px rgba(34, 197, 94, 0.2); }
+.status-dot.offline { background: #94a3b8; }
+.status-dot.active { background: #3b82f6; animation: pulse 1.5s infinite; }

@@ -28,7 +28,7 @@ export async function buildServer() {
   app.setSerializerCompiler(serializerCompiler);
 
   await app.register(cors, {
-    origin: ['http://localhost:3000', 'http://localhost:8008', 'http://127.0.0.1:3000'],
+    origin: ['http://localhost:3000', 'http://localhost:8008', 'http://127.0.0.1:3000', 'http://127.0.0.1:8008', 'http://127.0.0.1:5500'],
     credentials: true,
     allowedHeaders: ['Content-Type', 'Authorization', 'X-Robot-Key', 'X-Signature', 'X-Robot-Timestamp', 'X-Robot-Signing-Secret'],
   });

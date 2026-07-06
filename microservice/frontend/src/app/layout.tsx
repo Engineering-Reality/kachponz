@@ -1,6 +1,7 @@
 import type { Metadata } from "next";
 import { Space_Grotesk, JetBrains_Mono } from "next/font/google";
 import "./globals.css";
+import { AppShell } from "@/components/AppShell";
 
 const spaceGrotesk = Space_Grotesk({
   variable: "--font-sans",
@@ -13,8 +14,8 @@ const jetbrainsMono = JetBrains_Mono({
 });
 
 export const metadata: Metadata = {
-  title: "AMADEUS | Multi-Agent Orchestrator",
-  description: "Autonomous Multi-Agent Union Swarm",
+  title: "Amadeus — Enterprise Agentic Orchestrator",
+  description: "Secure multi-agent orchestration for Trade Finance settlement.",
 };
 
 export default function RootLayout({
@@ -27,7 +28,9 @@ export default function RootLayout({
       lang="en"
       className={`${spaceGrotesk.variable} ${jetbrainsMono.variable} h-full antialiased`}
     >
-      <body className="min-h-full flex flex-col font-sans bg-slate-50 text-slate-900">{children}</body>
+      <body className="min-h-full font-sans bg-white text-slate-900">
+        <AppShell>{children}</AppShell>
+      </body>
     </html>
   );
 }

@@ -94,22 +94,7 @@ export default function AgentInvoke() {
   };
 
   return (
-    <div className="flex flex-col h-screen bg-[#FAFAFA] text-slate-900 font-sans">
-      
-      {/* Header */}
-      <header className="h-16 bg-white border-b border-slate-200 flex items-center px-6 justify-between flex-shrink-0 z-10">
-        <div className="flex items-center gap-4">
-          <Link href="/" className="p-2 hover:bg-slate-50 rounded-lg text-slate-500 transition-colors">
-            <ArrowLeft className="w-5 h-5" />
-          </Link>
-          <div className="flex items-center gap-2">
-            <div className="w-8 h-8 bg-cyan-100 rounded-lg flex items-center justify-center text-cyan-600">
-              <Activity className="w-4 h-4" />
-            </div>
-            <h1 className="font-bold text-lg tracking-tight">Invoke Stream</h1>
-          </div>
-        </div>
-      </header>
+    <div className="flex h-full text-slate-900 overflow-hidden">
 
       {/* Main Split */}
       <div className="flex flex-1 overflow-hidden">

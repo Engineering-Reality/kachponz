@@ -10,6 +10,9 @@ import { registerDefaultExecutors } from './executors/executorMap.js';
 import { explainRoute } from './executors/router.js';
 import { dispatchCurrentStep } from './executors/dispatchBridge.js';
 import type { A2AEnvelope } from './a2a/protocol.js';
+import { handleRpc } from './a2a/rpcHandler.js';
+import { streamHandler } from './a2a/streamHandler.js';
+import { buildAgentCard } from './a2a/agentCard.js';
 
 // Daftarkan agent bawaan sekali saat modul dimuat.
 try {
@@ -46,6 +49,11 @@ const RunAgenticSchema = z
   .strict();
 
 export async function registerOrchestratorRoutes(app: FastifyInstance): Promise<void> {
+  // GET /.well-known/amadeus-agent-card.json (Public discovery)
+  app.get('/.well-known/amadeus-agent-card.json', async (_req, reply) => {
+    return reply.send(buildAgentCard());
+  });
+
   app.register(async (secured) => {
     secured.addHook('preHandler', authenticateRobot);
     secured.addHook('preHandler', verifyFinancialSignature);
@@ -53,6 +61,7 @@ export async function registerOrchestratorRoutes(app: FastifyInstance): Promise<
     const typedSecured = secured.withTypeProvider<ZodTypeProvider>();
 
     // POST /a2a — terima envelope A2A dari robot/agent.
+    // Legacy amadeus.a2a/0 — dipertahankan untuk backwards compat.
     typedSecured.post('/a2a', {
       schema: { body: A2AEnvelopeSchema }
     }, async (req, reply) => {
@@ -60,6 +69,17 @@ export async function registerOrchestratorRoutes(app: FastifyInstance): Promise<
       const result = await handleA2A(req.auth!, env);
       return reply.send(result);
     });
+
+    // POST /a2a/rpc — Endpoint utama amadeus.a2a/1 (JSON-RPC 2.0)
+    typedSecured.post('/a2a/rpc', async (req, reply) => {
+      const rawBody = typeof req.body === 'string' ? req.body : JSON.stringify(req.body ?? {});
+      const result = await handleRpc(req.body as any, req.auth!, rawBody);
+      // Ensure HTTP status is 200 for JSON-RPC even if it contains a JSON-RPC error
+      return reply.code(200).send(result);
+    });
+
+    // GET /a2a/tasks/:id/stream — SSE endpoint untuk task update
+    typedSecured.get('/a2a/tasks/:id/stream', streamHandler);
 
     // POST /orchestrator/run-agentic — jalankan agent agentic in-process
     // untuk current_step transaksi (mis. Document Examination Agent).

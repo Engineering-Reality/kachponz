@@ -1,5 +1,7 @@
 # Amadeus A2A Protocol — v0
 
+> **Status:** Legacy (amadeus.a2a/0). Klien baru silakan pakai v1 — lihat [a2a_protocol_v1.md](a2a_protocol_v1.md).
+> Server tetap mendukung v0 untuk robot yang belum di-upgrade.
 Protokol Agent-to-Agent untuk koordinasi robot UiPath/PAD & agent internal
 di alur settlement Import LC/SKBDN/SBLC. Menggantikan handoff email manual.
 

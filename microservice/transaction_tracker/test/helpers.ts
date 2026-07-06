@@ -4,7 +4,7 @@ import { insertServiceAccount } from '../src/services/serviceAccounts.js';
 import type { AuthContext } from '../src/types/domain.js';
 
 export async function truncateAll(): Promise<void> {
-  await query('TRUNCATE transaction_events, transactions, service_accounts RESTART IDENTITY CASCADE');
+  await query('TRUNCATE a2a_task_messages, a2a_tasks, transaction_events, transactions, service_accounts RESTART IDENTITY CASCADE');
 }
 
 export interface SeededRobot {

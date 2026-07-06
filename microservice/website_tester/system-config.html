@@ -34,8 +34,8 @@
         <input type="text" class="form-control-tech" id="robot-key-input" placeholder="amadeus-robot-key...">
 
         <label class="form-label-tech">Localhost API URL</label>
-        <input type="text" class="form-control-tech" id="localhost-input" placeholder="http://localhost:8000"
-            value="http://localhost:8000">
+        <input type="text" class="form-control-tech" id="localhost-input" placeholder="http://127.0.0.1:8080"
+            value="http://127.0.0.1:8080">
 
         <button class="btn-tech" id="save-config"> Authenticate System</button>
 
@@ -54,7 +54,7 @@
         // Load saved values
         jwtInput.value = localStorage.getItem('jwt_token') || '';
         robotKeyInput.value = localStorage.getItem('robot_key') || '';
-        localhostInput.value = localStorage.getItem('api_base_url') || 'http://localhost:8000';
+        localhostInput.value = localStorage.getItem('api_base_url') || 'http://127.0.0.1:8080';
 
         // Save configuration
         saveConfig.addEventListener('click', () => {

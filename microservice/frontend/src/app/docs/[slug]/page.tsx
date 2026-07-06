@@ -20,7 +20,8 @@ export async function generateStaticParams() {
   }
 }
 
-export default function DocViewer({ params }: { params: { slug: string } }) {
+export default async function DocViewer(props: { params: Promise<{ slug: string }> }) {
+  const params = await props.params;
   const docsDir = path.join(process.cwd(), 'src/content/docs');
   const filePath = path.join(docsDir, `${params.slug}.md`);
 

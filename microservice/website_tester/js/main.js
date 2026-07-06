@@ -11,14 +11,14 @@ if (typeof API === 'undefined') {
 
         // Get the base URL from localStorage
         getBaseUrl: function () {
-            const storedUrl = localStorage.getItem('api_url');
-            const url = storedUrl || 'http://localhost:8080';
+            const storedUrl = localStorage.getItem('api_base_url') || localStorage.getItem('api_url');
+            const url = storedUrl || 'http://127.0.0.1:8080';
             const trimmedUrl = url.trim();
 
             // Auto-fix if there's a space issue
             if (storedUrl && storedUrl !== trimmedUrl) {
                 console.warn('Fixed API URL with spaces:', storedUrl, '→', trimmedUrl);
-                localStorage.setItem('api_url', trimmedUrl);
+                localStorage.setItem('api_base_url', trimmedUrl);
             }
 
             return trimmedUrl;

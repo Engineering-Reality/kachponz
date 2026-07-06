@@ -1,0 +1,66 @@
+---
+title: "Agents"
+description: "Configuration-driven, secure intelligent actors for Trade Finance."
+---
+
+# Agents
+
+*Configuration-driven, secure intelligent actors for Trade Finance.*
+
+In Amadeus, an **Agent** is a secure, configuration-driven entity managed by a central LangGraph engine. Unlike traditional dynamic Python scripts, Amadeus Agents act as reasoning brains that determine *which* Model Context Protocol (MCP) Tools to execute without directly executing the code themselves.
+
+## Why use Agents in Amadeus?
+
+Transitioning from rigid RPA workflows to dynamic, goal-oriented agentic workflows provides significant architectural advantages:
+
+- **Dynamic Goal Orientation:** Instead of strict step-by-step programming, Agents dynamically plan the path to achieve a goal (e.g., "Verify this LC document against the UCP 600 regulations").
+- **Asynchronous Orchestration:** Agents can seamlessly orchestrate legacy UiPath jobs, Power Automate Desktop (PAD) flows, and asynchronous OCR tasks without blocking the main event loop.
+- **Resilience to Change:** When UI elements change or APIs update, rigid RPAs break. Agentic workflows can dynamically adjust their plans, asking for clarification via the `input_required` state when they encounter ambiguity.
+
+## How it Works (Under the Hood)
+
+Amadeus implements a **Configuration-Driven** approach designed strictly for air-gapped banking environments. 
+
+1. **Stateful Graph Execution:** Agents operate inside a stateless LangGraph engine. The entire execution graph is determined by the configuration, preventing arbitrary code execution.
+2. **Database-Backed Blueprints:** Agent blueprints and system prompts are stored securely in PostgreSQL (`a2a_tasks` and `transactions`). They are not generated as dynamic code.
+3. **Model Context Protocol (MCP):** Amadeus relies heavily on the MCP. The Agent reasoning engine **never holds credentials**. It simply outputs a structured JSON intent (e.g., "Extract text from Document X"). A standalone, highly-secured MCP Server then intercepts this intent, injects the necessary service accounts, and executes the physical tool.
+
+## Anatomy of an Agent
+
+In the Amadeus Database, an Agent is represented not by a script, but by a structured JSON configuration block. This explicitly defines its reasoning constraints, allowed capabilities, and assigned LLM endpoint.
+
+```json
+{
+  "agent_id": "doc_exam_agent",
+  "name": "Document Examination Agent",
+  "system_prompt": "You are a Trade Finance analyst. Verify LC parameters against ICC UCP 600. Do not guess information. If a document is unreadable, fail the step with 'OCR_FAILURE'.",
+  "allowed_mcp_tools": [
+    "mcp.vision.extract",
+    "mcp.core.get_transaction"
+  ],
+  "llm_config": {
+    "provider": "dashscope",
+    "model": "qwen-vl-max",
+    "temperature": 0.1
+  }
+}
+```
+
+<Note>
+**CISO Compliance Highlight: Secure Tooling Boundary**
+
+Because tools are executed over MCP, the LLM container never accesses the underlying `DATABASE_URL` or Core Banking `API_KEY`. If the LLM is compromised, it only has access to the isolated MCP tool intents explicitly whitelisted in its `allowed_mcp_tools` array.
+</Note>
+
+## Security & Compliance Gate
+
+> **Security Note:** High-Stakes Operations
+
+Amadeus ensures that rogue or hallucinating agents cannot corrupt the ledger.
+
+Agent execution is strictly protected by **Optimistic Locking** (`version` checking) and the A2A v1 Protocol. 
+To alter the Transaction State Tracker (e.g., completing an LC step), the Agent's executor must satisfy a **Dual Authentication** requirement:
+1. Valid Bearer Token or **X-Robot-Key**.
+2. **HMAC-SHA512** payload signature (Required for steps flagged with `financial: true`).
+
+If an Agent attempts to jump a step or mutate a stale transaction, the Optimistic Lock will instantly reject the commit with a `VERSION_CONFLICT` or `STEP_MISMATCH`.

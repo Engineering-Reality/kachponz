@@ -1,5 +1,10 @@
 // Transaction Tracker JavaScript
 
+// Initialize Mermaid
+if (window.mermaid) {
+    mermaid.initialize({ startOnLoad: false, theme: 'dark' });
+}
+
 // Override Auth to support X-Robot-Key
 document.addEventListener('DOMContentLoaded', function() {
     const originalGetHeaders = API.getHeaders.bind(API);
@@ -121,12 +126,33 @@ async function viewTransaction(id) {
                 </div>
                 <div class="col-sm-6 text-sm-end">
                     <p class="mb-1 text-white-50 small">Payload</p>
-                    <pre class="bg-black p-2 rounded text-start" style="font-size:0.8em">${JSON.stringify(tx.payload, null, 2)}</pre>
+                    <pre class="bg-black p-2 rounded text-start" style="font-size:0.8em; max-height: 120px; overflow-y: auto;">${JSON.stringify(tx.payload, null, 2)}</pre>
                 </div>
             </div>
             
-            <h5 class="text-info border-bottom border-secondary pb-2">Audit Trail / History</h5>
-            <div class="timeline">
+            <!-- Tabs Navigation -->
+            <ul class="nav nav-tabs mb-4 border-secondary" id="txTabs" role="tablist">
+                <li class="nav-item" role="presentation">
+                    <button class="nav-link active text-info" style="background: transparent; border-color: transparent transparent var(--c-cyan) transparent;" id="flow-tab" data-bs-toggle="tab" data-bs-target="#flow" type="button" role="tab" onclick="this.style.color='var(--c-cyan)'; this.style.borderBottom='2px solid var(--c-cyan)'; document.getElementById('audit-tab').style.border='none'; document.getElementById('audit-tab').style.color='rgba(255,255,255,0.5)';"><i class="bi bi-diagram-3 me-2"></i>Visual Flow</button>
+                </li>
+                <li class="nav-item" role="presentation">
+                    <button class="nav-link text-white-50" style="background: transparent; border: none;" id="audit-tab" data-bs-toggle="tab" data-bs-target="#audit" type="button" role="tab" onclick="this.style.color='var(--c-cyan)'; this.style.borderBottom='2px solid var(--c-cyan)'; document.getElementById('flow-tab').style.border='none'; document.getElementById('flow-tab').style.color='rgba(255,255,255,0.5)';"><i class="bi bi-list-check me-2"></i>Audit Trail</button>
+                </li>
+            </ul>
+
+            <div class="tab-content" id="txTabsContent">
+                <!-- Visual Flow Tab -->
+                <div class="tab-pane fade show active" id="flow" role="tabpanel">
+                    <div id="mermaid-container" class="text-center p-3 bg-black rounded" style="border: 1px solid rgba(0, 255, 255, 0.1); overflow-x: auto;">
+                        <div class="mermaid">
+                            ${generateMermaidGraph(tx, events)}
+                        </div>
+                    </div>
+                </div>
+
+                <!-- Audit Trail Tab -->
+                <div class="tab-pane fade" id="audit" role="tabpanel">
+                    <div class="timeline">
         `;
 
         if (events && events.length > 0) {
@@ -151,11 +177,69 @@ async function viewTransaction(id) {
             html += `<p class="text-white-50">No events recorded.</p>`;
         }
 
-        html += `</div>`;
+        html += `</div></div></div>`; // Close timeline, audit tab, and tab-content
         body.innerHTML = html;
+
+        // Render mermaid graph
+        if (window.mermaid) {
+            // Need a slight delay for modal DOM to settle
+            setTimeout(() => {
+                mermaid.init(undefined, document.querySelectorAll('.mermaid'));
+            }, 100);
+        }
 
     } catch (err) {
         console.error(err);
         body.innerHTML = `<div class="alert alert-danger">Failed to load transaction details.</div>`;
     }
+}
+
+function generateMermaidGraph(tx, events) {
+    const completedSteps = new Set((events || []).filter(e => e.event_type === 'step_completed').map(e => e.step));
+    
+    // Status tracking helper
+    const getStyle = (step) => {
+        if (tx.current_step === step && tx.status !== 'completed' && tx.status !== 'failed') return 'active';
+        if (completedSteps.has(step) || tx.status === 'completed') return 'completed';
+        if (tx.current_step === step && tx.status === 'failed') return 'failed';
+        return 'pending';
+    };
+
+    return `
+    graph LR
+        classDef completed fill:#198754,stroke:#fff,stroke-width:2px,color:#fff;
+        classDef active fill:#0dcaf0,stroke:#fff,stroke-width:3px,color:#000;
+        classDef pending fill:#343a40,stroke:#6c757d,stroke-width:1px,color:#adb5bd;
+        classDef failed fill:#dc3545,stroke:#fff,stroke-width:2px,color:#fff;
+
+        Applicant[Pembeli / Applicant]:::completed --> Submitted
+        
+        subgraph "KOPRA / TSC"
+            Submitted["submitted<br>Register & Kirim Email"]:::${getStyle('submitted')}
+        end
+        
+        subgraph "CTO / TOI"
+            Dist["distributed_to_analyst<br>Distribusi Aplikasi"]:::${getStyle('distributed_to_analyst')}
+        end
+        
+        subgraph "Agentic AI"
+            DocExam["doc_examined<br>Scan & Extract"]:::${getStyle('doc_examined')}
+        end
+        
+        subgraph "Eximbills Enterprise"
+            Maker["ee_ntf_created<br>Maker Modify"]:::${getStyle('ee_ntf_created')}
+            Checker["ee_ntf_approved<br>Checker Otorisasi"]:::${getStyle('ee_ntf_approved')}
+            MT["mt_converted<br>Completion Template"]:::${getStyle('mt_converted')}
+            Swift["swift_released<br>Release SWIFT"]:::${getStyle('swift_released')}
+            Settled["settled<br>Terbit LC"]:::${getStyle('settled')}
+        end
+        
+        Submitted --> Dist
+        Dist --> DocExam
+        DocExam --> Maker
+        Maker --> Checker
+        Checker --> MT
+        MT --> Swift
+        Swift --> Settled
+    `;
 }

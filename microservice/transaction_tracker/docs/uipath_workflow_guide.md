@@ -101,6 +101,27 @@ Try
     └── If response.status != 200:
           Throw BusinessRuleException("Amadeus report failed: " + response.body)
 
+### Varian v1 (JSON-RPC)
+Bila ingin langsung menggunakan protokol `amadeus.a2a/1` (terutama untuk task tracking per-step), alur HTTP Request-nya:
+```text
+HTTP Request activity → POST /a2a/rpc
+URL: https://amadeus.internal/a2a/rpc
+Headers: Sama dengan v0
+Body (JSON):
+{
+  "jsonrpc": "2.0",
+  "id": "req-1",
+  "method": "task.submit",
+  "params": {
+    "transactionId": in_AmadeusTransactionId,
+    "step": in_AmadeusStep,
+    "correlationId": "uipath:" + Environment.MachineName + ":" + JobId,
+    "data": resultPayload
+    // signature ditaruh dalam object "signature" bila step finansial
+  }
+}
+```
+
 Catch (any exception)
     ├── Log message + rollback (bila perlu, tergantung step)
     │
@@ -181,6 +202,24 @@ curl -X POST http://localhost:8080/a2a \
   }'
 
 # → response: state tracker maju ke ee_ntf_approved
+```
+
+### Varian v1 (JSON-RPC)
+```bash
+# 1) Robot submit task baru
+curl -X POST http://localhost:8080/a2a/rpc \
+  -H "X-Robot-Key: $ROBOT_KEY" -H "Content-Type: application/json" \
+  -d '{
+    "jsonrpc": "2.0",
+    "id": "1",
+    "method": "task.submit",
+    "params": {
+      "transactionId": "...",
+      "step": "ee_ntf_created",
+      "correlationId": "test"
+    }
+  }'
+# → response JSON-RPC dengan taskId
 ```
 
 Verifikasi via GET `/transactions/:id` → `current_step` sudah maju,

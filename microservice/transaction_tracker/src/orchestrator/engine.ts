@@ -83,6 +83,45 @@ async function completeAndHandoff(
   };
 }
 
+export async function computeHandoffAfterTaskCompletion(
+  auth: AuthContext,
+  transactionId: string,
+  taskId: string,
+  step: string,
+  correlationId: string,
+  data?: Record<string, unknown>
+): Promise<A2AResult> {
+  const log = txLogger(transactionId);
+  const result = await completeStep(auth, transactionId, {
+    step,
+    idempotencyKey: `task-completion-${taskId}`,
+    payload: data,
+  });
+
+  const flow = getFlow(result.transaction.type);
+  const nextStep = result.transaction.status === 'completed'
+    ? null
+    : flow?.steps[result.transaction.current_step]
+      ? result.transaction.current_step
+      : null;
+  const nextActorHint = nextStep ? (flow?.steps[nextStep]?.actorHint ?? null) : null;
+
+  log.info(
+    { correlationId, nextStep, nextActorHint },
+    'A2A handoff computed from task completion',
+  );
+
+  return {
+    accepted: true,
+    transactionId: result.transaction.id,
+    currentStep: result.transaction.current_step,
+    status: result.transaction.status,
+    nextStep,
+    nextActorHint,
+    idempotentReplay: result.idempotentReplay,
+  };
+}
+
 async function failStep(
   auth: AuthContext,
   env: A2AEnvelope,

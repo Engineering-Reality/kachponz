@@ -127,54 +127,29 @@ export default function Dashboard() {
   const failedCount = transactions.filter(t => t.status === "failed").length;
 
   return (
-    <div className="h-screen flex flex-col bg-[#FAFAFA] text-slate-900 font-sans overflow-hidden">
+    <div className="h-full flex flex-col bg-[#FAFAFA] text-slate-900 overflow-hidden">
       {/* Compact Header */}
-      <header className="h-12 bg-white border-b border-slate-200 flex items-center px-4 justify-between flex-shrink-0 z-10">
+      <header className="h-11 bg-white border-b border-slate-100 flex items-center px-4 justify-between flex-shrink-0">
         <div className="flex items-center gap-3">
-          <Link href="/" className="p-1.5 hover:bg-slate-50 rounded-md text-slate-400 transition-colors">
-            <ArrowLeft className="w-4 h-4" />
-          </Link>
-          <div className="h-5 w-px bg-slate-200" />
-          <h1 className="text-sm font-bold tracking-tight">Orchestrator Dashboard</h1>
-          <span className="text-[10px] font-mono bg-slate-100 text-slate-500 px-1.5 py-0.5 rounded border border-slate-200">
-            amadeus.a2a/0
-          </span>
+          <h2 className="text-xs font-bold text-slate-900 uppercase tracking-wider">Transaction Ledger</h2>
+          <span className="badge badge-slate">{transactions.length} records</span>
         </div>
         <div className="flex items-center gap-2">
-          <button onClick={createTestTransaction} className="flex items-center gap-1.5 px-3 py-1.5 text-xs font-medium bg-slate-900 text-white rounded-md hover:bg-slate-800 transition-colors">
+          {failedCount > 0 && (
+            <span className="badge badge-red">
+              <AlertTriangle className="w-2.5 h-2.5" /> {failedCount} Failed
+            </span>
+          )}
+          <span className="badge badge-blue">{activeCount} Active</span>
+          <span className="badge badge-green">{completedCount} Completed</span>
+          <button onClick={createTestTransaction} className="btn-primary text-[11px] py-1.5 px-3">
             <Play className="w-3 h-3" /> Inject Tx
           </button>
-          <button onClick={fetchTransactions} className="flex items-center gap-1.5 px-3 py-1.5 text-xs font-medium border border-slate-200 text-slate-600 rounded-md hover:bg-slate-50 transition-colors">
+          <button onClick={fetchTransactions} className="btn-secondary text-[11px] py-1.5 px-3">
             <RefreshCw className="w-3 h-3" /> Sync
           </button>
         </div>
       </header>
-
-      {/* Compact Metric Strip */}
-      <div className="h-9 bg-white border-b border-slate-100 flex items-center px-4 gap-6 flex-shrink-0 text-xs">
-        <div className="flex items-center gap-1.5 text-slate-500">
-          <Layers className="w-3 h-3" />
-          <span className="font-medium text-slate-900">{transactions.length}</span> Total
-        </div>
-        <div className="flex items-center gap-1.5 text-blue-600">
-          <Activity className="w-3 h-3" />
-          <span className="font-medium">{activeCount}</span> Active
-        </div>
-        <div className="flex items-center gap-1.5 text-emerald-600">
-          <CheckCircle className="w-3 h-3" />
-          <span className="font-medium">{completedCount}</span> Completed
-        </div>
-        {failedCount > 0 && (
-          <div className="flex items-center gap-1.5 text-red-600">
-            <AlertTriangle className="w-3 h-3" />
-            <span className="font-medium">{failedCount}</span> Failed
-          </div>
-        )}
-        <div className="ml-auto flex items-center gap-4 text-slate-400">
-          <div className="flex items-center gap-1.5" title="UiPath Dispatcher"><Server className="w-3 h-3 text-emerald-500" /> <span className="font-mono text-[10px]">UiPath: Online</span></div>
-          <div className="flex items-center gap-1.5" title="PostgreSQL"><Database className="w-3 h-3 text-emerald-500" /> <span className="font-mono text-[10px]">PG: Connected</span></div>
-        </div>
-      </div>
 
       {/* Main Split Content */}
       <div className="flex flex-1 overflow-hidden">
@@ -441,7 +416,7 @@ export default function Dashboard() {
 
                 {tab === "graph" && (
                   <div className="h-full min-h-[400px] relative">
-                    <TransactionGraph currentStep={selectedTx?.current_step || null} />
+                    <TransactionGraph tx={selectedTx} events={txEvents} />
                   </div>
                 )}
               </div>
