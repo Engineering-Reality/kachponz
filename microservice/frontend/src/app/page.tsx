@@ -3,6 +3,8 @@
 import { useState, useEffect, useRef } from "react";
 import Link from "next/link";
 import { TransactionGraph } from "@/components/TransactionGraph";
+import { ParticleBackground } from "@/components/ParticleBackground";
+import { SpectralText } from "@/components/SpectralText";
 import {
   ShieldCheck,
   Lock,
@@ -226,12 +228,15 @@ export default function Home() {
 
         .scroll-reveal {
           opacity: 0;
-          transform: translateY(30px) scale(0.98);
-          transition: all 0.9s cubic-bezier(0.16, 1, 0.3, 1);
+          transform: translateY(60px) scale(0.9) perspective(1000px) rotateX(-15deg);
+          transition-property: opacity, transform;
+          transition-duration: 1.2s;
+          transition-timing-function: cubic-bezier(0.19, 1, 0.22, 1);
+          transform-origin: top center;
         }
         .reveal-active {
           opacity: 1;
-          transform: translateY(0) scale(1);
+          transform: translateY(0) scale(1) perspective(1000px) rotateX(0deg);
         }
       `}</style>
 
@@ -239,13 +244,8 @@ export default function Home() {
       <header className="h-16 border-b border-white/10 surface-dark sticky top-0 z-50">
         <div className="max-w-6xl mx-auto px-6 h-full flex items-center justify-between">
           <div className="flex items-center gap-3">
-            <div className="w-8 h-8 rounded-lg flex items-center justify-center overflow-hidden relative">
-              <div className="absolute inset-0 vibrant-rainbow-border animate-border-spin opacity-80" />
-              <div className="absolute inset-[2px] bg-[#0a0a0a] rounded-md flex items-center justify-center">
-                <img src="/amadeus.svg" alt="A" className="w-4.5 h-4.5 object-contain invert" />
-              </div>
-            </div>
-            <span className="font-extrabold text-base tracking-tight text-white">Amadeus</span>
+            <img src="/amadeus.svg" alt="Amadeus Logo" className="w-10 h-10 object-contain animate-spin-tesseract" />
+            <span className="font-extrabold text-xl tracking-tight text-white">Amadeus</span>
           </div>
           <nav className="hidden md:flex items-center gap-8">
             <Link href="/dashboard" className="text-sm font-medium text-white/60 hover:text-white transition-colors">Dashboard</Link>
@@ -263,21 +263,22 @@ export default function Home() {
 
       {/* Hero Section — full-bleed dark */}
       <section className="surface-dark relative py-20 md:py-28 overflow-hidden">
-        <div className="max-w-6xl mx-auto px-6 grid grid-cols-1 lg:grid-cols-12 gap-12 items-center">
+        <ParticleBackground />
+        <div className="max-w-6xl mx-auto px-6 grid grid-cols-1 lg:grid-cols-12 gap-12 items-center relative z-10">
           {/* Left Text Column */}
-          <div className="lg:col-span-6 space-y-8 text-left">
-            <p className="ui-label text-white/40">AMADEUS / CONVERSATIONAL ORCHESTRATION</p>
+          <div className="lg:col-span-6 text-left">
+            <p className="ui-label text-white/40 mb-4">AMADEUS / CONVERSATIONAL ORCHESTRATION</p>
 
-            <h1 className="display-hero text-5xl md:text-6xl lg:text-7xl text-white">
-              Talk to Your Banking{" "}
-              <span className="rainbow-underline">Agents</span>!
+            <h1 className="display-hero text-5xl md:text-6xl lg:text-7xl text-white relative z-20 leading-tight mb-4">
+              Talk to Your{" "}
+              <SpectralText text="Banker Agents!" />
             </h1>
 
-            <p className="text-[15px] text-slate-300 leading-relaxed max-w-lg">
-              More than just a chatbot, Amadeus is a conversational orchestration platform for your banking operations. We prioritize Human Context Protocol (HCP), over Model Context Protocol (MCP).
+            <p className="text-[15px] text-slate-300 leading-relaxed max-w-lg mb-8">
+              More than just a chatbot, Amadeus is a powerful orchestration platform for autonomous banking operations. We prioritize precise state execution over conversational fluff.
             </p>
 
-            <div className="flex items-center gap-3 pt-2">
+            <div className="flex items-center gap-3">
               <Link href="/agent-invoke" className="inline-flex items-center gap-2 bg-white text-black px-6 py-3 text-sm font-semibold rounded-lg hover:bg-white/90 transition-colors">
                 Talk to an Agent <ArrowRight className="w-4 h-4" />
               </Link>
@@ -455,7 +456,7 @@ export default function Home() {
       </section>
 
       {/* Section 3: App Grid */}
-      <section className="py-24 bg-[#fafafa] scroll-reveal">
+      <section className="py-24 bg-[#fafafa]">
         <div className="max-w-6xl mx-auto px-6 space-y-10">
           <div className="text-left space-y-2 max-w-xl">
             <p className="ui-label text-slate-400">Our Features</p>
@@ -469,11 +470,11 @@ export default function Home() {
 
           <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6 relative z-0">
             {gridApps.map(({ href, step, label, desc, icon: Icon, accent, bg }, index) => (
-              <Link
-                key={href}
-                href={href}
-                className="relative group rounded-2xl p-[1.5px] overflow-hidden transition-all duration-500 hover:-translate-y-1.5"
-              >
+              <div key={href} className="scroll-reveal" style={{ transitionDelay: `${index * 120}ms` }}>
+                <Link
+                  href={href}
+                  className="relative group rounded-2xl p-[1.5px] overflow-hidden transition-all duration-500 hover:-translate-y-1.5 block h-full shadow-sm hover:shadow-xl"
+                >
                 <div className="absolute inset-0 bg-gradient-to-br from-slate-200 to-slate-100 group-hover:from-indigo-500 group-hover:via-purple-500 group-hover:to-pink-500 transition-colors duration-500 opacity-60 group-hover:opacity-100" />
                 <div className="relative z-10 flex flex-col h-full bg-white rounded-[14px] p-6 shadow-sm hover:shadow-2xl hover:shadow-indigo-500/10 transition-all duration-500">
                   <div className="flex justify-between items-start mb-6">
@@ -492,7 +493,8 @@ export default function Home() {
                     Explore <ArrowRight className="w-3.5 h-3.5 transform group-hover:translate-x-1.5 transition-transform" />
                   </div>
                 </div>
-              </Link>
+                </Link>
+              </div>
             ))}
           </div>
 

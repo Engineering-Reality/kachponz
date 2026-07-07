@@ -1,9 +1,9 @@
 import type { Metadata } from "next";
-import { Space_Grotesk, JetBrains_Mono, Poppins } from "next/font/google";
+import { Inter, JetBrains_Mono, Poppins } from "next/font/google";
 import "./globals.css";
 import { AppShell } from "@/components/AppShell";
 
-const spaceGrotesk = Space_Grotesk({
+const inter = Inter({
   variable: "--font-sans",
   subsets: ["latin"],
 });
@@ -37,7 +37,7 @@ export default function RootLayout({
   return (
     <html
       lang="en"
-      className={`${spaceGrotesk.variable} ${jetbrainsMono.variable} ${poppins.variable} h-full antialiased`}
+      className={`${inter.variable} ${jetbrainsMono.variable} ${poppins.variable} h-full antialiased`}
     >
       <body className="min-h-full bg-white text-slate-900">
         <AppShell>{children}</AppShell>

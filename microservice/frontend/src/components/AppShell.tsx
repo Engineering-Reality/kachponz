@@ -46,13 +46,9 @@ export function AppShell({ children }: { children: React.ReactNode }) {
         {/* Logo */}
         <div className="h-14 flex items-center px-5 border-b border-white/8">
           <Link href="/" className="flex items-center gap-2.5 group">
-            <div className="w-7 h-7 rounded-lg flex items-center justify-center overflow-hidden relative">
-              <div className="absolute inset-0 vibrant-rainbow-border animate-border-spin opacity-90" />
-              <div className="absolute inset-[2px] bg-[#0a0a0a] rounded-md flex items-center justify-center">
-                <img src="/amadeus.svg" alt="A" className="w-4 h-4 object-contain invert" />
-              </div>
-            </div>
-            <span className="font-bold text-sm text-white tracking-tight">Amadeus</span>
+            {/* eslint-disable-next-line @next/next/no-img-element */}
+            <img src="/amadeus.svg" alt="Amadeus Logo" className="w-8 h-8 object-contain animate-spin-tesseract" />
+            <span className="font-bold text-base text-white tracking-tight">Amadeus</span>
             <span className="ui-label text-[8px] text-white/40 border border-white/15 rounded px-1.5 py-0.5">A2A</span>
           </Link>
         </div>

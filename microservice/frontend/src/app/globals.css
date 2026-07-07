@@ -138,6 +138,25 @@ body {
   animation: border-spin 4s linear infinite;
 }
 
+.pastel-rainbow-text {
+  background: linear-gradient(
+    90deg,
+    #93c5fd,
+    #c4b5fd,
+    #f9a8d4,
+    #fcd34d,
+    #86efac,
+    #93c5fd
+  );
+  background-size: 200% auto;
+  color: transparent;
+  -webkit-background-clip: text;
+  background-clip: text;
+  animation: border-spin 6s linear infinite;
+  padding-bottom: 0.15em;
+  display: inline-block;
+}
+
 /* === CARD SYSTEM === */
 
 .glass-panel {
@@ -207,6 +226,14 @@ body {
 }
 
 /* === BUTTON SYSTEM === */
+@keyframes spin-tesseract {
+  0% { transform: rotate(0deg); }
+  100% { transform: rotate(360deg); }
+}
+.animate-spin-tesseract {
+  animation: spin-tesseract 15s linear infinite;
+}
+
 .btn-primary {
   display: inline-flex;
   align-items: center;

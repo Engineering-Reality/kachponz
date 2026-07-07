@@ -17,6 +17,8 @@ import {
   Copy,
   Check,
   Zap,
+  Link as LinkIcon,
+  Loader2,
 } from "lucide-react";
 
 export default function ToolsPage() {
@@ -27,6 +29,11 @@ export default function ToolsPage() {
   const [modalMode, setModalMode] = useState<"create" | "edit">("create");
   const [currentTool, setCurrentTool] = useState<any>(null);
   const [formData, setFormData] = useState({ name: "", description: "", on_status: "Online", port: "", args: "", method: "sse" });
+
+  const [isAuthModalOpen, setIsAuthModalOpen] = useState(false);
+  const [authProvider, setAuthProvider] = useState<"uipath" | "pad" | "amadeus" | "">("");
+  const [authFormData, setAuthFormData] = useState({ clientId: "", clientSecret: "", org: "", tenant: "", folderId: "" });
+  const [isAuthenticating, setIsAuthenticating] = useState(false);
 
   const [searchQuery, setSearchQuery] = useState("");
   const [methodFilter, setMethodFilter] = useState("all");
@@ -126,7 +133,19 @@ export default function ToolsPage() {
         }
       }, null, 2);
     } else {
-      const parts = args.split(" ");
+      let parts = [];
+      // Handle quoted JSON arguments properly (crude parsing for the snippet)
+      if (args.includes("'")) {
+        const firstQuote = args.indexOf("'");
+        const lastQuote = args.lastIndexOf("'");
+        parts = args.substring(0, firstQuote).trim().split(" ");
+        parts.push(args.substring(firstQuote + 1, lastQuote));
+        const rest = args.substring(lastQuote + 1).trim();
+        if (rest) parts.push(...rest.split(" "));
+      } else {
+        parts = args.split(" ");
+      }
+      
       const cmd = parts[0] || "node";
       const cmdArgs = parts.slice(1);
       return JSON.stringify({
@@ -138,6 +157,70 @@ export default function ToolsPage() {
         }
       }, null, 2);
     }
+  };
+
+  const openAuthModal = (provider: "uipath" | "pad" | "amadeus") => {
+    setAuthProvider(provider);
+    setAuthFormData({ clientId: "", clientSecret: "", org: "", tenant: "", folderId: "" });
+    setIsAuthModalOpen(true);
+  };
+
+  const handleAuthConnect = async (e: React.FormEvent) => {
+    e.preventDefault();
+    setIsAuthenticating(true);
+    
+    // Simulate OAuth delay
+    setTimeout(async () => {
+      try {
+        let payload: any = {};
+        
+        if (authProvider === "uipath") {
+          const argsObj = {
+            baseUrl: "https://cloud.uipath.com",
+            org: authFormData.org,
+            tenant: authFormData.tenant,
+            clientId: authFormData.clientId,
+            clientSecret: authFormData.clientSecret,
+            scopes: "OR.Jobs OR.Robots.Read OR.Execution",
+            folderId: authFormData.folderId
+          };
+          payload = {
+            name: "mcp-uipath",
+            description: "UiPath MCP — RPA trigger and monitoring",
+            on_status: "Online",
+            versions: [{ version: "1.0.0", released: { method: "stdio", port: "—", args: `node /home/firania/Downloads/ponzgen/microservice/mcp-uipath/build/index.js '${JSON.stringify(argsObj)}' --stdio`, env: {} } }]
+          };
+        } else if (authProvider === "pad") {
+          payload = {
+            name: "mcp-pad",
+            description: "Power Automate Desktop MCP — Windows automation triggers",
+            on_status: "Online",
+            versions: [{ version: "1.0.0", released: { method: "sse", port: "10003", args: "node /path/to/mcp-pad/build/index.js", env: {} } }]
+          };
+        } else if (authProvider === "amadeus") {
+          payload = {
+            name: "amadeus-mcp",
+            description: "Amadeus Orchestrator MCP — transaction tracker & step dispatcher",
+            on_status: "Online",
+            versions: [{ version: "1.0.0", released: { method: "sse", port: "10002", args: "node /path/to/amadeus-mcp/build/index.js", env: {} } }]
+          };
+        }
+
+        const res = await fetch(`${apiUrl}/tools`, {
+          method: "POST",
+          headers: { ...headers, "Content-Type": "application/json" },
+          body: JSON.stringify(payload),
+        });
+        if (!res.ok) throw new Error("Failed to connect integration");
+        
+        setIsAuthModalOpen(false);
+        setIsAuthenticating(false);
+        fetchTools();
+      } catch (err: any) {
+        alert(err.message);
+        setIsAuthenticating(false);
+      }
+    }, 2000);
   };
 
   const filteredTools = tools.filter(t => {
@@ -170,13 +253,13 @@ export default function ToolsPage() {
         </div>
       </div>
 
-      {/* Quick Presets Grid */}
+      {/* Integrations Grid */}
       <div className="mb-8">
-        <h2 className="ui-label text-slate-400 mb-3 flex items-center gap-1.5"><Zap className="w-3.5 h-3.5 text-amber-500" /> Quick-install presets</h2>
+        <h2 className="ui-label text-slate-400 mb-3 flex items-center gap-1.5"><LinkIcon className="w-3.5 h-3.5 text-blue-500" /> Connect Integrations</h2>
         <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
           {[
             { 
-              label: "UiPath MCP Integration", 
+              label: "Login with UiPath", 
               desc: "Trigger RPA settlement robot queues", 
               color: "border-orange-200 hover:border-orange-300 bg-orange-50/20 text-orange-700", 
               logo: (
@@ -186,17 +269,17 @@ export default function ToolsPage() {
                   <path d="M19 14H27V28H19V14Z" fill="#141414" />
                 </svg>
               ),
-              preset: { name: "mcp-uipath", description: "UiPath MCP — RPA trigger and monitoring", on_status: "Online", port: "10001", args: "node /path/to/mcp-uipath/build/index.js", method: "sse" } 
+              provider: "uipath" as const
             },
             { 
-              label: "Amadeus MCP Core", 
+              label: "Connect Amadeus Core", 
               desc: "Verify LC steps & append transitions", 
               color: "border-indigo-200 hover:border-indigo-300 bg-indigo-50/20 text-indigo-700", 
               logo: <img src="/amadeus.svg" alt="Amadeus" className="w-5 h-5 mb-2" />,
-              preset: { name: "amadeus-mcp", description: "Amadeus Orchestrator MCP — transaction tracker & step dispatcher", on_status: "Online", port: "10002", args: "node /path/to/amadeus-mcp/build/index.js", method: "sse" } 
+              provider: "amadeus" as const
             },
             { 
-              label: "Power Automate MCP", 
+              label: "Login with Power Automate", 
               desc: "Trigger desktop automation flows", 
               color: "border-blue-200 hover:border-blue-300 bg-blue-50/20 text-blue-700", 
               logo: (
@@ -205,12 +288,12 @@ export default function ToolsPage() {
                   <path d="M21 12L12 21L21 30L30 21L21 12Z" fill="#005A9E" />
                 </svg>
               ),
-              preset: { name: "mcp-pad", description: "Power Automate Desktop MCP — Windows automation triggers", on_status: "Online", port: "10003", args: "node /path/to/mcp-pad/build/index.js", method: "sse" } 
+              provider: "pad" as const
             },
-          ].map(({ label, desc, color, logo, preset }) => (
+          ].map(({ label, desc, color, logo, provider }) => (
             <button
               key={label}
-              onClick={() => { setModalMode("create"); setCurrentTool(null); setFormData(preset); setIsModalOpen(true); }}
+              onClick={() => openAuthModal(provider)}
               className={`border p-4 rounded-2xl text-left hover:shadow-md transition-all duration-200 ${color}`}
             >
               {logo}
@@ -462,6 +545,72 @@ export default function ToolsPage() {
                 {modalMode === "create" ? "Register Server" : "Save Changes"} <ChevronRight className="w-4 h-4" />
               </button>
             </div>
+          </div>
+        </div>
+      )}
+      {/* Auth Modal */}
+      {isAuthModalOpen && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/25 backdrop-blur-sm p-4 animate-in fade-in duration-200">
+          <div className="bg-white border border-slate-200 rounded-2xl w-full max-w-md shadow-2xl flex flex-col">
+            <div className="flex justify-between items-center px-6 py-4 border-b border-slate-100">
+              <h2 className="font-extrabold text-slate-900 text-lg flex items-center gap-2">
+                {authProvider === "uipath" && <span className="text-orange-600">Connect to UiPath</span>}
+                {authProvider === "pad" && <span className="text-blue-600">Connect to Power Automate</span>}
+                {authProvider === "amadeus" && <span className="text-indigo-600">Connect Amadeus Core</span>}
+              </h2>
+              <button type="button" onClick={() => setIsAuthModalOpen(false)} className="p-1.5 text-slate-400 hover:text-slate-700 hover:bg-slate-100 rounded-lg">
+                <X className="w-4 h-4" />
+              </button>
+            </div>
+            
+            <form onSubmit={handleAuthConnect} className="flex-1 flex flex-col">
+              <div className="p-6 space-y-4">
+                {authProvider === "uipath" ? (
+                  <>
+                    <div className="bg-slate-50 p-3 rounded-xl border border-slate-100 text-xs text-slate-500 mb-2">
+                      Please enter your UiPath External Application credentials to generate the MCP connection token.
+                    </div>
+                    <div className="grid grid-cols-2 gap-3">
+                      <div>
+                        <label className="form-label">Organization</label>
+                        <input required value={authFormData.org} onChange={e => setAuthFormData({ ...authFormData, org: e.target.value })} className="form-input rounded-xl border-slate-200" placeholder="e.g. maestffaiddh" />
+                      </div>
+                      <div>
+                        <label className="form-label">Tenant</label>
+                        <input required value={authFormData.tenant} onChange={e => setAuthFormData({ ...authFormData, tenant: e.target.value })} className="form-input rounded-xl border-slate-200" placeholder="e.g. DefaultTenant" />
+                      </div>
+                    </div>
+                    <div>
+                      <label className="form-label">Client ID (App ID)</label>
+                      <input required value={authFormData.clientId} onChange={e => setAuthFormData({ ...authFormData, clientId: e.target.value })} className="form-input rounded-xl border-slate-200" placeholder="UUID format" />
+                    </div>
+                    <div>
+                      <label className="form-label">Client Secret</label>
+                      <input required type="password" value={authFormData.clientSecret} onChange={e => setAuthFormData({ ...authFormData, clientSecret: e.target.value })} className="form-input rounded-xl border-slate-200" placeholder="••••••••••••••••" />
+                    </div>
+                    <div>
+                      <label className="form-label">Folder ID</label>
+                      <input required value={authFormData.folderId} onChange={e => setAuthFormData({ ...authFormData, folderId: e.target.value })} className="form-input rounded-xl border-slate-200" placeholder="e.g. 6500192" />
+                    </div>
+                  </>
+                ) : (
+                  <div className="bg-slate-50 p-4 rounded-xl border border-slate-100 text-sm text-slate-500 text-center py-8">
+                    Standard connection initialization.<br/>Click Connect to proceed.
+                  </div>
+                )}
+              </div>
+              
+              <div className="px-6 py-4 border-t border-slate-100 flex justify-end gap-3 bg-slate-50/50 rounded-b-2xl">
+                <button type="button" onClick={() => setIsAuthModalOpen(false)} className="btn-secondary text-sm rounded-xl">Cancel</button>
+                <button type="submit" disabled={isAuthenticating} className="btn-primary text-sm rounded-xl bg-slate-900 text-white hover:bg-slate-800 disabled:opacity-70 disabled:cursor-wait">
+                  {isAuthenticating ? (
+                    <><Loader2 className="w-4 h-4 animate-spin" /> Authenticating...</>
+                  ) : (
+                    "Connect Account"
+                  )}
+                </button>
+              </div>
+            </form>
           </div>
         </div>
       )}
