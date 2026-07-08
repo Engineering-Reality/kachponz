@@ -48,7 +48,7 @@ const RunAgenticSchema = z
     prompt: z.string().optional(),
     messages: z.array(z.object({
       role: z.enum(['user', 'assistant', 'system', 'tool']),
-      content: z.string()
+      content: z.union([z.string(), z.array(z.any())])
     })).optional(),
     stream: z.boolean().optional(),
   })

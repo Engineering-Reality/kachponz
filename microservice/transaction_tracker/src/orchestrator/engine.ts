@@ -325,11 +325,25 @@ export async function runAgenticStep(
   const { tools, clients } = await loadMcpTools(toolConfigs, log);
 
   try {
+    const inputMessages = messagesHistory && messagesHistory.length > 0 
+      ? messagesHistory 
+      : [{ role: "user", content: prompt || `Execute step ${step} for transaction ${txId}` }];
+
+    let requiresVision = false;
+    for (const msg of inputMessages) {
+      if (Array.isArray(msg.content) && msg.content.some((p: any) => p.type === 'image_url')) {
+        requiresVision = true;
+        break;
+      }
+    }
+
+    const resolvedModel = agentConfig.model && agentConfig.model !== "gpt-4o" 
+      ? agentConfig.model 
+      : (requiresVision ? "qwen-vl-max" : (process.env.QWEN_LLM_MODEL || "qwen-max"));
+
     // 4. Instantiate LangGraph createReactAgent In-Memory
     const llm = new ChatOpenAI({
-      modelName: agentConfig.model && agentConfig.model !== "gpt-4o" 
-        ? agentConfig.model 
-        : process.env.QWEN_LLM_MODEL || "qwen-max",
+      modelName: resolvedModel,
       temperature: 0,
       apiKey: process.env.QWEN_API_KEY,
       configuration: {
@@ -342,10 +356,6 @@ export async function runAgenticStep(
       tools,
       stateModifier: agentConfig.agent_style || "You are a helpful assistant.",
     });
-
-    const inputMessages = messagesHistory && messagesHistory.length > 0 
-      ? messagesHistory 
-      : [{ role: "user", content: prompt || `Execute step ${step} for transaction ${txId}` }];
 
     // 5. Invoke LangGraph
     const result = await agent.invoke({
@@ -464,11 +474,25 @@ export async function runAgenticStepStream(
   const { tools, clients } = await loadMcpTools(toolConfigs, log);
 
   try {
+    const inputMessages = messagesHistory && messagesHistory.length > 0 
+      ? messagesHistory 
+      : [{ role: "user", content: prompt || `Execute step ${step} for transaction ${txId}` }];
+
+    let requiresVision = false;
+    for (const msg of inputMessages) {
+      if (Array.isArray(msg.content) && msg.content.some((p: any) => p.type === 'image_url')) {
+        requiresVision = true;
+        break;
+      }
+    }
+
+    const resolvedModel = agentConfig.model && agentConfig.model !== "gpt-4o" 
+      ? agentConfig.model 
+      : (requiresVision ? "qwen-vl-max" : (process.env.QWEN_LLM_MODEL || "qwen-max"));
+
     const modelInitStart = Date.now();
     const llm = new ChatOpenAI({
-      modelName: agentConfig.model && agentConfig.model !== "gpt-4o" 
-        ? agentConfig.model 
-        : process.env.QWEN_LLM_MODEL || "qwen-max",
+      modelName: resolvedModel,
       temperature: 0,
       apiKey: process.env.QWEN_API_KEY,
       configuration: {
@@ -492,10 +516,6 @@ export async function runAgenticStepStream(
     }
 
     const responseStart = Date.now();
-    const inputMessages = messagesHistory && messagesHistory.length > 0 
-      ? messagesHistory 
-      : [{ role: "user", content: prompt || `Execute step ${step} for transaction ${txId}` }];
-
     const stream = await agent.stream({
       messages: inputMessages
     });

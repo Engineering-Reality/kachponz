@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useEffect, Suspense } from 'react';
+import { useState, useEffect, Suspense, useRef } from 'react';
 import { useSearchParams } from 'next/navigation';
 import {
   Bot,
@@ -11,12 +11,36 @@ import {
   X,
   Cpu,
   AlertTriangle,
+  Paperclip,
+  FileText,
+  Image as ImageIcon
 } from 'lucide-react';
 import { Select } from '@/components/Select';
+import { EditableJsonTable } from '@/components/EditableJsonTable';
+import { MessageSquarePlus, MessageSquare } from 'lucide-react';
+
+export interface ChatSession {
+  id: string;
+  title: string;
+  agentId: string;
+  messages: Message[];
+  createdAt: number;
+}
+
 
 interface Message {
   role: 'system' | 'bot' | 'user' | 'error';
   content: string;
+  apiContent?: any;
+  attachments?: { name: string, type: string, preview: string | null }[];
+}
+
+interface Attachment {
+  file: File;
+  preview: string | null;
+  name: string;
+  type: string;
+  extractedText?: string;
 }
 
 export default function AgentInvoke() {
@@ -41,6 +65,54 @@ function AgentInvokeInner() {
   const [modelInit, setModelInit] = useState<string | null>(null);
   const [agentInit, setAgentInit] = useState<string | null>(null);
   const [responseTime, setResponseTime] = useState<string | null>(null);
+  const [sessions, setSessions] = useState<ChatSession[]>([]);
+  const [currentSessionId, setCurrentSessionId] = useState<string | null>(null);
+  const [attachments, setAttachments] = useState<Attachment[]>([]);
+  const fileInputRef = useRef<HTMLInputElement>(null);
+
+  useEffect(() => {
+    const savedSessions = localStorage.getItem('agent-sessions');
+    if (savedSessions) {
+      try {
+        const parsed = JSON.parse(savedSessions);
+        setSessions(parsed);
+        if (parsed.length > 0 && !currentSessionId) {
+          switchSession(parsed[0].id);
+        }
+      } catch (e) {}
+    }
+  }, []);
+
+  const saveSessions = (newSessions: ChatSession[]) => {
+    setSessions(newSessions);
+    localStorage.setItem('agent-sessions', JSON.stringify(newSessions));
+  };
+
+  const switchSession = (id: string) => {
+    setCurrentSessionId(id);
+    const session = sessions.find(s => s.id === id);
+    if (session) {
+      setMessages(session.messages);
+      setSelectedAgent(session.agentId);
+      setInput('');
+      setAttachments([]);
+    }
+  };
+
+  const startNewSession = () => {
+    const newId = `session-${Date.now()}`;
+    const newSession: ChatSession = {
+      id: newId,
+      title: `Chat ${new Date().toLocaleDateString()}`,
+      agentId: selectedAgent,
+      messages: [],
+      createdAt: Date.now()
+    };
+    setCurrentSessionId(newId);
+    setMessages([]);
+    saveSessions([newSession, ...sessions]);
+  };
+
 
   const selectedAgentObj = agents.find(a => a.agent_id === selectedAgent);
   const connectedTools = selectedAgentObj
@@ -117,13 +189,118 @@ function AgentInvokeInner() {
     if (match) setSelectedAgent(match.agent_id);
   }, [preselectAgent, agents, selectedAgent]);
 
+  const extractPdfAsImages = async (file: File): Promise<string[]> => {
+    const pdfjsLib = await import('pdfjs-dist');
+    pdfjsLib.GlobalWorkerOptions.workerSrc = `//unpkg.com/pdfjs-dist@${pdfjsLib.version}/build/pdf.worker.min.mjs`;
+    const arrayBuffer = await file.arrayBuffer();
+    const pdf = await pdfjsLib.getDocument({ data: arrayBuffer }).promise;
+    const images: string[] = [];
+    
+    const maxPages = Math.min(pdf.numPages, 5);
+    for (let i = 1; i <= maxPages; i++) {
+      const page = await pdf.getPage(i);
+      const viewport = page.getViewport({ scale: 1.5 });
+      const canvas = document.createElement('canvas');
+      const ctx = canvas.getContext('2d');
+      if (!ctx) continue;
+      canvas.width = viewport.width;
+      canvas.height = viewport.height;
+      
+      await page.render({ canvasContext: ctx, viewport } as any).promise;
+      images.push(canvas.toDataURL('image/jpeg', 0.8));
+    }
+    return images;
+  };
+
+  const handleFileSelect = async (e: React.ChangeEvent<HTMLInputElement>) => {
+    const files = Array.from(e.target.files || []);
+    if (files.length === 0) return;
+
+    for (const f of files) {
+      if (f.type.startsWith('image/')) {
+        const reader = new FileReader();
+        reader.onload = (ev) => {
+          setAttachments(prev => [...prev, {
+            file: f,
+            preview: ev.target?.result as string,
+            name: f.name,
+            type: 'image'
+          }]);
+        };
+        reader.readAsDataURL(f);
+      } else if (f.type === 'application/pdf') {
+        try {
+          const base64Images = await extractPdfAsImages(f);
+          const newAtts = base64Images.map((b64, idx) => ({
+            file: f,
+            preview: b64,
+            name: `${f.name} (Pg ${idx + 1})`,
+            type: 'image'
+          }));
+          setAttachments(prev => [...prev, ...newAtts]);
+        } catch (err) {
+          console.error("Failed to parse PDF as images", err);
+          alert("Failed to read PDF file.");
+        }
+      } else {
+        alert("Unsupported file type: " + f.name);
+      }
+    }
+    
+    if (fileInputRef.current) {
+      fileInputRef.current.value = '';
+    }
+  };
+
+  const removeAttachment = (index: number) => {
+    setAttachments(prev => prev.filter((_, i) => i !== index));
+  };
+
   const handleSend = async () => {
-    if (!input.trim()) {
+    if (!input.trim() && attachments.length === 0) {
       return;
     }
-    const currentInput = input;
-    setMessages(prev => [...prev, { role: 'user', content: currentInput }]);
+    const currentInputDisplay = input.trim();
+    const systemInstruction = attachments.length > 0 
+      ? `\n\n[SYSTEM INSTRUCTION: Baca gambar lampiran secara langsung menggunakan kemampuan vision Anda (JANGAN memanggil fungsi/tools eksternal apapun untuk membaca dokumen ini). Jika terdapat data tabel, form, atau kolom pada dokumen, tulis ulang data tersebut HANYA berupa JSON Array of Objects di dalam blok \`\`\`json (tanpa teks lain). Jangan memanggil fungsi apapun. Contoh: \`\`\`json\n[{"Kolom 1": "A", "Kolom 2": "B"}]\n\`\`\`]`
+      : ``;
+    const promptToSend = currentInputDisplay + systemInstruction;
+    
+    let apiContent: any;
+    const imageAttachments = attachments.filter(a => a.type === 'image');
+    if (imageAttachments.length > 0) {
+      apiContent = [
+        { type: 'text', text: promptToSend },
+        ...imageAttachments.map(a => ({
+          type: 'image_url',
+          image_url: { url: a.preview }
+        }))
+      ];
+    } else {
+      apiContent = promptToSend;
+    }
+
+    const userMessage: Message = { 
+      role: 'user', 
+      content: currentInputDisplay || "Attached File(s)", 
+      apiContent: apiContent, 
+      attachments: attachments.map(a => ({ name: a.name, type: a.type, preview: a.preview })) 
+    };
+
+    setMessages(prev => {
+      const newMsgs = [...prev, userMessage];
+      // update session
+      if (currentSessionId) {
+        setSessions(s => {
+          const updated = s.map(session => session.id === currentSessionId ? { ...session, messages: newMsgs } : session);
+          localStorage.setItem('agent-sessions', JSON.stringify(updated));
+          return updated;
+        });
+      }
+      return newMsgs;
+    });
     setInput('');
+    setAttachments([]);
     setStatus('Processing...');
     setModelInit(null);
     setAgentInit(null);
@@ -140,12 +317,12 @@ function AgentInvokeInner() {
           transactionId: transactionId.trim() || undefined,
           agentId: selectedAgent || undefined,
           idempotencyKey: `invoke-${Date.now()}`,
-          prompt: currentInput,
-          messages: [...messages, { role: 'user', content: currentInput }]
+          prompt: promptToSend,
+          messages: [...messages, userMessage]
             .filter(m => m.role === 'user' || m.role === 'bot')
             .map(m => ({
               role: m.role === 'bot' ? 'assistant' : 'user',
-              content: m.content
+              content: m.apiContent || m.content
             })),
           stream: true
         })
@@ -207,6 +384,16 @@ function AgentInvokeInner() {
                           content: accumulatedResponse
                         };
                       }
+                      
+                      // sync to localstorage
+                      if (currentSessionId) {
+                        setSessions(s => {
+                          const updated = s.map(session => session.id === currentSessionId ? { ...session, messages: next } : session);
+                          localStorage.setItem('agent-sessions', JSON.stringify(updated));
+                          return updated;
+                        });
+                      }
+                      
                       return next;
                     });
                   }
@@ -248,6 +435,30 @@ function AgentInvokeInner() {
 
   return (
     <div className="flex h-full text-slate-900 overflow-hidden bg-[#FAFAFA]">
+
+      {/* Sessions Sidebar (Far Left) */}
+      <aside className="w-64 bg-slate-50 border-r border-slate-200 flex flex-col shrink-0 z-10">
+        <div className="p-4 border-b border-slate-200">
+          <button onClick={startNewSession} className="w-full flex items-center justify-center gap-2 bg-white border border-slate-200 shadow-sm text-slate-700 py-2.5 rounded-xl text-sm font-medium hover:bg-slate-50 transition-colors">
+            <MessageSquarePlus className="w-4 h-4" />
+            New Chat
+          </button>
+        </div>
+        <div className="flex-1 overflow-y-auto p-2 space-y-1">
+          {sessions.map(session => (
+            <button
+              key={session.id}
+              onClick={() => switchSession(session.id)}
+              className={`w-full text-left px-3 py-3 rounded-xl text-sm transition-colors flex items-center gap-3 ${currentSessionId === session.id ? 'bg-blue-50 text-blue-700 font-medium' : 'text-slate-600 hover:bg-slate-100'}`}
+            >
+              <MessageSquare className={`w-4 h-4 shrink-0 ${currentSessionId === session.id ? 'text-blue-600' : 'text-slate-400'}`} />
+              <div className="truncate flex-1" title={session.title}>
+                {session.title}
+              </div>
+            </button>
+          ))}
+        </div>
+      </aside>
 
       {/* Main Split */}
       <div className="flex flex-1 overflow-hidden">
@@ -466,6 +677,22 @@ function AgentInvokeInner() {
                       <div className="relative rounded-2xl p-[2px] overflow-hidden max-w-[80%] rounded-tr-sm shadow-sm">
                         <div className="absolute inset-0 vibrant-rainbow-border animate-border-spin opacity-80" />
                         <div className="relative bg-white rounded-[14px] p-4 z-10 flex flex-col">
+                          {msg.attachments && msg.attachments.length > 0 && (
+                            <div className="flex flex-wrap gap-2 mb-3">
+                              {msg.attachments.map((att, i) => (
+                                <div key={i} className="shrink-0 group">
+                                  {att.preview ? (
+                                    <img src={att.preview} alt={att.name} className="w-16 h-16 rounded-xl object-cover border border-slate-200 shadow-sm" />
+                                  ) : (
+                                    <div className="w-16 h-16 rounded-xl bg-slate-50 border border-slate-200 flex flex-col items-center justify-center">
+                                      <FileText className="w-4 h-4 text-slate-400" />
+                                      <span className="text-[8px] text-slate-400 mt-0.5 truncate w-14 text-center px-1" title={att.name}>{att.name}</span>
+                                    </div>
+                                  )}
+                                </div>
+                              ))}
+                            </div>
+                          )}
                           <span className="text-sm leading-relaxed whitespace-pre-wrap block text-slate-800">
                             {formatMessageContent(msg.content)}
                           </span>
@@ -479,6 +706,21 @@ function AgentInvokeInner() {
                 }
 
                 if (msg.role === 'bot') {
+                  let contentToRender = msg.content;
+                  let jsonArray: any = null;
+                  
+                  const jsonStart = contentToRender.indexOf('```json');
+                  if (jsonStart !== -1) {
+                    const jsonEnd = contentToRender.indexOf('```', jsonStart + 7);
+                    if (jsonEnd !== -1) {
+                      const jsonStr = contentToRender.substring(jsonStart + 7, jsonEnd).trim();
+                      try {
+                        jsonArray = JSON.parse(jsonStr);
+                        contentToRender = (contentToRender.substring(0, jsonStart) + contentToRender.substring(jsonEnd + 3)).trim();
+                      } catch(e) {}
+                    }
+                  }
+
                   return (
                     <div key={idx} className="flex gap-3 max-w-3xl mx-auto justify-start stream-in">
                       <div className="w-8 h-8 rounded-full flex items-center justify-center flex-shrink-0 mt-0.5 relative overflow-hidden p-[1.5px]">
@@ -487,11 +729,41 @@ function AgentInvokeInner() {
                           <Bot className="w-4 h-4 text-slate-700" />
                         </div>
                       </div>
-                      <div className="flex flex-col min-w-0">
+                      <div className="flex flex-col min-w-0 w-full">
                         <span className="text-xs font-semibold text-slate-500 mb-1">Amadeus</span>
-                        <span className="text-sm leading-relaxed whitespace-pre-wrap block text-slate-700">
-                          {formatMessageContent(msg.content)}
-                        </span>
+                        
+                        {contentToRender && (
+                          <span className="text-sm leading-relaxed whitespace-pre-wrap block text-slate-700">
+                            {formatMessageContent(contentToRender)}
+                          </span>
+                        )}
+                        
+                        {Array.isArray(jsonArray) && jsonArray.length > 0 && typeof jsonArray[0] === 'object' && (
+                           <EditableJsonTable 
+                             initialData={jsonArray}
+                             onSave={(newDataStr) => {
+                               setMessages(prev => {
+                                  const next = [...prev];
+                                  const msg = next[idx];
+                                  const jStart = msg.content.indexOf('```json');
+                                  const jEnd = msg.content.indexOf('```', jStart + 7);
+                                  if (jStart !== -1 && jEnd !== -1) {
+                                     msg.content = msg.content.substring(0, jStart) + '```json\n' + newDataStr + '\n' + msg.content.substring(jEnd);
+                                  }
+                                  
+                                  // sync to localstorage
+                                  if (currentSessionId) {
+                                    setSessions(s => {
+                                      const updated = s.map(session => session.id === currentSessionId ? { ...session, messages: next } : session);
+                                      localStorage.setItem('agent-sessions', JSON.stringify(updated));
+                                      return updated;
+                                    });
+                                  }
+                                  return next;
+                               });
+                             }}
+                           />
+                        )}
                         <div className="text-[10px] text-slate-400 mt-2">
                           {new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}
                         </div>
@@ -507,7 +779,36 @@ function AgentInvokeInner() {
 
           {/* Input */}
           <div className="p-6 bg-[#FAFAFA] border-t border-slate-200">
+            {attachments.length > 0 && (
+              <div className="max-w-3xl mx-auto mb-3 flex gap-2 overflow-x-auto pb-1">
+                {attachments.map((att, i) => (
+                  <div key={i} className="relative shrink-0 group">
+                    {att.preview ? (
+                      <img src={att.preview} alt={att.name} className="w-16 h-16 rounded-xl object-cover border-2 border-slate-200 shadow-sm" />
+                    ) : (
+                      <div className="w-16 h-16 rounded-xl bg-white border-2 border-slate-200 flex flex-col items-center justify-center">
+                        <FileText className="w-5 h-5 text-slate-400" />
+                        <span className="text-[8px] text-slate-400 mt-1 truncate w-14 text-center px-1" title={att.name}>{att.name}</span>
+                      </div>
+                    )}
+                    <button onClick={() => removeAttachment(i)} className="absolute -top-1.5 -right-1.5 w-5 h-5 rounded-full bg-red-500 text-white flex items-center justify-center opacity-0 group-hover:opacity-100 transition-opacity shadow-sm z-10">
+                      <X className="w-3 h-3" />
+                    </button>
+                  </div>
+                ))}
+              </div>
+            )}
+            
             <div className="max-w-3xl mx-auto relative flex items-end bg-white border border-slate-200 rounded-2xl focus-within:border-slate-400 focus-within:ring-2 focus-within:ring-slate-900/5 transition-all p-2 shadow-sm">
+              <input ref={fileInputRef} type="file" multiple accept="image/*,.pdf" className="hidden" onChange={handleFileSelect} />
+              <button
+                onClick={() => fileInputRef.current?.click()}
+                className="shrink-0 p-3 rounded-xl text-slate-400 hover:text-slate-600 hover:bg-slate-50 transition-colors mr-1"
+                title="Attach files (Image/PDF)"
+              >
+                <Paperclip className="w-4 h-4" />
+              </button>
+
               <textarea
                 rows={1}
                 value={input}
@@ -524,7 +825,7 @@ function AgentInvokeInner() {
 
               <button
                 onClick={handleSend}
-                disabled={!input.trim()}
+                disabled={!input.trim() && attachments.length === 0}
                 className="relative p-3 rounded-xl overflow-hidden disabled:opacity-40 ml-2 group"
               >
                 <div className="absolute inset-0 vibrant-rainbow-bg" />
