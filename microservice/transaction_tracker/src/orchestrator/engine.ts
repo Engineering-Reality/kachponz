@@ -19,6 +19,7 @@ import { z } from "zod";
 import { BaseMessage } from "@langchain/core/messages";
 import { randomUUID } from "node:crypto";
 import { loadPortRange } from "../services/portAllocator.js";
+import { resolveCorsOrigin } from "../config/cors.js";
 import { jsonSchemaToZod } from "./jsonSchemaToZod.js";
 
 const mcpHost = loadPortRange().host;
@@ -617,8 +618,21 @@ export async function runAgenticStepStream(
   mode: InvocationMode,
   reply: FastifyReply,
 ): Promise<void> {
+  // reply.hijack() (called by the route handler before this function runs)
+  // takes the raw response out of Fastify's control, so @fastify/cors's
+  // onRequest hook — which only *stages* headers on the Fastify reply
+  // wrapper for Fastify's own send flow — never gets flushed here. Every
+  // direct reply.raw write in this function must set CORS headers itself,
+  // or the browser reports a plain "Failed to fetch" for what was actually
+  // a normal, readable error response (e.g. NO_AGENT, NO_TOOLS_AVAILABLE).
+  const corsOrigin = resolveCorsOrigin(reply.request.headers.origin);
   const writeJsonError = (status: number, code: string, message: string, extra?: Record<string, unknown>) => {
-    reply.raw.writeHead(status, { 'Content-Type': 'application/json' });
+    const headers: Record<string, string> = { 'Content-Type': 'application/json' };
+    if (corsOrigin) {
+      headers['Access-Control-Allow-Origin'] = corsOrigin;
+      headers['Vary'] = 'Origin';
+    }
+    reply.raw.writeHead(status, headers);
     reply.raw.end(JSON.stringify({ error: { code, message, ...extra } }));
   };
 
@@ -684,7 +698,10 @@ export async function runAgenticStepStream(
   reply.raw.setHeader('Content-Type', 'text/event-stream');
   reply.raw.setHeader('Cache-Control', 'no-cache');
   reply.raw.setHeader('Connection', 'keep-alive');
-  reply.raw.setHeader('Access-Control-Allow-Origin', '*');
+  if (corsOrigin) {
+    reply.raw.setHeader('Access-Control-Allow-Origin', corsOrigin);
+    reply.raw.setHeader('Vary', 'Origin');
+  }
   reply.raw.flushHeaders();
 
   reply.raw.write(`event: mcp_health\ndata: ${JSON.stringify({ servers: report })}\n\n`);

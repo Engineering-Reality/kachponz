@@ -1,6 +1,7 @@
 import { FastifyInstance, FastifyPluginAsync } from 'fastify';
 import { z } from 'zod';
 import { query } from '../db/pool.js';
+import { callFn } from '../db/rpc.js';
 import { DomainError } from '../types/domain.js';
 
 export const registerAgentsRoutes: FastifyPluginAsync = async (app: FastifyInstance) => {
@@ -103,45 +104,24 @@ export const registerAgentsRoutes: FastifyPluginAsync = async (app: FastifyInsta
     async (request, reply) => {
       const { id } = request.params as { id: string };
       const body = request.body as z.infer<typeof agentUpdateSchema>;
-      
-      const fields: string[] = [];
-      const values: any[] = [];
-      let idx = 1;
 
-      if (body.agent_name !== undefined) {
-        fields.push(`agent_name = $${idx++}`);
-        values.push(body.agent_name);
-      }
-      if (body.description !== undefined) {
-        fields.push(`description = $${idx++}`);
-        values.push(body.description);
-      }
-      if (body.agent_style !== undefined) {
-        fields.push(`agent_style = $${idx++}`);
-        values.push(body.agent_style);
-      }
-      if (body.on_status !== undefined) {
-        fields.push(`on_status = $${idx++}`);
-        values.push(body.on_status);
-      }
-      if (body.tools !== undefined) {
-        fields.push(`tools = $${idx++}`);
-        values.push(body.tools);
-      }
-      if (body.share_editor_with !== undefined) {
-        fields.push(`share_editor_with = $${idx++}`);
-        values.push(body.share_editor_with);
-      }
-
-      if (fields.length === 0) {
+      if (Object.keys(body).length === 0) {
         throw new DomainError('VALIDATION_ERROR', 'Tidak ada data untuk diperbarui', 400);
       }
 
-      values.push(id);
-      
-      const res = await query(
-        `UPDATE agents SET ${fields.join(', ')} WHERE agent_id = $${idx} RETURNING *`,
-        values
+      // fn_update_agent (db/functions/) treats NULL as "field not supplied" via
+      // COALESCE — undefined fields must be passed as null, not omitted.
+      const res = await callFn(
+        'fn_update_agent',
+        [
+          id,
+          body.agent_name ?? null,
+          body.description ?? null,
+          body.agent_style ?? null,
+          body.on_status ?? null,
+          body.tools ?? null,
+          body.share_editor_with ?? null,
+        ],
       );
 
       if (res.rows.length === 0) {

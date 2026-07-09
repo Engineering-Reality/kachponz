@@ -3,6 +3,7 @@ import helmet from '@fastify/helmet';
 import cors from '@fastify/cors';
 import { ZodError } from 'zod';
 import { env } from './config/env.js';
+import { ALLOWED_ORIGINS } from './config/cors.js';
 import { logger } from './lib/logger.js';
 import { registerTransactionRoutes } from './routes/transactions.js';
 import { registerOrchestratorRoutes } from './orchestrator/routes.js';
@@ -18,7 +19,7 @@ export async function buildServer() {
   const app = Fastify({
     loggerInstance: logger,
     // Batasi ukuran body — anti-DoS payload besar (CISO Availability #73).
-    bodyLimit: 1_048_576, // 1 MB
+    bodyLimit: 10 * 1_048_576, // 10 MB (chat requests can carry base64 image attachments)
     // Jangan expose versi/framework di response (CISO Code Review #31).
     disableRequestLogging: false,
     trustProxy: true, // di belakang reverse proxy TLS on-prem
@@ -27,8 +28,15 @@ export async function buildServer() {
   app.setValidatorCompiler(validatorCompiler);
   app.setSerializerCompiler(serializerCompiler);
 
+  app.addHook('onRequest', async (req) => {
+    if (req.url === '/orchestrator/run-agentic' && req.method === 'POST') {
+      const contentLength = req.headers['content-length'];
+      req.log.info({ contentLength, origin: req.headers.origin }, 'run-agentic request received');
+    }
+  });
+
   await app.register(cors, {
-    origin: ['http://localhost:3000', 'http://localhost:8008', 'http://127.0.0.1:3000', 'http://127.0.0.1:8008', 'http://127.0.0.1:5500'],
+    origin: ALLOWED_ORIGINS,
     credentials: true,
     methods: ['GET', 'POST', 'PUT', 'DELETE', 'PATCH', 'OPTIONS'],
     allowedHeaders: ['Content-Type', 'Authorization', 'X-Robot-Key', 'X-Signature', 'X-Robot-Timestamp', 'X-Robot-Signing-Secret'],

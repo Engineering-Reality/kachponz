@@ -366,11 +366,24 @@ server.tool(
         return { content: [{ type: "text", text: `UiPath AddQueueItem failed (${res.status}): ${text.slice(0, 300)}` }] };
       }
 
-      const json = JSON.parse(text) as { Id?: number; Status?: string };
+      process.stderr.write(`[mcp-uipath] AddQueueItem raw response: ${text.slice(0, 500)}\n`);
+
+      // AddQueueItem's response is usually a single item object, but may be
+      // wrapped in { value: {...} } on some Orchestrator versions.
+      const json = JSON.parse(text);
+      const item: { Id?: number; Status?: string } =
+        json && typeof json === "object" && "value" in json && json.value && typeof json.value === "object"
+          ? json.value
+          : json;
+
+      if (item.Id === undefined) {
+        process.stderr.write(`[mcp-uipath] AddQueueItem returned unrecognized shape but HTTP OK. Raw: ${text.slice(0, 500)}\n`);
+      }
+
       return {
         content: [{
           type: "text",
-          text: `✅ Queue item added to "${args.queueName}".\nItem ID: ${json.Id}\nStatus: ${json.Status ?? "New"}`,
+          text: `✅ Queue item added to "${args.queueName}".\nItem ID: ${item.Id ?? "unknown (verify in Transactions tab)"}\nStatus: ${item.Status ?? "New"}`,
         }],
       };
     } catch (e) {
@@ -386,10 +399,19 @@ server.tool(
   "Add multiple items to a UiPath Orchestrator queue in a single call. Use this instead of add_uipath_queue_item when you have an array of rows (e.g. from a parsed document or table). " +
     "Each entry in \"items\" is a plain row object — do NOT nest it under an \"itemData\" or \"specificContent\" wrapper, " +
     "that wrapping is handled internally by this tool. " +
-    "Example call: { \"queueName\": \"TestQueue\", \"items\": [ { \"Email\": \"a@b.com\", \"Name\": \"John\" }, { \"Email\": \"c@d.com\", \"Name\": \"Jane\" } ] }",
+    "If a row includes a top-level '_reference' key, it is used as that specific item's Reference field " +
+    "(a common convention for uniqueness/tracking), and stripped from SpecificContent before sending. " +
+    "Example call: { \"queueName\": \"TestQueue\", \"items\": [ { \"_reference\": \"John_Smith_ITSolutions\", \"Email\": \"a@b.com\", \"Name\": \"John\" }, { \"_reference\": \"Jane_Doe_Acme\", \"Email\": \"c@d.com\", \"Name\": \"Jane\" } ] }",
   {
     queueName: z.string().describe("Exact name of the target queue, from list_uipath_queues"),
-    items: coerceJson(z.array(z.record(z.any())).min(1)).describe("Array of row objects — each becomes one queue item's SpecificContent"),
+    items: coerceJson(
+      z.array(z.record(z.any())).min(1)
+    ).describe(
+      "Array of row objects. Each row's fields become queue item SpecificContent. " +
+      "If a row includes a top-level '_reference' key, it is used as this specific item's Reference field " +
+      "(a common convention for uniqueness/tracking), and stripped from SpecificContent before sending. " +
+      "Example: [{\"_reference\": \"John_Smith_ITSolutions\", \"First Name\": \"John\", ...}, ...]"
+    ),
     commitType: z.enum(["AllOrNothing", "StopOnFirstFailure"]).optional().default("StopOnFirstFailure"),
     priority: z.enum(["Low", "Normal", "High"]).optional().default("Normal"),
     folderId: z.string().optional(),
@@ -415,10 +437,17 @@ server.tool(
     const body = {
       queueName: args.queueName,
       commitType: args.commitType,
-      queueItems: args.items.map((row) => ({
-        Priority: args.priority,
-        SpecificContent: row,
-      })),
+      queueItems: args.items.map((row) => {
+        const { _reference, ...specificContent } = row;
+        const item: Record<string, unknown> = {
+          Priority: args.priority,
+          SpecificContent: specificContent,
+        };
+        if (typeof _reference === "string" && _reference.trim().length > 0) {
+          item.Reference = _reference.trim();
+        }
+        return item;
+      }),
     };
 
     try {
@@ -437,11 +466,41 @@ server.tool(
         return { content: [{ type: "text", text: `UiPath BulkAddQueueItems failed (${res.status}): ${text.slice(0, 300)}` }] };
       }
 
-      const json = JSON.parse(text) as {
-        value?: Array<{ Status: string; ItemDetail?: { Id: number } }>;
-      };
-      const succeeded = (json.value ?? []).filter((r) => r.Status !== "Failed").length;
-      const failed = (json.value ?? []).length - succeeded;
+      process.stderr.write(`[mcp-uipath] BulkAddQueueItems raw response: ${text.slice(0, 500)}\n`);
+
+      const json = JSON.parse(text);
+
+      // UiPath's BulkAddQueueItems response varies across Orchestrator versions.
+      // Possible shapes we've observed:
+      //   - { value: [ { Status, ItemDetail }, ... ] }        // ODataV4-ish
+      //   - [ { Status, ItemDetail }, ... ]                    // raw array
+      //   - { value: <count> }                                 // count only, on some versions
+      let results: Array<{ Status?: string; ItemDetail?: { Id?: number } }> = [];
+      if (Array.isArray(json)) {
+        results = json;
+      } else if (Array.isArray(json?.value)) {
+        results = json.value;
+      } else if (typeof json?.value === "number") {
+        return {
+          content: [{
+            type: "text",
+            text: `✅ ${json.value} item(s) added to queue "${args.queueName}" (per-item detail not returned by this Orchestrator version).`,
+          }],
+        };
+      }
+
+      if (results.length === 0) {
+        process.stderr.write(`[mcp-uipath] BulkAddQueueItems returned unrecognized shape but HTTP OK. Raw: ${text.slice(0, 500)}\n`);
+        return {
+          content: [{
+            type: "text",
+            text: `✅ ${args.items.length} item(s) submitted to queue "${args.queueName}" (Orchestrator returned no per-item detail — verify in the Transactions tab).`,
+          }],
+        };
+      }
+
+      const succeeded = results.filter((r) => r.Status !== "Failed" && r.Status !== "Retried").length;
+      const failed = results.length - succeeded;
 
       return {
         content: [{

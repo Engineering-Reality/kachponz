@@ -1,0 +1,5 @@
+- `fn_complete_step(p_transaction_id, p_expected_version, p_new_step, p_new_status, p_actor, p_reason, p_idempotency_key, p_payload, p_financial)` → transaction+event row + idempotent_replay flag. Called from `src/services/transactions.ts` `completeStep()`.
+- `fn_fail_step(p_transaction_id, p_step, p_actor, p_reason, p_idempotency_key, p_payload)` → transaction+event row + idempotent_replay flag. Called from `src/services/transactions.ts` `failStep()`.
+- `fn_update_agent(p_agent_id, p_agent_name, p_description, p_agent_style, p_on_status, p_tools, p_share_editor_with)` → full `agents` row. Called from `src/routes/agents.ts` PUT handler.
+- `fn_reserve_mcp_port(p_tool_id, p_method, p_port, p_pid, p_status, p_last_error, p_entry_mtime, p_set_started_at)` → full `mcp_runtime_state` row. Called from `scripts/mcpAutoManager.ts` `upsertRuntimeState()`.
+- `fn_release_mcp_runtime(p_tool_ids)` → all updated `mcp_runtime_state` rows. Called from `scripts/mcpAutoManager.ts` `markStopped()`.

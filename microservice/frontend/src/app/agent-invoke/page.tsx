@@ -345,10 +345,27 @@ function AgentInvokeInner() {
           prompt: promptToSend,
           messages: [...messages, userMessage]
             .filter(m => m.role === 'user' || m.role === 'bot')
-            .map(m => ({
-              role: m.role === 'bot' ? 'assistant' : 'user',
-              content: m.apiContent || m.content
-            })),
+            // Cap history length — unbounded history sent on every turn scales badly.
+            .slice(-20)
+            .map((m, i, arr) => {
+              const isCurrentTurn = i === arr.length - 1;
+              let content = m.apiContent || m.content;
+              // Prior turns' apiContent can carry full base64 image/PDF data.
+              // The model already extracted that data in its own turn — echoing
+              // it back on every subsequent turn blows past the server's
+              // bodyLimit and surfaces as a bare "Failed to fetch". Only the
+              // current turn needs the actual attachment bytes.
+              if (!isCurrentTurn && Array.isArray(content)) {
+                const textPart = content.find((c: any) => c.type === 'text');
+                const imageCount = content.filter((c: any) => c.type === 'image_url').length;
+                content = (textPart?.text ?? m.content ?? '') +
+                  (imageCount > 0 ? `\n[${imageCount} attachment(s) from this turn already processed — not re-sent]` : '');
+              }
+              return {
+                role: m.role === 'bot' ? 'assistant' : 'user',
+                content
+              };
+            }),
           stream: true,
           mode: 'playground'
         })

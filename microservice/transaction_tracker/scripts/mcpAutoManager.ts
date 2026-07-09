@@ -72,28 +72,26 @@ async function upsertRuntimeState(fields: {
   startedAt?: boolean; // true => set started_at = now()
   entryMtime?: number | null; // entry-file mtime (ms) current when this process was spawned
 }): Promise<void> {
+  // fn_reserve_mcp_port (db/functions/) — atomic upsert, replaces the ternary-built
+  // SQL string this used to construct inline for the started_at column.
   await pool.query(
-    `INSERT INTO mcp_runtime_state (tool_id, method, port, pid, status, last_error, entry_mtime, started_at, updated_at)
-     VALUES ($1, $2, $3, $4, $5, $6, $7, ${fields.startedAt ? 'now()' : 'NULL'}, now())
-     ON CONFLICT (tool_id) DO UPDATE SET
-       method = EXCLUDED.method,
-       port = EXCLUDED.port,
-       pid = EXCLUDED.pid,
-       status = EXCLUDED.status,
-       last_error = EXCLUDED.last_error,
-       entry_mtime = COALESCE(EXCLUDED.entry_mtime, mcp_runtime_state.entry_mtime),
-       started_at = ${fields.startedAt ? 'now()' : 'mcp_runtime_state.started_at'},
-       updated_at = now()`,
-    [fields.toolId, fields.method, fields.port, fields.pid, fields.status, fields.lastError ?? null, fields.entryMtime ?? null],
+    `SELECT * FROM fn_reserve_mcp_port($1, $2, $3, $4, $5, $6, $7, $8)`,
+    [
+      fields.toolId,
+      fields.method,
+      fields.port,
+      fields.pid,
+      fields.status,
+      fields.lastError ?? null,
+      fields.entryMtime ?? null,
+      fields.startedAt === true,
+    ],
   );
 }
 
 async function markStopped(toolIds: string[]): Promise<void> {
   if (toolIds.length === 0) return;
-  await pool.query(
-    `UPDATE mcp_runtime_state SET status = 'stopped', pid = NULL, updated_at = now() WHERE tool_id = ANY($1::uuid[])`,
-    [toolIds],
-  );
+  await pool.query(`SELECT * FROM fn_release_mcp_runtime($1::uuid[])`, [toolIds]);
 }
 
 /** Plain TCP connect check — doesn't need to be a valid SSE handshake, just proof something is listening. */
@@ -267,13 +265,40 @@ async function syncMcpServers() {
     const res = await pool.query("SELECT * FROM tools WHERE on_status = 'Online' OR on_status = 'true'");
     const tools = res.rows;
 
-    const runningRes = await pool.query<{ tool_id: string; entry_mtime: string | null }>(
-      `SELECT tool_id, entry_mtime FROM mcp_runtime_state WHERE status IN ('starting','running')`,
+    const runningRes = await pool.query<{ tool_id: string; entry_mtime: string | null; port: number | null }>(
+      `SELECT tool_id, entry_mtime, port FROM mcp_runtime_state WHERE status IN ('starting','running')`,
     );
     const runningToolIds = new Set(runningRes.rows.map((r) => r.tool_id));
     const recordedEntryMtimes = new Map(
       runningRes.rows.map((r) => [r.tool_id, r.entry_mtime !== null ? Number(r.entry_mtime) : null]),
     );
+
+    // Reconcile rows inherited from a previous daemon incarnation. A DB status
+    // of 'starting'/'running' alone doesn't prove a process is alive — this
+    // daemon instance's own activeProcesses map only knows about processes IT
+    // spawned. If the daemon was killed/restarted mid-spawn (e.g. tsx watch
+    // reloading on a file save), the row is left claiming 'starting' forever,
+    // and every future tick below would skip respawning it since the DB says
+    // someone already has it. Verify with a real TCP probe before trusting it.
+    for (const row of runningRes.rows) {
+      const toolId = row.tool_id;
+      if (activeProcesses.has(toolId)) continue; // owned by this process, no need to re-verify
+      const alive = row.port ? await tcpProbe(portRange.host, row.port) : false;
+      if (!alive) {
+        console.log(
+          `[MCP AutoManager] Stale runtime row for tool ${toolId} (status claims alive, nothing responds on port ${row.port ?? 'n/a'}) — clearing so it respawns`,
+        );
+        runningToolIds.delete(toolId);
+        await upsertRuntimeState({
+          toolId,
+          method: 'sse',
+          port: null,
+          pid: null,
+          status: 'crashed',
+          lastError: 'Stale row from a previous daemon instance — no live process found on probe',
+        });
+      }
+    }
 
     const expectedServerIds = new Set<string>();
 

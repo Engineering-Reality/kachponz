@@ -1,4 +1,6 @@
 import { withTransaction, query } from '../db/pool.js';
+import { callFn } from '../db/rpc.js';
+import { mapPgFunctionError } from '../db/pgErrors.js';
 import {
   getFlow,
   isForwardTransition,
@@ -9,6 +11,62 @@ import {
 import { DomainError } from '../types/domain.js';
 import type { Transaction, TransactionEvent, AuthContext } from '../types/domain.js';
 import { txLogger } from '../lib/logger.js';
+
+// Row shape returned by fn_complete_step / fn_fail_step (db/functions/) —
+// both bundle a transaction row + event row + idempotent_replay flag into
+// one round trip instead of separate idempotency-check/lock/update/insert calls.
+interface StepWriteRow {
+  out_tx_id: string;
+  out_tx_type: string;
+  out_tx_current_step: string;
+  out_tx_status: string;
+  out_tx_company_id: string;
+  out_tx_version: number;
+  out_tx_created_at: string;
+  out_tx_updated_at: string;
+  out_event_id: string;
+  out_event_step: string;
+  out_event_status: string;
+  out_event_actor: string;
+  out_event_reason: string | null;
+  out_event_idempotency_key: string;
+  out_event_payload: Record<string, unknown>;
+  out_event_signed: boolean;
+  out_event_created_at: string;
+  out_idempotent_replay: boolean;
+}
+
+function splitStepWriteRow(row: StepWriteRow): {
+  transaction: Transaction;
+  event: TransactionEvent;
+  idempotentReplay: boolean;
+} {
+  return {
+    transaction: {
+      id: row.out_tx_id,
+      type: row.out_tx_type,
+      current_step: row.out_tx_current_step,
+      status: row.out_tx_status,
+      company_id: row.out_tx_company_id,
+      version: row.out_tx_version,
+      created_at: row.out_tx_created_at,
+      updated_at: row.out_tx_updated_at,
+    },
+    event: {
+      id: row.out_event_id,
+      transaction_id: row.out_tx_id,
+      step: row.out_event_step,
+      status: row.out_event_status,
+      actor: row.out_event_actor,
+      reason: row.out_event_reason,
+      idempotency_key: row.out_event_idempotency_key,
+      payload: row.out_event_payload,
+      signed: row.out_event_signed,
+      created_at: row.out_event_created_at,
+    },
+    idempotentReplay: row.out_idempotent_replay,
+  };
+}
 
 export interface CreateTxInput {
   type: string;
@@ -84,140 +142,109 @@ export async function completeStep(
 ): Promise<CompleteStepResult> {
   const log = txLogger(transactionId);
 
-  return withTransaction(async (client) => {
-    // 1) Idempotency check lebih dulu (di dalam tx untuk konsistensi).
-    const existing = await client.query<TransactionEvent>(
-      `SELECT id, transaction_id, step, status, actor, reason, idempotency_key,
-              payload, signed, created_at
-         FROM transaction_events
-        WHERE transaction_id = $1 AND idempotency_key = $2`,
-      [transactionId, input.idempotencyKey],
+  // Business-rule validation needs current_step/type up front to decide the next
+  // step, so this read can't be skipped even on an idempotent-replay call. It's
+  // unlocked (no FOR UPDATE) — fn_complete_step's own idempotency check + optimistic
+  // version check (p_expected_version) is what actually guards against races, not
+  // this read.
+  const curRes = await query<Transaction>(
+    `SELECT id, type, current_step, status, company_id, version, created_at, updated_at
+       FROM transactions WHERE id = $1`,
+    [transactionId],
+  );
+  const tx = curRes.rows[0];
+  if (!tx) throw new DomainError('NOT_FOUND', 'Transaksi tidak ditemukan', 404);
+
+  if (tx.company_id !== auth.companyId) {
+    throw new DomainError('COMPANY_MISMATCH', 'Transaksi milik company lain', 403);
+  }
+  if (auth.allowedTypes && !auth.allowedTypes.includes(tx.type)) {
+    throw new DomainError('TYPE_FORBIDDEN', 'Robot tidak berhak atas tipe transaksi ini', 403);
+  }
+
+  const flow = getFlow(tx.type);
+  if (!flow) throw new DomainError('UNKNOWN_TYPE', `Flow hilang untuk tipe ${tx.type}`, 500);
+
+  if (!stepExists(flow, input.step)) {
+    throw new DomainError('UNKNOWN_STEP', `Step tidak dikenal: ${input.step}`, 400, {
+      step: input.step,
+    });
+  }
+
+  // Step yang diselesaikan harus == current_step.
+  if (input.step !== tx.current_step) {
+    throw new DomainError(
+      'STEP_MISMATCH',
+      `Step yang diselesaikan (${input.step}) bukan current_step (${tx.current_step})`,
+      409,
+      { expected: tx.current_step, got: input.step },
     );
-    if (existing.rows[0]) {
-      const txRes = await client.query<Transaction>(
-        `SELECT id, type, current_step, status, company_id, version, created_at, updated_at
-           FROM transactions WHERE id = $1`,
-        [transactionId],
+  }
+
+  // Tentukan next step (bisa eksplisit lewat targetStep, atau default ke cabang utama).
+  const nextStep = input.targetStep ?? flow.steps[tx.current_step]?.next[0];
+  const isTerminal = flow.steps[tx.current_step]?.terminal === true;
+
+  // Validasi transisi. MAJU normal OK. MUNDUR/lompat butuh reason.
+  if (!isTerminal && nextStep) {
+    const forward = isForwardTransition(flow, tx.current_step, nextStep);
+    const backwardOrJump =
+      stepIndex(flow, nextStep) <= stepIndex(flow, tx.current_step);
+    if (!forward) {
+      throw new DomainError('INVALID_TRANSITION', 'Transisi tidak sah', 422, {
+        from: tx.current_step,
+        to: nextStep,
+      });
+    }
+    if (backwardOrJump && !input.reason) {
+      throw new DomainError(
+        'REASON_REQUIRED',
+        'Transisi mundur/non-linear membutuhkan `reason`',
+        422,
+        { from: tx.current_step, to: nextStep },
       );
-      const tx = txRes.rows[0];
-      if (!tx) throw new DomainError('NOT_FOUND', 'Transaksi tidak ditemukan', 404);
+    }
+  }
+
+  // Financial gate: step finansial WAJIB sudah signed.
+  const financial = isFinancialStep(flow, tx.current_step);
+  if (financial && !auth.financiallySigned) {
+    throw new DomainError(
+      'SIGNATURE_REQUIRED',
+      'Step finansial memerlukan signature HMAC-SHA512 (2FA)',
+      401,
+      { step: tx.current_step },
+    );
+  }
+
+  const newStep = isTerminal ? tx.current_step : (nextStep ?? tx.current_step);
+  const newStatus = isTerminal ? 'completed' : 'in_progress';
+
+  try {
+    const res = await callFn<StepWriteRow>('fn_complete_step', [
+      transactionId,
+      tx.version,
+      newStep,
+      newStatus,
+      auth.robotName,
+      input.reason ?? null,
+      input.idempotencyKey,
+      input.payload ?? {},
+      financial,
+    ]);
+    const result = splitStepWriteRow(res.rows[0]!);
+    if (result.idempotentReplay) {
       log.info({ idempotency_key: input.idempotencyKey }, 'idempotent replay');
-      return { transaction: tx, event: existing.rows[0], idempotentReplay: true };
-    }
-
-    // 2) Ambil transaksi + kunci baris (FOR UPDATE) untuk hindari race dalam tx ini.
-    const curRes = await client.query<Transaction>(
-      `SELECT id, type, current_step, status, company_id, version, created_at, updated_at
-         FROM transactions WHERE id = $1 FOR UPDATE`,
-      [transactionId],
-    );
-    const tx = curRes.rows[0];
-    if (!tx) throw new DomainError('NOT_FOUND', 'Transaksi tidak ditemukan', 404);
-
-    if (tx.company_id !== auth.companyId) {
-      throw new DomainError('COMPANY_MISMATCH', 'Transaksi milik company lain', 403);
-    }
-    if (auth.allowedTypes && !auth.allowedTypes.includes(tx.type)) {
-      throw new DomainError('TYPE_FORBIDDEN', 'Robot tidak berhak atas tipe transaksi ini', 403);
-    }
-
-    const flow = getFlow(tx.type);
-    if (!flow) throw new DomainError('UNKNOWN_TYPE', `Flow hilang untuk tipe ${tx.type}`, 500);
-
-    if (!stepExists(flow, input.step)) {
-      throw new DomainError('UNKNOWN_STEP', `Step tidak dikenal: ${input.step}`, 400, {
-        step: input.step,
-      });
-    }
-
-    // 3) Step yang diselesaikan harus == current_step.
-    if (input.step !== tx.current_step) {
-      throw new DomainError(
-        'STEP_MISMATCH',
-        `Step yang diselesaikan (${input.step}) bukan current_step (${tx.current_step})`,
-        409,
-        { expected: tx.current_step, got: input.step },
+    } else {
+      log.info(
+        { from: input.step, to: newStep, actor: auth.robotName, financial },
+        'step completed',
       );
     }
-
-    // 4) Tentukan next step (bisa eksplisit lewat targetStep, atau default ke cabang utama).
-    const nextStep = input.targetStep ?? flow.steps[tx.current_step]?.next[0];
-    const isTerminal = flow.steps[tx.current_step]?.terminal === true;
-
-    // 5) Validasi transisi. MAJU normal OK. MUNDUR/lompat butuh reason.
-    if (!isTerminal && nextStep) {
-      const forward = isForwardTransition(flow, tx.current_step, nextStep);
-      const backwardOrJump =
-        stepIndex(flow, nextStep) <= stepIndex(flow, tx.current_step);
-      if (!forward) {
-        throw new DomainError('INVALID_TRANSITION', 'Transisi tidak sah', 422, {
-          from: tx.current_step,
-          to: nextStep,
-        });
-      }
-      if (backwardOrJump && !input.reason) {
-        throw new DomainError(
-          'REASON_REQUIRED',
-          'Transisi mundur/non-linear membutuhkan `reason`',
-          422,
-          { from: tx.current_step, to: nextStep },
-        );
-      }
-    }
-
-    // 6) Financial gate: step finansial WAJIB sudah signed.
-    const financial = isFinancialStep(flow, tx.current_step);
-    if (financial && !auth.financiallySigned) {
-      throw new DomainError(
-        'SIGNATURE_REQUIRED',
-        'Step finansial memerlukan signature HMAC-SHA512 (2FA)',
-        401,
-        { step: tx.current_step },
-      );
-    }
-
-    // 7) Optimistic lock update.
-    const newStep = isTerminal ? tx.current_step : (nextStep ?? tx.current_step);
-    const newStatus = isTerminal ? 'completed' : 'in_progress';
-    const upd = await client.query<Transaction>(
-      `UPDATE transactions
-          SET current_step = $1, status = $2, version = version + 1, updated_at = now()
-        WHERE id = $3 AND version = $4
-        RETURNING id, type, current_step, status, company_id, version, created_at, updated_at`,
-      [newStep, newStatus, transactionId, tx.version],
-    );
-    if (upd.rowCount === 0) {
-      throw new DomainError('VERSION_CONFLICT', 'Update konkuren ditolak (optimistic lock)', 409, {
-        expectedVersion: tx.version,
-      });
-    }
-    const updatedTx = upd.rows[0]!;
-
-    // 8) Append event (immutable).
-    const evtRes = await client.query<TransactionEvent>(
-      `INSERT INTO transaction_events
-          (transaction_id, step, status, actor, reason, idempotency_key, payload, signed)
-       VALUES ($1, $2, 'completed', $3, $4, $5, $6, $7)
-       RETURNING id, transaction_id, step, status, actor, reason, idempotency_key,
-                 payload, signed, created_at`,
-      [
-        transactionId,
-        input.step,
-        auth.robotName,
-        input.reason ?? null,
-        input.idempotencyKey,
-        input.payload ?? {},
-        financial,
-      ],
-    );
-    const event = evtRes.rows[0]!;
-
-    log.info(
-      { from: input.step, to: newStep, actor: auth.robotName, financial },
-      'step completed',
-    );
-    return { transaction: updatedTx, event, idempotentReplay: false };
-  });
+    return result;
+  } catch (err) {
+    throw mapPgFunctionError(err) ?? err;
+  }
 }
 
 export interface FailStepInput {
@@ -243,82 +270,59 @@ export async function failStep(
 ): Promise<FailStepResult> {
   const log = txLogger(transactionId);
 
-  return withTransaction(async (client) => {
-    // 1) Idempotency check
-    const existing = await client.query<TransactionEvent>(
-      `SELECT id, transaction_id, step, status, actor, reason, idempotency_key,
-              payload, signed, created_at
-         FROM transaction_events
-        WHERE transaction_id = $1 AND idempotency_key = $2`,
-      [transactionId, input.idempotencyKey],
+  // Business-rule validation (company/type/step-match) needs the transaction row
+  // up front. failStep never advances current_step/version, so there's no
+  // optimistic-lock race for fn_fail_step to guard beyond its own idempotency check.
+  const curRes = await query<Transaction>(
+    `SELECT id, type, current_step, status, company_id, version, created_at, updated_at
+       FROM transactions WHERE id = $1`,
+    [transactionId],
+  );
+  const tx = curRes.rows[0];
+  if (!tx) throw new DomainError('NOT_FOUND', 'Transaksi tidak ditemukan', 404);
+
+  if (tx.company_id !== auth.companyId) {
+    throw new DomainError('COMPANY_MISMATCH', 'Transaksi milik company lain', 403);
+  }
+  if (auth.allowedTypes && !auth.allowedTypes.includes(tx.type)) {
+    throw new DomainError('TYPE_FORBIDDEN', 'Robot tidak berhak atas tipe transaksi ini', 403);
+  }
+
+  if (input.step !== tx.current_step) {
+    throw new DomainError(
+      'STEP_MISMATCH',
+      `Step yang dilaporkan gagal (${input.step}) bukan current_step (${tx.current_step})`,
+      409,
+      { expected: tx.current_step, got: input.step },
     );
-    if (existing.rows[0]) {
-      const txRes = await client.query<Transaction>(
-        `SELECT id, type, current_step, status, company_id, version, created_at, updated_at
-           FROM transactions WHERE id = $1`,
-        [transactionId],
-      );
-      const tx = txRes.rows[0];
-      if (!tx) throw new DomainError('NOT_FOUND', 'Transaksi tidak ditemukan', 404);
+  }
+
+  if (!input.reason) {
+    throw new DomainError('REASON_REQUIRED', 'failStep wajib menyertakan reason', 422);
+  }
+
+  try {
+    const res = await callFn<StepWriteRow>('fn_fail_step', [
+      transactionId,
+      input.step,
+      auth.robotName,
+      input.reason,
+      input.idempotencyKey,
+      input.payload ?? {},
+    ]);
+    const result = splitStepWriteRow(res.rows[0]!);
+    if (result.idempotentReplay) {
       log.info({ idempotency_key: input.idempotencyKey }, 'idempotent replay (failStep)');
-      return { transaction: tx, event: existing.rows[0], idempotentReplay: true };
-    }
-
-    // 2) Kunci baris (FOR UPDATE)
-    const curRes = await client.query<Transaction>(
-      `SELECT id, type, current_step, status, company_id, version, created_at, updated_at
-         FROM transactions WHERE id = $1 FOR UPDATE`,
-      [transactionId],
-    );
-    const tx = curRes.rows[0];
-    if (!tx) throw new DomainError('NOT_FOUND', 'Transaksi tidak ditemukan', 404);
-
-    if (tx.company_id !== auth.companyId) {
-      throw new DomainError('COMPANY_MISMATCH', 'Transaksi milik company lain', 403);
-    }
-    if (auth.allowedTypes && !auth.allowedTypes.includes(tx.type)) {
-      throw new DomainError('TYPE_FORBIDDEN', 'Robot tidak berhak atas tipe transaksi ini', 403);
-    }
-
-    // 3) Validasi step harus == current_step
-    if (input.step !== tx.current_step) {
-      throw new DomainError(
-        'STEP_MISMATCH',
-        `Step yang dilaporkan gagal (${input.step}) bukan current_step (${tx.current_step})`,
-        409,
-        { expected: tx.current_step, got: input.step },
+    } else {
+      log.warn(
+        { step: input.step, actor: auth.robotName, reason: input.reason },
+        'step failed recorded',
       );
     }
-
-    if (!input.reason) {
-      throw new DomainError('REASON_REQUIRED', 'failStep wajib menyertakan reason', 422);
-    }
-
-    // 4) Append event failed
-    const evtRes = await client.query<TransactionEvent>(
-      `INSERT INTO transaction_events
-          (transaction_id, step, status, actor, reason, idempotency_key, payload, signed)
-       VALUES ($1, $2, 'failed', $3, $4, $5, $6, $7)
-       RETURNING id, transaction_id, step, status, actor, reason, idempotency_key,
-                 payload, signed, created_at`,
-      [
-        transactionId,
-        input.step,
-        auth.robotName,
-        input.reason,
-        input.idempotencyKey,
-        input.payload ?? {},
-        false, // failure event tidak butuh signature finansial
-      ],
-    );
-    const event = evtRes.rows[0]!;
-
-    log.warn(
-      { step: input.step, actor: auth.robotName, reason: input.reason },
-      'step failed recorded',
-    );
-    return { transaction: tx, event, idempotentReplay: false };
-  });
+    return result;
+  } catch (err) {
+    throw mapPgFunctionError(err) ?? err;
+  }
 }
 
 export async function getTransactionWithEvents(
