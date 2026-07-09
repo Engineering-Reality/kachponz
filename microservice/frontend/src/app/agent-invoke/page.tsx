@@ -17,6 +17,8 @@ import {
 } from 'lucide-react';
 import { Select } from '@/components/Select';
 import { EditableJsonTable } from '@/components/EditableJsonTable';
+import { AgentContextPanel } from '@/components/AgentContextPanel';
+import { UiPathLiveGraph } from '@/components/UiPathLiveGraph';
 import { MessageSquarePlus, MessageSquare } from 'lucide-react';
 
 export interface ChatSession {
@@ -367,7 +369,8 @@ function AgentInvokeInner() {
               };
             }),
           stream: true,
-          mode: 'playground'
+          mode: 'playground',
+          sessionLabel: currentSessionId ?? undefined,
         })
       });
 
@@ -532,135 +535,104 @@ function AgentInvokeInner() {
         </div>
       </aside>
 
+      
       {/* Main Split */}
       <div className="flex flex-1 overflow-hidden">
+        {/* Chat Area — Stream Console */}
+        <main className="flex-1 flex flex-col relative bg-[#FAFAFA] min-w-0">
 
-        {/* Sidebar Panel — Mission Control */}
-        <aside className="w-80 bg-white border-r border-slate-200 flex flex-col overflow-y-auto">
-          {/* Header */}
-          <div className="px-6 py-4 border-b border-slate-200 flex items-center gap-2">
-            <span className="terminal-dot bg-red-400" />
-            <span className="terminal-dot bg-amber-400" />
-            <span className="terminal-dot bg-emerald-400" />
-            <span className="ui-label text-slate-500 ml-2">Amadeus Console</span>
-          </div>
-
-          <div className="p-6 space-y-8">
-
-            {/* Agent Select */}
-            <div>
-              <label className="ui-label text-slate-500 block mb-2">Active Node</label>
-              <div className="relative rounded-lg p-[1.5px] mb-2 overflow-hidden">
-                <div className={`absolute inset-0 vibrant-rainbow-border ${selectedAgent ? 'animate-border-spin opacity-70' : 'opacity-25'}`} />
-                <Select
-                  value={selectedAgent}
-                  onChange={setSelectedAgent}
-                  placeholder="Select an agent"
-                  options={agents.map((agent) => ({ value: agent.agent_id, label: agent.agent_name }))}
-                  className="relative z-10"
-                  triggerClassName="rounded-[7px] border-transparent"
-                />
+          {/* Chat Header / Amadeus Console Top Bar */}
+          <div className="border-b border-slate-200 bg-white flex flex-col sticky top-0 z-20 w-full shrink-0 shadow-sm">
+            {/* Top Row: Title & Basic Info */}
+            <div className="h-10 flex items-center justify-between px-6 border-b border-slate-100 bg-slate-50/80 backdrop-blur">
+              <div className="flex items-center gap-3">
+                <span className="terminal-dot bg-red-400" />
+                <span className="terminal-dot bg-amber-400" />
+                <span className="terminal-dot bg-emerald-400" />
+                <span className="ui-label text-slate-500 ml-2">Amadeus Console</span>
               </div>
-              <button
-                onClick={() => {
-                  if (selectedAgent) {
-                    setIsInspectOpen(true);
-                  } else {
-                    alert("Select an agent first!");
-                  }
-                }}
-                className="inline-flex items-center gap-1.5 text-xs text-slate-500 hover:text-slate-900 hover:underline transition-colors"
-              >
-                <Search className="w-3.5 h-3.5" /> Inspect Node
-              </button>
+              <div className="flex items-center gap-4">
+                <div className="flex items-center gap-2">
+                  <div className="w-2 h-2 rounded-full bg-emerald-500 animate-pulse"></div>
+                  <span className="ui-label text-slate-500">{status}</span>
+                </div>
+                {selectedAgentObj && (
+                  <span className="ui-label text-slate-500 truncate max-w-[150px]">{selectedAgentObj.agent_name}</span>
+                )}
+                <button onClick={clearChat} className="p-1.5 text-slate-400 hover:text-red-500 transition-colors rounded-lg hover:bg-red-50" title="Clear Chat">
+                  <Trash2 className="w-3.5 h-3.5" />
+                </button>
+              </div>
             </div>
 
-            {/* Session Settings */}
-            <div>
-              <label className="ui-label text-slate-500 block mb-2">Session</label>
+            {/* Bottom Row: Controls */}
+            <div className="px-6 py-2.5 flex items-center gap-6 overflow-x-auto scrollbar-hide">
+              
+              {/* Agent Select */}
+              <div className="flex items-center gap-3 shrink-0">
+                <label className="ui-label text-slate-500">Active Node</label>
+                <div className="w-48 relative rounded-md p-[1px] overflow-hidden">
+                  <div className={`absolute inset-0 vibrant-rainbow-border ${selectedAgent ? 'animate-border-spin opacity-70' : 'opacity-25'}`} />
+                  <Select
+                    value={selectedAgent}
+                    onChange={(val) => {
+                      setSelectedAgent(val);
+                      if (currentSessionId) {
+                        setSessions(s => {
+                          const updated = s.map(session => session.id === currentSessionId ? { ...session, agentId: val } : session);
+                          localStorage.setItem('agent-sessions', JSON.stringify(updated));
+                          return updated;
+                        });
+                      }
+                    }}
+                    placeholder="Select an agent"
+                    options={agents.map((agent) => ({ value: agent.agent_id, label: agent.agent_name }))}
+                    className="relative z-10 !py-1 text-xs bg-white"
+                    triggerClassName="rounded-[5px] border-transparent"
+                  />
+                </div>
+                <button
+                  onClick={() => {
+                    if (selectedAgent) setIsInspectOpen(true);
+                    else alert("Select an agent first!");
+                  }}
+                  className="p-1.5 text-slate-400 hover:text-indigo-600 transition-colors rounded-md hover:bg-indigo-50"
+                  title="Inspect Node"
+                >
+                  <Search className="w-4 h-4" />
+                </button>
+              </div>
 
-              <div className="flex rounded-lg border border-slate-200 overflow-hidden mb-3 bg-slate-50">
-                <span className="ui-label text-slate-400 border-r border-slate-200 px-3 flex items-center">Ref ID</span>
+              <div className="w-px h-5 bg-slate-200 shrink-0" />
+
+              {/* Session Settings */}
+              <div className="flex items-center gap-3 shrink-0">
+                <label className="ui-label text-slate-500">Ref ID</label>
                 <input
                   type="text"
-                  placeholder="Transaction UUID"
+                  placeholder="Tx UUID"
                   value={transactionId}
                   onChange={(e) => setTransactionId(e.target.value)}
-                  className="w-full p-2.5 text-xs font-mono text-slate-700 bg-transparent outline-none placeholder:text-slate-400"
+                  className="w-32 px-3 py-1.5 text-xs font-mono text-slate-700 bg-slate-50 border border-slate-200 rounded-md outline-none focus:border-indigo-400 transition-colors"
                 />
               </div>
 
-              <label className="flex items-center justify-between gap-2 text-sm text-slate-700 mb-3 cursor-pointer">
-                <span>Flush Memory</span>
-                <span className="toggle-switch">
-                  <input type="checkbox" />
-                  <span className="toggle-track" />
-                  <span className="toggle-thumb" />
-                </span>
-              </label>
-              <label className="flex items-center justify-between gap-2 text-sm text-slate-700 cursor-pointer">
-                <span>Load Context</span>
-                <span className="toggle-switch">
-                  <input type="checkbox" defaultChecked />
-                  <span className="toggle-track" />
-                  <span className="toggle-thumb" />
-                </span>
-              </label>
-            </div>
+              <div className="w-px h-5 bg-slate-200 shrink-0" />
 
-            {/* Metrics — Telemetry */}
-            <div>
-              <label className="ui-label text-slate-500 mb-2 flex justify-between items-center">
-                Telemetry
-                <span className="inline-flex items-center gap-1 px-1.5 py-0.5 rounded text-[8px] text-white vibrant-rainbow-bg">LIVE</span>
-              </label>
-              <div className="bg-slate-50 border border-slate-200 rounded-xl p-4 space-y-3">
-                <div className="flex justify-between text-sm items-center">
-                  <span className="text-slate-500 text-[13px]">Model Init</span>
-                  <span key={`m-${modelInit}`} className={`metric-value text-slate-900 text-[13px] ${modelInit ? 'stream-in' : ''}`}>{modelInit ?? '—'}</span>
-                </div>
-                <div className="flex justify-between text-sm items-center">
-                  <span className="text-slate-500 text-[13px]">Agent Init</span>
-                  <span key={`a-${agentInit}`} className={`metric-value text-slate-900 text-[13px] ${agentInit ? 'stream-in' : ''}`}>{agentInit ?? '—'}</span>
-                </div>
-                <div className="flex justify-between text-sm items-center">
-                  <span className="text-slate-500 text-[13px]">Response Time</span>
-                  <span key={`r-${responseTime}`} className={`metric-value text-slate-900 text-[13px] ${responseTime ? 'stream-in' : ''}`}>{responseTime ?? '—'}</span>
+              {/* Telemetry */}
+              <div className="flex items-center gap-4 shrink-0">
+                <span className="ui-label text-slate-500">Telemetry <span className="text-[8px] text-white vibrant-rainbow-bg px-1 py-[1px] rounded ml-1">LIVE</span></span>
+                <div className="flex items-center gap-4 text-[11px]">
+                  <span className="text-slate-400">Init: <span key={`a-${agentInit}`} className={`text-slate-800 font-mono ${agentInit ? 'stream-in' : ''}`}>{agentInit ?? '—'}</span></span>
+                  <span className="text-slate-400">Resp: <span key={`r-${responseTime}`} className={`text-slate-800 font-mono ${responseTime ? 'stream-in' : ''}`}>{responseTime ?? '—'}</span></span>
                 </div>
               </div>
             </div>
-
           </div>
-
-          <div className="mt-auto p-4 border-t border-slate-200">
-            <button className="relative w-full rounded-xl p-[1.5px] overflow-hidden group">
-              <div className="absolute inset-0 vibrant-rainbow-border animate-border-spin opacity-80" />
-              <span className="relative z-10 flex items-center justify-center gap-2 bg-white text-slate-900 py-3 rounded-[10px] text-sm font-semibold">
-                <Settings2 className="w-4 h-4" /> Apply Config
-              </span>
-            </button>
-          </div>
-        </aside>
-
-        {/* Chat Area — Stream Console */}
-        <main className="flex-1 flex flex-col relative bg-[#FAFAFA]">
-
-          {/* Chat Header */}
-          <div className="h-14 border-b border-slate-200 bg-white flex items-center justify-between px-6 absolute top-0 left-0 w-full z-10">
-            <div className="flex items-center gap-2">
-              <div className="w-2 h-2 rounded-full bg-emerald-500 animate-pulse"></div>
-              <span className="ui-label text-slate-500">{status}</span>
-            </div>
-            {selectedAgentObj && (
-              <span className="ui-label text-slate-500 truncate max-w-[40%]">{selectedAgentObj.agent_name}</span>
-            )}
-            <button onClick={clearChat} className="p-2 text-slate-400 hover:text-red-500 transition-colors rounded-lg hover:bg-red-50">
-              <Trash2 className="w-4 h-4" />
-            </button>
-          </div>
-
-          {/* Messages */}
-          <div className="flex-1 overflow-y-auto pt-20 p-6 space-y-6">
+          
+          
+{/* Messages */}
+          <div className="flex-1 overflow-y-auto pt-6 p-6 space-y-6">
             {mcpHealth.length > 0 && (
               <div className="max-w-3xl mx-auto w-full bg-white border border-slate-200 rounded-xl p-3 flex flex-wrap gap-2">
                 {mcpHealth.map((h) => {
@@ -1016,8 +988,15 @@ function AgentInvokeInner() {
             </div>
           )}
 
+        
         </main>
+        
+        {/* Right Sidebar — UiPathLiveGraph */}
+        <aside className="w-[340px] bg-white border-l border-slate-200 flex flex-col overflow-hidden shrink-0 z-10">
+          <UiPathLiveGraph sessionLabel={currentSessionId} agentId={selectedAgent} apiUrl={apiUrl} robotKey={robotKey} />
+        </aside>
       </div>
+
     </div>
   );
 }

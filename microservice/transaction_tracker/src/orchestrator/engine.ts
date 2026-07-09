@@ -21,6 +21,7 @@ import { randomUUID } from "node:crypto";
 import { loadPortRange } from "../services/portAllocator.js";
 import { resolveCorsOrigin } from "../config/cors.js";
 import { jsonSchemaToZod } from "./jsonSchemaToZod.js";
+import { callFn } from "../db/rpc.js";
 
 const mcpHost = loadPortRange().host;
 
@@ -225,12 +226,40 @@ async function statusOf(env: A2AEnvelope): Promise<A2AResult> {
 }
 
 /**
+ * Pulls the structured job-trace side channel off a tool result's `_meta`
+ * (attached server-side by mcp-uipath, never part of `content` — so it never
+ * reaches the LLM's context). Only trigger_uipath_job/get_uipath_job_status
+ * carry a jobId, which is what uipath_job_trace is keyed on; queue-item tools
+ * have no job to key a NOT-NULL/UNIQUE job_id column on, so they're not wired
+ * into this table.
+ */
+function extractJobTraceMeta(
+  toolName: string,
+  meta: Record<string, unknown> | undefined,
+): { jobId: string; jobKey: string | null; releaseKey: string | null; folderId: string | null; state: string; info: string | null } | null {
+  if (!meta) return null;
+  if (toolName !== 'trigger_uipath_job' && toolName !== 'get_uipath_job_status') return null;
+  const jobId = meta.jobId;
+  if (typeof jobId !== 'string' || !jobId) return null;
+  return {
+    jobId,
+    jobKey: typeof meta.jobKey === 'string' ? meta.jobKey : null,
+    releaseKey: typeof meta.releaseKey === 'string' ? meta.releaseKey : null,
+    folderId: typeof meta.folderId === 'string' ? meta.folderId : null,
+    state: typeof meta.state === 'string' && meta.state ? meta.state : 'Pending',
+    info: typeof meta.info === 'string' ? meta.info : null,
+  };
+}
+
+/**
  * MCP Integration: Loads tools dynamically for the LangGraph Agent.
  * This also implements the STATE TRACKING constraint by wrapping tool execution.
  */
 async function loadMcpTools(
   toolConfigs: any[],
   log: ReturnType<typeof txLogger>,
+  agentId?: string,
+  sessionLabel?: string,
 ): Promise<{ tools: any[]; clients: Client[]; report: McpServerHealth[] }> {
   const langchainTools: any[] = [];
   const clients: Client[] = [];
@@ -369,6 +398,29 @@ async function loadMcpTools(
               // 3. Transaction Tracker Integration: Update state AFTER tool yields
               log.info({ tool: mcpTool.name, action: "PROCESSING_TO_AWAITING_CALLBACK" }, "External MCP tool completed");
 
+              // UiPath job trace write-back: reads only res._meta (never res.content),
+              // so this can never leak into what the LLM sees.
+              const trace = extractJobTraceMeta(mcpTool.name, (res as any)._meta as Record<string, unknown> | undefined);
+              if (trace) {
+                try {
+                  await callFn('fn_upsert_uipath_job_trace', [
+                    agentId ?? null,
+                    toolId || null,
+                    sessionLabel ?? null,
+                    trace.jobId,
+                    trace.jobKey,
+                    trace.releaseKey,
+                    null, // process_name — not available from trigger/status responses
+                    trace.folderId,
+                    null, // queue_name — not available from trigger/status responses
+                    trace.state,
+                    trace.info,
+                  ]);
+                } catch (e) {
+                  log.warn({ err: e, jobId: trace.jobId }, 'Failed to persist uipath_job_trace');
+                }
+              }
+
               return (res as any).content.map((c: any) => c.type === 'text' ? c.text : JSON.stringify(c)).join("\n");
             },
           })
@@ -399,6 +451,191 @@ async function loadMcpTools(
   return { tools: langchainTools, clients, report };
 }
 
+export type UipathContextSummary = {
+  toolId: string;
+  toolName: string;
+  processes: string[];
+  queues: { name: string; pendingCount: number | null }[];
+  recentJobs?: { id: string; key: string; processName: string; state: string; createdAt: string; logs?: string }[];
+  error?: string;
+};
+
+/**
+ * Connects a short-lived MCP client to a single tool row (SSE via its
+ * currently-live mcp_runtime_state port, or stdio spawned fresh) — the same
+ * connect logic loadMcpTools() uses per tool, factored out so one-off reads
+ * (context panel, dashboard drill-down) don't need a full agent run. Caller
+ * owns closing the returned client.
+ */
+async function connectToMcpToolById(toolId: string, clientName: string): Promise<Client> {
+  const toolRes = await query<any>('SELECT * FROM tools WHERE tool_id = $1', [toolId]);
+  const toolRow = toolRes.rows[0];
+  if (!toolRow) throw new Error('Tool not found');
+
+  let versions = toolRow.versions;
+  if (typeof versions === 'string') {
+    try { versions = JSON.parse(versions); } catch { /* falls through to the release check below */ }
+  }
+  const release = versions?.[versions.length - 1]?.released;
+  if (!release || typeof release.args === 'string' || !release.command || (release.method !== 'sse' && release.method !== 'stdio')) {
+    throw new Error('Tool not connectable (unsupported/legacy config)');
+  }
+
+  let ssePort: number | null = null;
+  if (release.method === 'sse') {
+    const runtime = await query<{ port: number | null; status: string }>(
+      `SELECT port, status FROM mcp_runtime_state WHERE tool_id = $1`,
+      [toolId],
+    );
+    const row = runtime.rows[0];
+    if (!row || row.status !== 'running' || !row.port) throw new Error('SSE server is not currently running');
+    ssePort = row.port;
+  }
+
+  const buildTransport = () =>
+    release.method === 'sse'
+      ? new SSEClientTransport(new URL(`http://${mcpHost}:${ssePort}/sse`))
+      : new StdioClientTransport({ command: release.command || 'node', args: Array.isArray(release.args) ? release.args : [] });
+
+  return withMcpRetry(async () => {
+    const c = new Client({ name: clientName, version: '1.0.0' });
+    await c.connect(buildTransport());
+    return c;
+  });
+}
+
+/**
+ * Proactive context fetch for the agent-invoke sidebar (Part 2.3): connects to
+ * every UiPath-type tool linked to an agent and pulls processes + queues (with a
+ * pending-item count for the first few queues) — a pure data fetch, no LLM
+ * reasoning, so it doesn't cost a conversational turn. Reuses the same
+ * connect/transport logic as loadMcpTools() rather than duplicating the raw
+ * UiPath HTTP calls a second time.
+ */
+export async function fetchAgentUipathContext(agentId: string): Promise<UipathContextSummary[]> {
+  const agentRes = await query<{ tools: string[] | null }>(
+    'SELECT tools FROM agents WHERE agent_id = $1',
+    [agentId],
+  );
+  const agentRow = agentRes.rows[0];
+  if (!agentRow?.tools || agentRow.tools.length === 0) return [];
+
+  const toolsRes = await query<any>(
+    `SELECT * FROM tools WHERE tool_id = ANY($1::uuid[]) AND name ILIKE '%uipath%'`,
+    [agentRow.tools],
+  );
+
+  const log = txLogger(`uipath-context:${agentId}`);
+  const results: UipathContextSummary[] = [];
+
+  for (const toolRow of toolsRes.rows) {
+    const toolId: string = toolRow.tool_id;
+    const toolName: string = toolRow.name;
+
+    let client: Client;
+    try {
+      client = await connectToMcpToolById(toolId, 'amadeus-context-panel');
+    } catch (e) {
+      results.push({ toolId, toolName, processes: [], queues: [], error: sanitizeMcpError(e) });
+      continue;
+    }
+
+    try {
+      const asText = (res: any) => (res?.content ?? []).map((c: any) => (c.type === 'text' ? c.text : '')).join('\n');
+
+      const processesText = asText(await client.callTool({ name: 'list_uipath_processes', arguments: {} }));
+      const processes = processesText
+        .split('\n')
+        .map((l: string) => (l.replace(/^•\s*/, '').split(' (key:')[0] ?? '').trim())
+        .filter((l: string) => l && !/^No processes found/.test(l));
+
+      const queuesText = asText(await client.callTool({ name: 'list_uipath_queues', arguments: {} }));
+      const queueNames = [...queuesText.matchAll(/^•\s*(.+?)\s*\(id:/gm)].map((m) => m[1] as string);
+
+      const queues: { name: string; pendingCount: number | null }[] = [];
+      const MAX_QUEUES_WITH_COUNT = 5;
+      for (const qName of queueNames.slice(0, MAX_QUEUES_WITH_COUNT)) {
+        try {
+          const txText = asText(await client.callTool({ name: 'get_uipath_queue_transactions', arguments: { queueName: qName, top: 100 } }));
+          queues.push({ name: qName, pendingCount: (txText.match(/\[New\]/g) || []).length });
+        } catch {
+          queues.push({ name: qName, pendingCount: null });
+        }
+      }
+      for (const qName of queueNames.slice(MAX_QUEUES_WITH_COUNT)) {
+        queues.push({ name: qName, pendingCount: null });
+      }
+
+      const jobsText = asText(await client.callTool({ name: 'list_uipath_jobs', arguments: { top: 30 } }));
+      const recentJobs = jobsText.split('\n')
+        .filter((l: string) => l.startsWith('• Job ID:'))
+        .map((l: string) => {
+          const match = l.match(/Job ID: (\d+) \(Key: ([^)]+)\) \| Process: (.*?) \| State: (\w+) \| Created: (.*)/);
+          if (!match) return null;
+          return { id: match[1], key: match[2], processName: match[3], state: match[4], createdAt: match[5], logs: '' };
+        })
+        .filter(Boolean) as { id: string; key: string; processName: string; state: string; createdAt: string; logs: string }[];
+
+      // Fetch real-time logs for the latest job of each unique process
+      const uniqueProcesses = new Set();
+      for (const job of recentJobs) {
+        if (!uniqueProcesses.has(job.processName)) {
+          uniqueProcesses.add(job.processName);
+          try {
+            const logsText = asText(await client.callTool({ name: 'get_uipath_job_logs', arguments: { jobId: job.key, top: 15 } }));
+            job.logs = logsText || 'No logs found.';
+          } catch {
+            job.logs = 'Failed to fetch logs.';
+          }
+        }
+      }
+
+      results.push({ toolId, toolName, processes, queues, recentJobs });
+    } catch (e) {
+      log.warn({ toolId, error: e }, 'Failed to fetch UiPath context');
+      results.push({ toolId, toolName, processes: [], queues: [], error: sanitizeMcpError(e) });
+    } finally {
+      try { await client.close(); } catch { /* best effort */ }
+    }
+  }
+
+  return results;
+}
+
+export type QueueTransactionItem = { id: number; status: string; reference: string | null; createdAt: string | null };
+
+/**
+ * Backs the Robots dashboard's row-expand ("show queue items for this job's
+ * queue") — a one-off MCP call against the tool that triggered the job,
+ * parsing get_uipath_queue_transactions' text response into structured rows.
+ */
+export async function fetchQueueTransactionsForTool(
+  toolId: string,
+  queueName: string,
+  folderId?: string | null,
+): Promise<QueueTransactionItem[]> {
+  const client = await connectToMcpToolById(toolId, 'amadeus-robots-dashboard');
+  try {
+    const res = await client.callTool({
+      name: 'get_uipath_queue_transactions',
+      arguments: { queueName, top: 25, ...(folderId ? { folderId } : {}) },
+    });
+    const text = ((res as any)?.content ?? []).map((c: any) => (c.type === 'text' ? c.text : '')).join('\n');
+    const items: QueueTransactionItem[] = [];
+    for (const m of text.matchAll(/^•\s*#(\d+)\s*\[([^\]]+)\](?:\s*ref=(\S+))?\s*created=(\S+)/gm)) {
+      items.push({
+        id: Number(m[1]),
+        status: m[2] as string,
+        reference: (m[3] as string | undefined) ?? null,
+        createdAt: (m[4] as string) === '?' ? null : (m[4] as string),
+      });
+    }
+    return items;
+  } finally {
+    try { await client.close(); } catch { /* best effort */ }
+  }
+}
+
 /**
  * Universal LangGraph Engine.
  * Dynamically builds and runs a createReactAgent from a JSON Configuration.
@@ -418,6 +655,7 @@ export async function runAgenticStep(
   messagesHistory?: any[],
   agentId?: string,
   mode: InvocationMode = 'playground',
+  sessionLabel?: string,
 ): Promise<A2AResult & { mcpHealth?: McpServerHealth[] }> {
   let txId: string;
   let step: string;
@@ -477,7 +715,7 @@ export async function runAgenticStep(
   }
 
   // 3. Construct MCP Tools (Dynamic Adapters) + connection health report
-  const { tools, clients, report } = await loadMcpTools(toolConfigs, log);
+  const { tools, clients, report } = await loadMcpTools(toolConfigs, log, agentConfig.agent_id, sessionLabel);
 
   // Fail loud: the agent had tools registered, but none of them connected.
   if (toolConfigs.length > 0 && tools.length === 0) {
@@ -617,6 +855,7 @@ export async function runAgenticStepStream(
   agentId: string | undefined,
   mode: InvocationMode,
   reply: FastifyReply,
+  sessionLabel?: string,
 ): Promise<void> {
   // reply.hijack() (called by the route handler before this function runs)
   // takes the raw response out of Fastify's control, so @fastify/cors's
@@ -685,7 +924,7 @@ export async function runAgenticStepStream(
     toolConfigs = toolsRes.rows;
   }
 
-  const { tools, clients, report } = await loadMcpTools(toolConfigs, log);
+  const { tools, clients, report } = await loadMcpTools(toolConfigs, log, agentConfig.agent_id, sessionLabel);
 
   // Fail loud: the agent had tools registered, but none of them connected.
   if (toolConfigs.length > 0 && tools.length === 0) {

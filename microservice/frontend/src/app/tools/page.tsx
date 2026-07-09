@@ -49,6 +49,9 @@ export default function ToolsPage() {
   const [authProvider, setAuthProvider] = useState<"uipath" | "pad" | "amadeus" | "">("");
   const [authFormData, setAuthFormData] = useState({ clientId: "", clientSecret: "", org: "", tenant: "", folderId: "" });
   const [isAuthenticating, setIsAuthenticating] = useState(false);
+  const [folderOptions, setFolderOptions] = useState<{ id: string; fullyQualifiedName: string }[]>([]);
+  const [isTestingFolders, setIsTestingFolders] = useState(false);
+  const [folderTestError, setFolderTestError] = useState<string | null>(null);
 
   const [searchQuery, setSearchQuery] = useState("");
   const [methodFilter, setMethodFilter] = useState("all");
@@ -295,7 +298,38 @@ export default function ToolsPage() {
   const openAuthModal = (provider: "uipath" | "pad" | "amadeus") => {
     setAuthProvider(provider);
     setAuthFormData({ clientId: "", clientSecret: "", org: "", tenant: "", folderId: "" });
+    setFolderOptions([]);
+    setFolderTestError(null);
     setIsAuthModalOpen(true);
+  };
+
+  // Turns "paste the link from Orchestrator" into "pick your folder from a
+  // dropdown once, at registration time" — does a live OAuth test connection
+  // with the credentials already typed in, then lists real folder names.
+  const testListFolders = async () => {
+    setIsTestingFolders(true);
+    setFolderTestError(null);
+    setFolderOptions([]);
+    try {
+      const res = await fetch(`${apiUrl}/orchestrator/uipath/folders`, {
+        method: "POST",
+        headers: { ...headers, "Content-Type": "application/json" },
+        body: JSON.stringify({
+          clientId: authFormData.clientId,
+          clientSecret: authFormData.clientSecret,
+          org: authFormData.org,
+          tenant: authFormData.tenant,
+          baseUrl: "https://cloud.uipath.com",
+        }),
+      });
+      const data = await res.json();
+      if (!res.ok) throw new Error(data?.error?.message || "Failed to list folders");
+      setFolderOptions(data.folders || []);
+    } catch (err: any) {
+      setFolderTestError(err.message);
+    } finally {
+      setIsTestingFolders(false);
+    }
   };
 
   const handleAuthConnect = async (e: React.FormEvent) => {
@@ -816,7 +850,35 @@ export default function ToolsPage() {
                     </div>
                     <div>
                       <label className="form-label">Folder ID</label>
-                      <input required value={authFormData.folderId} onChange={e => setAuthFormData({ ...authFormData, folderId: e.target.value })} className="form-input rounded-xl border-slate-200" placeholder="e.g. 6500192" />
+                      <div className="flex gap-2">
+                        <input required value={authFormData.folderId} onChange={e => setAuthFormData({ ...authFormData, folderId: e.target.value })} className="form-input rounded-xl border-slate-200 flex-1" placeholder="e.g. 6500192" />
+                        <button
+                          type="button"
+                          onClick={testListFolders}
+                          disabled={isTestingFolders || !authFormData.clientId || !authFormData.clientSecret || !authFormData.org || !authFormData.tenant}
+                          className="btn-secondary text-xs px-3 rounded-xl bg-white border border-slate-200 hover:bg-slate-50 disabled:opacity-50 disabled:cursor-not-allowed whitespace-nowrap"
+                        >
+                          {isTestingFolders ? <Loader2 className="w-3.5 h-3.5 animate-spin" /> : "Test & List Folders"}
+                        </button>
+                      </div>
+                      {folderTestError && (
+                        <p className="text-xs text-red-600 mt-1.5">{folderTestError}</p>
+                      )}
+                      {folderOptions.length > 0 && (
+                        <div className="mt-2 max-h-32 overflow-y-auto border border-slate-200 rounded-lg divide-y divide-slate-100">
+                          {folderOptions.map((f) => (
+                            <button
+                              type="button"
+                              key={f.id}
+                              onClick={() => setAuthFormData({ ...authFormData, folderId: f.id })}
+                              className={`w-full text-left px-3 py-2 text-xs hover:bg-slate-50 flex justify-between items-center ${authFormData.folderId === f.id ? "bg-blue-50 text-blue-700 font-medium" : "text-slate-600"}`}
+                            >
+                              <span className="truncate">{f.fullyQualifiedName}</span>
+                              <span className="font-mono text-[10px] text-slate-400 ml-2 shrink-0">{f.id}</span>
+                            </button>
+                          ))}
+                        </div>
+                      )}
                     </div>
                   </>
                 ) : (

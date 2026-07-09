@@ -151,6 +151,10 @@ server.tool(
               : `Job submitted but no details returned. Raw: ${text.slice(0, 200)}`,
           },
         ],
+        // Machine-readable side-channel for the orchestrator's uipath_job_trace
+        // write-back hook (engine.ts loadMcpTools). Never surfaced to the LLM —
+        // only the `content` text above is ever forwarded into model context.
+        ...(job ? { _meta: { jobId: String(job.Id), jobKey: job.Key, state: job.State, releaseKey: args.releaseKey, folderId } } : {}),
       };
     } catch (e) {
       const detail = e instanceof Error ? e.message : String(e);
@@ -208,6 +212,60 @@ server.tool(
 );
 
 server.tool(
+  "list_uipath_jobs",
+  "List recent UiPath jobs in the current folder, optionally filtered by process (ReleaseName)",
+  {
+    folderId: z.string().optional().describe("Folder ID, defaults to env"),
+    releaseName: z.string().optional().describe("Filter by specific process name (e.g., 'Robot1')"),
+    top: z.number().int().max(100).optional().default(10).describe("Number of recent jobs to return")
+  },
+  async (args) => {
+    const baseUrl = process.env.UIPATH_BASE_URL ?? "https://cloud.uipath.com";
+    const org = process.env.UIPATH_ORG ?? "";
+    const tenant = process.env.UIPATH_TENANT ?? "";
+    const folderId = args.folderId ?? process.env.UIPATH_FOLDER_ID ?? "0";
+
+    if (!org || !tenant) {
+      return { content: [{ type: "text", text: "Error: UIPATH_ORG and UIPATH_TENANT must be set." }] };
+    }
+
+    let token: string;
+    try {
+      token = await getUiPathToken();
+    } catch (e) {
+      return { content: [{ type: "text", text: `Auth failed: ${e instanceof Error ? e.message : String(e)}` }] };
+    }
+
+    try {
+      let filter = "";
+      if (args.releaseName) {
+        filter = `&$filter=ReleaseName eq '${args.releaseName}'`;
+      }
+      
+      const res = await fetch(`${baseUrl}/${org}/${tenant}/orchestrator_/odata/Jobs?$top=${args.top}&$orderby=CreationTime desc${filter}`, {
+        headers: {
+          Authorization: `Bearer ${token}`,
+          "X-UIPATH-OrganizationUnitId": folderId,
+        },
+      });
+
+      const text = await res.text();
+      if (!res.ok) {
+        return { content: [{ type: "text", text: `UiPath Jobs failed (${res.status}): ${text.slice(0, 300)}` }] };
+      }
+
+      const data = JSON.parse(text) as { value?: Array<{ Id: number; Key: string; State: string; ReleaseName: string; CreationTime: string }> };
+      const list = (data.value ?? []).map((j) => `• Job ID: ${j.Id} (Key: ${j.Key}) | Process: ${j.ReleaseName} | State: ${j.State} | Created: ${j.CreationTime}`).join("\n");
+      return { content: [{ type: "text", text: list || "No recent jobs found." }] };
+    } catch (e) {
+      const detail = e instanceof Error ? e.message : String(e);
+      const cause = e instanceof Error && e.cause ? ` (cause: ${e.cause instanceof Error ? e.cause.message : String(e.cause)})` : "";
+      return { content: [{ type: "text", text: `Network error calling UiPath: ${detail}${cause}` }], isError: true };
+    }
+  }
+);
+
+server.tool(
   "get_uipath_job_status",
   "Check the status of a UiPath job by ID",
   {
@@ -247,7 +305,77 @@ server.tool(
             text: `Job ${args.jobId}:\nState: ${job.State}\nStart: ${job.StartTime ?? "pending"}\nEnd: ${job.EndTime ?? "running"}\nInfo: ${job.Info ?? "none"}`,
           },
         ],
+        // Machine-readable side-channel — see trigger_uipath_job for rationale.
+        _meta: { jobId: String(args.jobId), state: String(job.State ?? ""), info: job.Info != null ? String(job.Info) : undefined },
       };
+    } catch (e) {
+      const detail = e instanceof Error ? e.message : String(e);
+      const cause = e instanceof Error && e.cause ? ` (cause: ${e.cause instanceof Error ? e.cause.message : String(e.cause)})` : "";
+      return { content: [{ type: "text", text: `Network error calling UiPath: ${detail}${cause}` }], isError: true };
+    }
+  }
+);
+
+server.tool(
+  "get_uipath_job_logs",
+  "Fetch detailed process execution logs for a specific UiPath Job",
+  {
+    jobId: z.string().describe("Job ID to fetch logs for"),
+    folderId: z.string().optional().describe("Folder ID, defaults to env"),
+    top: z.number().int().max(100).optional().default(20),
+  },
+  async (args) => {
+    const baseUrl = process.env.UIPATH_BASE_URL ?? "https://cloud.uipath.com";
+    const org = process.env.UIPATH_ORG ?? "";
+    const tenant = process.env.UIPATH_TENANT ?? "";
+    const folderId = args.folderId ?? process.env.UIPATH_FOLDER_ID ?? "0";
+
+    if (!org || !tenant) {
+      return { content: [{ type: "text", text: "Error: UIPATH_ORG and UIPATH_TENANT must be set." }] };
+    }
+
+    let token: string;
+    try {
+      token = await getUiPathToken();
+    } catch (e) {
+      return { content: [{ type: "text", text: `Auth failed: ${e instanceof Error ? e.message : String(e)}` }] };
+    }
+
+    try {
+      let jobKey = args.jobId;
+      // If jobId is purely numeric, resolve it to a Key first
+      if (/^\d+$/.test(args.jobId)) {
+        const jobRes = await fetch(`${baseUrl}/${org}/${tenant}/orchestrator_/odata/Jobs(${args.jobId})`, {
+          headers: { Authorization: `Bearer ${token}`, "X-UIPATH-OrganizationUnitId": folderId },
+        });
+        const jobText = await jobRes.text();
+        if (!jobRes.ok) {
+          return { content: [{ type: "text", text: `Failed to find Job ${args.jobId} (${jobRes.status}): ${jobText.slice(0, 200)}` }] };
+        }
+        const jobData = JSON.parse(jobText) as { Key?: string };
+        jobKey = jobData.Key || "";
+      }
+
+      if (!jobKey) {
+        return { content: [{ type: "text", text: `Job ${args.jobId} has no Key.` }] };
+      }
+
+      // 2. Fetch RobotLogs by JobKey
+      const res = await fetch(`${baseUrl}/${org}/${tenant}/orchestrator_/odata/RobotLogs?$filter=JobKey eq ${jobKey}&$top=${args.top}&$orderby=TimeStamp desc`, {
+        headers: {
+          Authorization: `Bearer ${token}`,
+          "X-UIPATH-OrganizationUnitId": folderId,
+        },
+      });
+
+      const text = await res.text();
+      if (!res.ok) {
+        return { content: [{ type: "text", text: `UiPath job logs lookup failed (${res.status}): ${text.slice(0, 300)}. NOTE: This requires OR.Monitoring or OR.Logs scope in your credentials.` }] };
+      }
+
+      const data = JSON.parse(text) as { value?: Array<{ TimeStamp: string; Level: string; Message: string }> };
+      const list = (data.value ?? []).map((l) => `[${l.TimeStamp}] [${l.Level}] ${l.Message}`).join("\n");
+      return { content: [{ type: "text", text: list || "No logs found for this job." }] };
     } catch (e) {
       const detail = e instanceof Error ? e.message : String(e);
       const cause = e instanceof Error && e.cause ? ` (cause: ${e.cause instanceof Error ? e.cause.message : String(e.cause)})` : "";
@@ -509,6 +637,69 @@ server.tool(
             ? `✅ ${succeeded} item(s) added to queue "${args.queueName}".`
             : `⚠️ ${succeeded} item(s) added, ${failed} failed. Queue: "${args.queueName}". Raw: ${text.slice(0, 400)}`,
         }],
+      };
+    } catch (e) {
+      const detail = e instanceof Error ? e.message : String(e);
+      const cause = e instanceof Error && e.cause ? ` (cause: ${e.cause instanceof Error ? e.cause.message : String(e.cause)})` : "";
+      return { content: [{ type: "text", text: `Network error calling UiPath: ${detail}${cause}` }], isError: true };
+    }
+  }
+);
+
+server.tool(
+  "get_uipath_queue_transactions",
+  "List recent transaction items in a UiPath queue, with their processing status (New, InProgress, Successful, Failed, Abandoned, Retried).",
+  {
+    queueName: z.string().describe("Exact queue name, from list_uipath_queues"),
+    folderId: z.string().optional().describe("Folder ID, defaults to env"),
+    top: z.number().int().positive().max(100).optional().default(25),
+  },
+  async (args) => {
+    const baseUrl = process.env.UIPATH_BASE_URL ?? "https://cloud.uipath.com";
+    const org = process.env.UIPATH_ORG ?? "";
+    const tenant = process.env.UIPATH_TENANT ?? "";
+    const folderId = args.folderId ?? process.env.UIPATH_FOLDER_ID ?? "0";
+
+    if (!org || !tenant) {
+      return { content: [{ type: "text", text: "Error: UIPATH_ORG and UIPATH_TENANT must be set." }] };
+    }
+
+    let token: string;
+    try {
+      token = await getUiPathToken();
+    } catch (e) {
+      return { content: [{ type: "text", text: `Auth failed: ${e instanceof Error ? e.message : String(e)}` }] };
+    }
+
+    const filter = encodeURIComponent(`QueueDefinition/Name eq '${args.queueName.replace(/'/g, "''")}'`);
+    const url = `${baseUrl}/${org}/${tenant}/orchestrator_/odata/QueueItems?$filter=${filter}&$orderby=CreationTime desc&$top=${args.top}`;
+
+    try {
+      const res = await fetch(url, {
+        headers: {
+          Authorization: `Bearer ${token}`,
+          "X-UIPATH-OrganizationUnitId": folderId,
+        },
+      });
+
+      const text = await res.text();
+      if (!res.ok) {
+        return { content: [{ type: "text", text: `UiPath QueueItems failed (${res.status}): ${text.slice(0, 300)}` }] };
+      }
+
+      process.stderr.write(`[mcp-uipath] QueueItems raw response: ${text.slice(0, 500)}\n`);
+
+      const data = JSON.parse(text) as {
+        value?: Array<{ Id: number; Status: string; Reference?: string; CreationTime?: string; EndProcessingTime?: string }>;
+      };
+      const items = data.value ?? [];
+      const list = items
+        .map((it) => `• #${it.Id} [${it.Status}]${it.Reference ? ` ref=${it.Reference}` : ""} created=${it.CreationTime ?? "?"}`)
+        .join("\n");
+
+      return {
+        content: [{ type: "text", text: items.length ? list : `No transaction items found in queue "${args.queueName}".` }],
+        _meta: { queueName: args.queueName, folderId, count: items.length },
       };
     } catch (e) {
       const detail = e instanceof Error ? e.message : String(e);

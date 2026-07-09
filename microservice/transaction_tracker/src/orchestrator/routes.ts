@@ -3,7 +3,7 @@ import type { ZodTypeProvider } from 'fastify-type-provider-zod';
 import { z } from 'zod';
 import { query } from '../db/pool.js';
 import { authenticateRobot, verifyFinancialSignature } from '../middleware/auth.js';
-import { handleA2A, runAgenticStep, runAgenticStepStream } from './engine.js';
+import { handleA2A, runAgenticStep, runAgenticStepStream, fetchAgentUipathContext, fetchQueueTransactionsForTool } from './engine.js';
 import { registry } from './agents/base.js';
 import { docExamAgent } from './agents/docExamAgent.js';
 import { executorRegistry } from './executors/base.js';
@@ -55,6 +55,10 @@ const RunAgenticSchema = z
     // 'playground' (default) never touches the `transactions` table — used by
     // the test-drive UI. 'production' requires a real, existing transactionId.
     mode: z.enum(['playground', 'production']).default('playground'),
+    // Client-generated chat-session id (agent-invoke's `agent-sessions` localStorage
+    // key), forwarded so uipath_job_trace rows can be correlated back to a chat.
+    // Best-effort only — never validated against a server-side session table.
+    sessionLabel: z.string().max(200).optional(),
   })
   .strict();
 
@@ -96,13 +100,13 @@ export async function registerOrchestratorRoutes(app: FastifyInstance): Promise<
     typedSecured.post('/orchestrator/run-agentic', {
       schema: { body: RunAgenticSchema }
     }, async (req, reply) => {
-      const body = req.body as { transactionId?: string; agentId?: string; idempotencyKey: string; prompt?: string; messages?: any[]; stream?: boolean; mode: 'playground' | 'production' };
+      const body = req.body as { transactionId?: string; agentId?: string; idempotencyKey: string; prompt?: string; messages?: any[]; stream?: boolean; mode: 'playground' | 'production'; sessionLabel?: string };
       if (body.stream) {
         reply.hijack();
-        await runAgenticStepStream(req.auth!, body.transactionId, body.idempotencyKey, body.prompt, body.messages, body.agentId, body.mode, reply);
+        await runAgenticStepStream(req.auth!, body.transactionId, body.idempotencyKey, body.prompt, body.messages, body.agentId, body.mode, reply, body.sessionLabel);
         return;
       }
-      const result = await runAgenticStep(req.auth!, body.transactionId, body.idempotencyKey, body.prompt, body.messages, body.agentId, body.mode);
+      const result = await runAgenticStep(req.auth!, body.transactionId, body.idempotencyKey, body.prompt, body.messages, body.agentId, body.mode, body.sessionLabel);
       return reply.send(result);
     });
 
@@ -204,6 +208,120 @@ export async function registerOrchestratorRoutes(app: FastifyInstance): Promise<
       const decision = explainRoute(q.step, q.type);
       if (!decision) return reply.code(404).send({ error: { code: 'NO_EXECUTOR', message: 'Tidak ada executor cocok' } });
       return reply.send(decision);
+    });
+
+    // GET /orchestrator/uipath-jobs — recent uipath_job_trace rows, joined with
+    // agent name, for the Robots dashboard (frontend/dashboard/robots). Plain
+    // SELECT — this is a simple read, no conditional write-path logic, so no
+    // RPC function per the "don't convert simple reads" convention.
+    typedSecured.get('/orchestrator/uipath-jobs', {
+      schema: {
+        querystring: z.object({
+          agentId: z.string().uuid().optional(),
+          state: z.enum(['Pending', 'Running', 'Successful', 'Faulted', 'Stopped']).optional(),
+          sessionLabel: z.string().max(200).optional(),
+          limit: z.coerce.number().int().min(1).max(200).default(50),
+        }).strict(),
+      },
+    }, async (req, reply) => {
+      const q = req.query as { agentId?: string; state?: string; sessionLabel?: string; limit: number };
+      const conditions: string[] = [];
+      const params: unknown[] = [];
+      if (q.agentId) { params.push(q.agentId); conditions.push(`ujt.agent_id = $${params.length}`); }
+      if (q.state) { params.push(q.state); conditions.push(`ujt.state = $${params.length}`); }
+      if (q.sessionLabel) { params.push(q.sessionLabel); conditions.push(`ujt.session_label = $${params.length}`); }
+      const where = conditions.length ? `WHERE ${conditions.join(' AND ')}` : '';
+      params.push(q.limit);
+      const res = await query(
+        `SELECT ujt.*, a.agent_name
+         FROM uipath_job_trace ujt
+         LEFT JOIN agents a ON a.agent_id = ujt.agent_id
+         ${where}
+         ORDER BY ujt.triggered_at DESC
+         LIMIT $${params.length}`,
+        params,
+      );
+      return reply.send({ items: res.rows, count: res.rows.length });
+    });
+
+    // GET /orchestrator/tools/:toolId/uipath-queue-transactions — row-expand
+    // drill-down on the Robots dashboard: live queue items for the queue a
+    // given job trace row was associated with.
+    typedSecured.get('/orchestrator/tools/:toolId/uipath-queue-transactions', {
+      schema: {
+        params: z.object({ toolId: z.string().uuid() }).strict(),
+        querystring: z.object({ queueName: z.string().min(1), folderId: z.string().optional() }).strict(),
+      },
+    }, async (req, reply) => {
+      const { toolId } = req.params as { toolId: string };
+      const { queueName, folderId } = req.query as { queueName: string; folderId?: string };
+      try {
+        const items = await fetchQueueTransactionsForTool(toolId, queueName, folderId);
+        return reply.send({ items });
+      } catch (e) {
+        return reply.code(502).send({ error: { code: 'UIPATH_QUEUE_FETCH_FAILED', message: e instanceof Error ? e.message : String(e) } });
+      }
+    });
+
+    // GET /orchestrator/agents/:id/uipath-context — proactive sidebar summary
+    // (Part 2.3): processes + queues for every UiPath tool linked to this agent,
+    // fetched live through the already-connected MCP client, no LLM turn spent.
+    typedSecured.get('/orchestrator/agents/:id/uipath-context', {
+      schema: { params: z.object({ id: z.string().uuid() }).strict() },
+    }, async (req, reply) => {
+      const { id } = req.params as { id: string };
+      const context = await fetchAgentUipathContext(id);
+      return reply.send({ agentId: id, tools: context });
+    });
+
+    // POST /orchestrator/uipath/folders — one-time "Test & List Folders" call
+    // used by the Tools registration form (Part 2.2). Credentials are the
+    // request body, never a query string, so they never land in access logs /
+    // browser history / proxy logs.
+    typedSecured.post('/orchestrator/uipath/folders', {
+      schema: {
+        body: z.object({
+          clientId: z.string().min(1),
+          clientSecret: z.string().min(1),
+          baseUrl: z.string().url().default('https://cloud.uipath.com'),
+          org: z.string().min(1),
+          tenant: z.string().min(1),
+        }).strict(),
+      },
+    }, async (req, reply) => {
+      const b = req.body as { clientId: string; clientSecret: string; baseUrl: string; org: string; tenant: string };
+      try {
+        const tokenRes = await fetch(`${b.baseUrl}/identity_/connect/token`, {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
+          body: new URLSearchParams({
+            grant_type: 'client_credentials',
+            client_id: b.clientId,
+            client_secret: b.clientSecret,
+            scope: 'OR.Folders.Read',
+          }).toString(),
+        });
+        const tokenText = await tokenRes.text();
+        req.log.info({ status: tokenRes.status }, 'UiPath folder-test OAuth response');
+        if (!tokenRes.ok) {
+          return reply.code(502).send({ error: { code: 'UIPATH_AUTH_FAILED', message: `UiPath OAuth2 failed ${tokenRes.status}: ${tokenText.slice(0, 300)}` } });
+        }
+        const { access_token } = JSON.parse(tokenText) as { access_token: string };
+
+        const foldersRes = await fetch(`${b.baseUrl}/${b.org}/${b.tenant}/orchestrator_/odata/Folders`, {
+          headers: { Authorization: `Bearer ${access_token}` },
+        });
+        const foldersText = await foldersRes.text();
+        req.log.info({ status: foldersRes.status, body: foldersText.slice(0, 2000) }, 'UiPath Folders raw response');
+        if (!foldersRes.ok) {
+          return reply.code(502).send({ error: { code: 'UIPATH_FOLDERS_FAILED', message: `UiPath Folders failed ${foldersRes.status}: ${foldersText.slice(0, 300)}` } });
+        }
+        const data = JSON.parse(foldersText) as { value?: Array<{ Id: number; FullyQualifiedName?: string; DisplayName?: string }> };
+        const folders = (data.value ?? []).map((f) => ({ id: String(f.Id), fullyQualifiedName: f.FullyQualifiedName ?? f.DisplayName ?? String(f.Id) }));
+        return reply.send({ folders });
+      } catch (e) {
+        return reply.code(502).send({ error: { code: 'UIPATH_REQUEST_FAILED', message: e instanceof Error ? e.message : String(e) } });
+      }
     });
 
     // POST /orchestrator/dispatch — jalankan step saat ini via executor terpilih.

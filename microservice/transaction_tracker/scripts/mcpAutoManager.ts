@@ -94,6 +94,139 @@ async function markStopped(toolIds: string[]): Promise<void> {
   await pool.query(`SELECT * FROM fn_release_mcp_runtime($1::uuid[])`, [toolIds]);
 }
 
+// ── UiPath job trace poller ──────────────────────────────────────────────
+// A row stays Pending/Running forever unless something re-checks Orchestrator.
+// This daemon already owns the "periodic background task against the DB"
+// role in this codebase (see syncMcpServers below), so the poll tick lives
+// here rather than inventing a second scheduler. Each row carries its own
+// tool_id, so credentials are read straight from that tool's stored
+// registration config (same {command, args: [json, "--stdio"]} shape
+// mcp-uipath itself parses at boot) — this mirrors getUiPathToken() in
+// mcp-uipath/src/index.ts and getAccessToken() in uipathExecutor.ts, but
+// neither of those is reusable here: both are singleton, single-credential-set
+// caches, while polling must hold one token per UiPath tool/account.
+interface UipathCreds {
+  baseUrl: string;
+  org: string;
+  tenant: string;
+  clientId: string;
+  clientSecret: string;
+}
+const uipathTokenCache = new Map<string, { accessToken: string; expiresAt: number }>();
+
+function extractUipathCreds(toolRow: any): UipathCreds | null {
+  let versions = toolRow.versions;
+  if (typeof versions === 'string') {
+    try { versions = JSON.parse(versions); } catch { return null; }
+  }
+  const release = versions?.[versions.length - 1]?.released;
+  const rawCredsArg: string | undefined = Array.isArray(release?.args)
+    ? release.args.find((a: string) => typeof a === 'string' && a.trim().startsWith('{'))
+    : undefined;
+  if (!rawCredsArg) return null;
+  try {
+    const parsed = JSON.parse(rawCredsArg);
+    if (!parsed.clientId || !parsed.clientSecret || !parsed.org || !parsed.tenant) return null;
+    return {
+      baseUrl: parsed.baseUrl || 'https://cloud.uipath.com',
+      org: parsed.org,
+      tenant: parsed.tenant,
+      clientId: parsed.clientId,
+      clientSecret: parsed.clientSecret,
+    };
+  } catch {
+    return null;
+  }
+}
+
+async function getUipathTokenForTool(toolId: string, creds: UipathCreds): Promise<string> {
+  const now = Date.now();
+  const cached = uipathTokenCache.get(toolId);
+  if (cached && cached.expiresAt > now + 30_000) return cached.accessToken;
+
+  const res = await fetch(`${creds.baseUrl}/identity_/connect/token`, {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
+    body: new URLSearchParams({
+      grant_type: 'client_credentials',
+      client_id: creds.clientId,
+      client_secret: creds.clientSecret,
+      scope: 'OR.Jobs',
+    }).toString(),
+  });
+  if (!res.ok) {
+    const t = await res.text().catch(() => '');
+    throw new Error(`UiPath OAuth2 failed ${res.status}: ${t.slice(0, 200)}`);
+  }
+  const json = (await res.json()) as { access_token: string; expires_in: number };
+  uipathTokenCache.set(toolId, { accessToken: json.access_token, expiresAt: now + json.expires_in * 1000 });
+  return json.access_token;
+}
+
+async function fetchJobStatus(
+  toolId: string,
+  creds: UipathCreds,
+  jobId: string,
+  folderId: string | null,
+): Promise<{ state: string; info: string | null }> {
+  const token = await getUipathTokenForTool(toolId, creds);
+  const res = await fetch(`${creds.baseUrl}/${creds.org}/${creds.tenant}/orchestrator_/odata/Jobs(${jobId})`, {
+    headers: {
+      Authorization: `Bearer ${token}`,
+      ...(folderId ? { 'X-UIPATH-OrganizationUnitId': folderId } : {}),
+    },
+  });
+  const text = await res.text();
+  if (!res.ok) {
+    throw new Error(`UiPath job lookup failed ${res.status}: ${text.slice(0, 200)}`);
+  }
+  const job = JSON.parse(text) as Record<string, unknown>;
+  return { state: String(job.State ?? 'Pending'), info: job.Info != null ? String(job.Info) : null };
+}
+
+async function pollActiveJobTraces(): Promise<void> {
+  try {
+    const { rows } = await pool.query(`
+      SELECT * FROM uipath_job_trace
+      WHERE state IN ('Pending', 'Running')
+        AND (last_polled_at IS NULL OR last_polled_at < now() - interval '15 seconds')
+      LIMIT 50
+    `);
+    if (rows.length === 0) return;
+
+    const toolIds = [...new Set(rows.map((r: any) => r.tool_id).filter(Boolean))];
+    const toolsById = new Map<string, any>();
+    if (toolIds.length > 0) {
+      const toolsRes = await pool.query(`SELECT * FROM tools WHERE tool_id = ANY($1::uuid[])`, [toolIds]);
+      for (const t of toolsRes.rows) toolsById.set(t.tool_id, t);
+    }
+
+    for (const row of rows) {
+      if (!row.tool_id) {
+        console.warn(`[MCP AutoManager] Skipping poll for job ${row.job_id} — no tool_id on record, can't resolve credentials`);
+        continue;
+      }
+      const toolRow = toolsById.get(row.tool_id);
+      const creds = toolRow ? extractUipathCreds(toolRow) : null;
+      if (!creds) {
+        console.warn(`[MCP AutoManager] Skipping poll for job ${row.job_id} — tool ${row.tool_id} has no usable UiPath credentials`);
+        continue;
+      }
+      try {
+        const status = await fetchJobStatus(row.tool_id, creds, row.job_id, row.folder_id);
+        await pool.query(`SELECT * FROM fn_upsert_uipath_job_trace($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11)`, [
+          null, null, null, row.job_id, null, null, null, row.folder_id, null,
+          status.state, status.info,
+        ]);
+      } catch (e) {
+        console.warn(`[MCP AutoManager] Failed to poll job trace ${row.job_id}:`, e instanceof Error ? e.message : e);
+      }
+    }
+  } catch (err) {
+    console.error('[MCP AutoManager] Error polling UiPath job traces:', err);
+  }
+}
+
 /** Plain TCP connect check — doesn't need to be a valid SSE handshake, just proof something is listening. */
 function tcpProbe(host: string, port: number, timeoutMs = 1500): Promise<boolean> {
   return new Promise((resolve) => {
@@ -383,6 +516,10 @@ async function syncMcpServers() {
 // Check every 10 seconds for changes in the DB
 setInterval(syncMcpServers, 10000);
 syncMcpServers(); // Initial check
+
+// Poll active UiPath job traces every 15 seconds
+setInterval(pollActiveJobTraces, 15000);
+pollActiveJobTraces(); // Initial check
 
 console.log('[MCP AutoManager] Daemon started. Monitoring database for Online MCP servers...');
 
