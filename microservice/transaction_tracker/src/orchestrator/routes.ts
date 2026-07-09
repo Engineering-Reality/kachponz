@@ -1,6 +1,7 @@
 import type { FastifyInstance } from 'fastify';
 import type { ZodTypeProvider } from 'fastify-type-provider-zod';
 import { z } from 'zod';
+import { query } from '../db/pool.js';
 import { authenticateRobot, verifyFinancialSignature } from '../middleware/auth.js';
 import { handleA2A, runAgenticStep, runAgenticStepStream } from './engine.js';
 import { registry } from './agents/base.js';
@@ -51,6 +52,9 @@ const RunAgenticSchema = z
       content: z.union([z.string(), z.array(z.any())])
     })).optional(),
     stream: z.boolean().optional(),
+    // 'playground' (default) never touches the `transactions` table — used by
+    // the test-drive UI. 'production' requires a real, existing transactionId.
+    mode: z.enum(['playground', 'production']).default('playground'),
   })
   .strict();
 
@@ -92,13 +96,13 @@ export async function registerOrchestratorRoutes(app: FastifyInstance): Promise<
     typedSecured.post('/orchestrator/run-agentic', {
       schema: { body: RunAgenticSchema }
     }, async (req, reply) => {
-      const body = req.body as { transactionId?: string; agentId?: string; idempotencyKey: string; prompt?: string; messages?: any[]; stream?: boolean };
+      const body = req.body as { transactionId?: string; agentId?: string; idempotencyKey: string; prompt?: string; messages?: any[]; stream?: boolean; mode: 'playground' | 'production' };
       if (body.stream) {
         reply.hijack();
-        await runAgenticStepStream(req.auth!, body.transactionId, body.idempotencyKey, body.prompt, body.messages, body.agentId, reply);
+        await runAgenticStepStream(req.auth!, body.transactionId, body.idempotencyKey, body.prompt, body.messages, body.agentId, body.mode, reply);
         return;
       }
-      const result = await runAgenticStep(req.auth!, body.transactionId, body.idempotencyKey, body.prompt, body.messages, body.agentId);
+      const result = await runAgenticStep(req.auth!, body.transactionId, body.idempotencyKey, body.prompt, body.messages, body.agentId, body.mode);
       return reply.send(result);
     });
 
@@ -107,6 +111,79 @@ export async function registerOrchestratorRoutes(app: FastifyInstance): Promise<
       return reply.send({
         agents: registry.all().map((a) => a.descriptor),
       });
+    });
+
+    // GET /orchestrator/mcp/status — live process state for every MCP tool
+    // that has ever been (re)started, sourced from mcp_runtime_state (the
+    // only place a currently-live SSE port is ever recorded). Polled by the
+    // Tools page to show "running on :PORT" / "stopped" without the user
+    // having to track ports themselves.
+    typedSecured.get('/orchestrator/mcp/status', async (_req, reply) => {
+      const res = await query<{
+        tool_id: string;
+        tool_name: string;
+        method: string;
+        port: number | null;
+        status: string;
+        pid: number | null;
+        started_at: string | null;
+        last_error: string | null;
+      }>(
+        `SELECT t.tool_id, t.name AS tool_name, mrs.method, mrs.port, mrs.status, mrs.pid, mrs.started_at, mrs.last_error
+         FROM mcp_runtime_state mrs
+         JOIN tools t ON t.tool_id = mrs.tool_id
+         ORDER BY t.name ASC`,
+      );
+      return reply.send(
+        res.rows.map((r) => ({
+          toolId: r.tool_id,
+          toolName: r.tool_name,
+          method: r.method,
+          port: r.port,
+          status: r.status,
+          pid: r.pid,
+          startedAt: r.started_at,
+          lastError: r.last_error,
+        })),
+      );
+    });
+
+    // POST /orchestrator/mcp/:toolId/restart — manual restart escape hatch for
+    // cases the mtime-based auto-restart in mcpAutoManager can't catch (e.g.
+    // env var / DB config changes with no entry-file change). Kills the
+    // currently-tracked process by pid (works cross-process since the daemon
+    // that actually spawned it lives in a separate node process from this
+    // API server) and clears its runtime row; the daemon's next sync tick
+    // (≤10s) sees the tool is no longer running and respawns it fresh.
+    typedSecured.post('/orchestrator/mcp/:toolId/restart', {
+      schema: { params: z.object({ toolId: z.string().uuid() }) },
+    }, async (req, reply) => {
+      const { toolId } = req.params as { toolId: string };
+
+      const res = await query<{ pid: number | null }>(
+        `SELECT pid FROM mcp_runtime_state WHERE tool_id = $1`,
+        [toolId],
+      );
+      const row = res.rows[0];
+      if (!row) {
+        return reply.code(404).send({ error: { code: 'NOT_FOUND', message: 'No runtime state for this tool' } });
+      }
+
+      const { pid } = row;
+      if (pid) {
+        try {
+          process.kill(pid, 'SIGKILL');
+        } catch {
+          // Already dead — fine, we just want it gone either way.
+        }
+      }
+
+      await query(
+        `UPDATE mcp_runtime_state SET status = 'stopped', pid = NULL, updated_at = now() WHERE tool_id = $1`,
+        [toolId],
+      );
+
+      return reply.code(202).send({ status: 'restarting' });
     });
 
     // ── EXECUTOR endpoints (meta-orchestrator: LLM + UiPath + PAD) ──────

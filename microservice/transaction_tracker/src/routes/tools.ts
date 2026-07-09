@@ -4,7 +4,39 @@ import { query } from '../db/pool.js';
 import { DomainError } from '../types/domain.js';
 
 export const registerToolsRoutes: FastifyPluginAsync = async (app: FastifyInstance) => {
-  // Base Tool schema
+  // Structured MCP server release contract (see bugfix1.md Bug 1). `command`
+  // is the executable, `args` is an array passed as-is to execvp — no shell
+  // interpolation, no re-splitting of a concatenated string.
+  const ReleaseSchema = z.discriminatedUnion('method', [
+    z.object({
+      method: z.literal('stdio'),
+      command: z.string().min(1),
+      args: z.array(z.string()),
+      env: z.record(z.string()).default({}),
+    }),
+    z.object({
+      method: z.literal('sse'),
+      // Legacy/display only — the live port is assigned at process-start
+      // time and lives solely in mcp_runtime_state (see portprompt.md).
+      // Never treated as durable config; optional so the UI no longer has
+      // to submit a value the user typed.
+      port: z.number().int().positive().optional(),
+      command: z.string().min(1),
+      args: z.array(z.string()),
+      env: z.record(z.string()).default({}),
+    }),
+  ]);
+
+  const VersionSchema = z
+    .object({
+      version: z.string().optional(),
+      released: ReleaseSchema,
+    })
+    .passthrough();
+
+  // Response schema stays lenient on `versions` — pre-existing rows in the DB
+  // may still hold the legacy (broken) shape, and response validation must
+  // not 500 on reads of old data. Only writes are held to the strict shape.
   const toolSchema = z.object({
     tool_id: z.string().uuid(),
     user_id: z.string().uuid().nullable().optional(),
@@ -15,8 +47,17 @@ export const registerToolsRoutes: FastifyPluginAsync = async (app: FastifyInstan
     on_status: z.string().nullable().optional(),
   });
 
-  const toolCreateSchema = toolSchema.omit({ tool_id: true, user_id: true, company_id: true });
-  const toolUpdateSchema = toolSchema.omit({ tool_id: true, user_id: true, company_id: true }).partial();
+  // Write schema enforces the structured {command, args[], env} contract so
+  // the UI/API can never persist the broken concatenated-string shape again.
+  const toolWriteSchema = z.object({
+    name: z.string(),
+    description: z.string().nullable().optional(),
+    versions: z.array(VersionSchema).nullable().optional(),
+    on_status: z.string().nullable().optional(),
+  });
+
+  const toolCreateSchema = toolWriteSchema;
+  const toolUpdateSchema = toolWriteSchema.partial();
 
   // GET /tools
   app.get(

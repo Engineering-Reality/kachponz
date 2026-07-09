@@ -63,7 +63,10 @@ describe('Universal LangGraph Engine', () => {
           return { rows: [{ agent_id: 'step1', model: 'gpt-4o', tools: ['tool-1'], agent_style: 'helpful' }] } as any;
         }
         if (sql.includes('FROM tools')) {
-          return { rows: [{ tool_id: 'tool-1', name: 'test_tool', on_status: 'Online', versions: '[{"released":{"method":"sse","port":"http://mock"}}]' }] } as any;
+          return { rows: [{ tool_id: 'tool-1', name: 'test_tool', on_status: 'Online', versions: '[{"released":{"method":"sse","command":"node","args":[]}}]' }] } as any;
+        }
+        if (sql.includes('FROM mcp_runtime_state')) {
+          return { rows: [{ port: 19999, status: 'running' }] } as any;
         }
         return { rows: [] } as any;
       });
@@ -79,7 +82,7 @@ describe('Universal LangGraph Engine', () => {
         idempotentReplay: false
       });
 
-      const result = await runAgenticStep(mockAuth, 'tx-1', 'idem-1');
+      const result = await runAgenticStep(mockAuth, 'tx-1', 'idem-1', undefined, undefined, undefined, 'production');
 
       expect(result.accepted).toBe(true);
       expect(result.status).toBe('in_progress');
@@ -102,7 +105,7 @@ describe('Universal LangGraph Engine', () => {
 
       vi.mocked(pool.query).mockResolvedValue({ rows: [] } as any);
 
-      await expect(runAgenticStep(mockAuth, 'tx-1', 'idem-1')).rejects.toThrow(DomainError);
+      await expect(runAgenticStep(mockAuth, 'tx-1', 'idem-1', undefined, undefined, undefined, 'production')).rejects.toThrow(DomainError);
     });
 
     it('should catch LangGraph execution errors and fail the step instead of crashing', async () => {
@@ -135,7 +138,7 @@ describe('Universal LangGraph Engine', () => {
         idempotentReplay: false
       });
 
-      const result = await runAgenticStep(mockAuth, 'tx-1', 'idem-1');
+      const result = await runAgenticStep(mockAuth, 'tx-1', 'idem-1', undefined, undefined, undefined, 'production');
       
       expect(result.accepted).toBe(true);
       expect(transactions.failStep).toHaveBeenCalled();

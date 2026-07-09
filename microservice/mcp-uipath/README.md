@@ -1,8 +1,9 @@
 # mcp-uipath
 
 MCP server that bridges to the UiPath Automation Cloud Orchestrator API. Exposes
-three tools over SSE: `trigger_uipath_job`, `list_uipath_processes`, and
-`get_uipath_job_status`.
+six tools over SSE: `trigger_uipath_job`, `list_uipath_processes`,
+`get_uipath_job_status`, `list_uipath_queues`, `add_uipath_queue_item`, and
+`bulk_add_uipath_queue_items`.
 
 ## Getting UiPath credentials to test against
 
@@ -13,6 +14,7 @@ three tools over SSE: `trigger_uipath_job`, `list_uipath_processes`, and
    (Orchestrator scope).
 5. Save → note the **Client ID** and **Client Secret**.
 6. Org slug: visible in the URL `cloud.uipath.com/{org-slug}/{tenant-slug}/orchestrator_/`.
+6b. Also check `OR.Queues` in the scopes list, or queue calls will fail with 403 even though jobs/processes work fine.
 7. Folder ID: open **Orchestrator** → the folder you want to use → its ID is in
    the URL, or fetch it via `GET /odata/Folders`.
 8. Release key: publish a simple process from UiPath Studio, then
@@ -44,4 +46,7 @@ npx @modelcontextprotocol/inspector http://localhost:10001/sse
 
 # 4. If no robot has picked up the job yet, the state will stay Pending — that's NORMAL.
 #    This already proves: MCP → OAuth2 → UiPath API → Job Created ✅
+# 5. Call "list_uipath_queues" → confirm your target queue appears
+# 6. Call "add_uipath_queue_item" with a small test payload → confirm Item ID returned
+# 7. Call "bulk_add_uipath_queue_items" with a 2-3 row test array → confirm success count matches
 ```

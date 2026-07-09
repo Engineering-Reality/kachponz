@@ -33,6 +33,7 @@ interface Message {
   content: string;
   apiContent?: any;
   attachments?: { name: string, type: string, preview: string | null }[];
+  unverifiedClaim?: boolean;
 }
 
 interface Attachment {
@@ -143,19 +144,12 @@ function AgentInvokeInner() {
   const apiUrl = process.env.NEXT_PUBLIC_API_URL ?? "http://localhost:8080";
   const robotKey = process.env.NEXT_PUBLIC_ROBOT_KEY ?? "amadeus_local_dev";
 
-  // Auto-generate transaction ID if empty
-  useEffect(() => {
-    if (typeof window !== 'undefined' && !transactionId) {
-      try {
-        setTransactionId(window.crypto.randomUUID());
-      } catch (e) {
-        setTransactionId('xxxxxxxx-xxxx-4xxx-yxxx-xxxxxxxxxxxx'.replace(/[xy]/g, function(c) {
-          const r = Math.random() * 16 | 0, v = c === 'x' ? r : (r & 0x3 | 0x8);
-          return v.toString(16);
-        }));
-      }
-    }
-  }, [transactionId]);
+  // This console always runs in playground mode (no DB writes). The "Ref ID"
+  // field is optional and only meaningful if the caller wants to correlate
+  // logs — it is intentionally NOT auto-generated and NOT sent as a fake
+  // transactionId (that used to trigger false "Transaksi tidak ditemukan"
+  // warnings server-side for every single invoke).
+  const [mcpHealth, setMcpHealth] = useState<{ toolName: string; toolId: string; status: string; error?: string; loadedTools: string[] }[]>([]);
 
   useEffect(() => {
     const fetchAgentsAndTools = async () => {
@@ -252,6 +246,24 @@ function AgentInvokeInner() {
     }
   };
 
+  const deleteSession = (id: string) => {
+    const updatedSessions = sessions.filter(session => session.id !== id);
+    if (updatedSessions.length === 0) {
+      const newId = `session-${Date.now()}`;
+      const newSession: ChatSession = { id: newId, title: `Chat ${new Date().toLocaleDateString()}`, agentId: selectedAgent, messages: [], createdAt: Date.now() };
+      saveSessions([newSession]);
+      setCurrentSessionId(newId);
+      setMessages([]);
+      setInput('');
+      setAttachments([]);
+    } else {
+      saveSessions(updatedSessions);
+      if (currentSessionId === id) {
+        switchSession(updatedSessions[0].id);
+      }
+    }
+  };
+
   const removeAttachment = (index: number) => {
     setAttachments(prev => prev.filter((_, i) => i !== index));
   };
@@ -262,7 +274,7 @@ function AgentInvokeInner() {
     }
     const currentInputDisplay = input.trim();
     const systemInstruction = attachments.length > 0 
-      ? `\n\n[SYSTEM INSTRUCTION: Baca gambar lampiran secara langsung menggunakan kemampuan vision Anda (JANGAN memanggil fungsi/tools eksternal apapun untuk membaca dokumen ini). Jika terdapat data tabel, form, atau kolom pada dokumen, tulis ulang data tersebut HANYA berupa JSON Array of Objects di dalam blok \`\`\`json (tanpa teks lain). Jangan memanggil fungsi apapun. Contoh: \`\`\`json\n[{"Kolom 1": "A", "Kolom 2": "B"}]\n\`\`\`]`
+      ? `\n\n[SYSTEM INSTRUCTION: Baca gambar lampiran secara langsung menggunakan kemampuan vision Anda (JANGAN memanggil fungsi/tools eksternal apapun untuk membaca dokumen ini). Jika terdapat data tabel, form, atau kolom pada dokumen, tulis ulang data tersebut HANYA berupa JSON Array of Objects di dalam blok \`\`\`json (tanpa teks lain). SANGAT PENTING: Anda TIDAK BOLEH mengubah format penulisan header/kolom (jangan menghilangkan spasi, jangan mengubah huruf besar/kecil). Jika di dokumen tertulis "First Name", tulis key sebagai "First Name" BUKAN "FirstName". Ekstrak apa adanya sesuai yang tertera secara visual. Jangan memanggil fungsi apapun. Contoh: \`\`\`json\n[{"First Name": "A", "Company Name": "B"}]\n\`\`\`]`
       : ``;
     const promptToSend = currentInputDisplay + systemInstruction;
     
@@ -292,7 +304,17 @@ function AgentInvokeInner() {
       // update session
       if (currentSessionId) {
         setSessions(s => {
-          const updated = s.map(session => session.id === currentSessionId ? { ...session, messages: newMsgs } : session);
+          const updated = s.map(session => {
+            if (session.id === currentSessionId) {
+              let newTitle = session.title;
+              if (prev.length === 0 && session.title.startsWith("Chat ")) {
+                newTitle = currentInputDisplay || "Attached File(s)";
+                if (newTitle.length > 30) newTitle = newTitle.slice(0, 30) + '...';
+              }
+              return { ...session, messages: newMsgs, title: newTitle };
+            }
+            return session;
+          });
           localStorage.setItem('agent-sessions', JSON.stringify(updated));
           return updated;
         });
@@ -305,6 +327,7 @@ function AgentInvokeInner() {
     setModelInit(null);
     setAgentInit(null);
     setResponseTime(null);
+    setMcpHealth([]);
 
     try {
       const res = await fetch(`${apiUrl}/orchestrator/run-agentic`, {
@@ -314,6 +337,8 @@ function AgentInvokeInner() {
           'X-Robot-Key': robotKey
         },
         body: JSON.stringify({
+          // Never send a fabricated UUID with no backing row — only forward
+          // transactionId if the user explicitly typed one in.
           transactionId: transactionId.trim() || undefined,
           agentId: selectedAgent || undefined,
           idempotencyKey: `invoke-${Date.now()}`,
@@ -324,7 +349,8 @@ function AgentInvokeInner() {
               role: m.role === 'bot' ? 'assistant' : 'user',
               content: m.apiContent || m.content
             })),
-          stream: true
+          stream: true,
+          mode: 'playground'
         })
       });
 
@@ -345,6 +371,7 @@ function AgentInvokeInner() {
       let accumulatedResponse = '';
       let buffer = '';
       let currentEvent = 'update';
+      let toolCallsThisTurn = 0;
 
       while (true) {
         const { value, done } = await reader.read();
@@ -364,12 +391,25 @@ function AgentInvokeInner() {
             try {
               const data = JSON.parse(dataStr);
 
-              if (currentEvent === 'metrics') {
+              if (currentEvent === 'mcp_health') {
+                setMcpHealth(data.servers || []);
+              } else if (currentEvent === 'metrics') {
                 if (data.modelInit !== undefined) setModelInit(`${data.modelInit.toFixed(3)}s`);
                 if (data.agentInit !== undefined) setAgentInit(`${data.agentInit.toFixed(3)}s`);
                 if (data.responseTime !== undefined) setResponseTime(`${data.responseTime.toFixed(3)}s`);
               } else if (currentEvent === 'complete') {
                 setStatus('Stream Complete');
+                const claimWithoutToolCall = toolCallsThisTurn === 0 && /\b(sent|added|queued|triggered|completed|updated|deleted)\b/i.test(accumulatedResponse);
+                if (claimWithoutToolCall) {
+                  setMessages(prev => {
+                    const next = [...prev];
+                    const lastIdx = next.length - 1;
+                    if (lastIdx >= 0 && next[lastIdx].role === 'bot') {
+                      next[lastIdx] = { ...next[lastIdx], unverifiedClaim: true };
+                    }
+                    return next;
+                  });
+                }
               } else if (currentEvent === 'error') {
                 throw new Error(data.message || data.error || 'Stream processing error');
               } else {
@@ -400,6 +440,7 @@ function AgentInvokeInner() {
                 }
                 // If there are tool calls, show a system thinking log
                 if (data.toolCalls && data.toolCalls.length > 0) {
+                  toolCallsThisTurn += data.toolCalls.length;
                   const toolsCalled = data.toolCalls.map((t: any) => `${t.name}(${JSON.stringify(t.args)})`).join(', ');
                   setStatus(`Running tool: ${data.toolCalls[0].name}...`);
                   setMessages(prev => {
@@ -431,6 +472,7 @@ function AgentInvokeInner() {
   const clearChat = () => {
     setMessages([]);
     setStatus('UPLINK: STABLE');
+    setMcpHealth([]);
   };
 
   return (
@@ -446,16 +488,29 @@ function AgentInvokeInner() {
         </div>
         <div className="flex-1 overflow-y-auto p-2 space-y-1">
           {sessions.map(session => (
-            <button
-              key={session.id}
-              onClick={() => switchSession(session.id)}
-              className={`w-full text-left px-3 py-3 rounded-xl text-sm transition-colors flex items-center gap-3 ${currentSessionId === session.id ? 'bg-blue-50 text-blue-700 font-medium' : 'text-slate-600 hover:bg-slate-100'}`}
-            >
-              <MessageSquare className={`w-4 h-4 shrink-0 ${currentSessionId === session.id ? 'text-blue-600' : 'text-slate-400'}`} />
-              <div className="truncate flex-1" title={session.title}>
-                {session.title}
-              </div>
-            </button>
+            <div key={session.id} className="relative group">
+              <button
+                onClick={() => switchSession(session.id)}
+                className={`w-full text-left px-3 py-3 rounded-xl text-sm transition-colors flex items-center gap-3 pr-10 ${currentSessionId === session.id ? 'bg-blue-50 text-blue-700' : 'text-slate-600 hover:bg-slate-100'}`}
+              >
+                <MessageSquare className={`w-4 h-4 shrink-0 ${currentSessionId === session.id ? 'text-blue-600' : 'text-slate-400'}`} />
+                <div className="flex-1 min-w-0">
+                  <div className={`truncate ${currentSessionId === session.id ? 'font-medium' : ''}`} title={session.title}>
+                    {session.title}
+                  </div>
+                  <div className={`text-[10px] mt-0.5 ${currentSessionId === session.id ? 'text-blue-400' : 'text-slate-400'}`}>
+                    {new Date(session.createdAt).toLocaleString(undefined, { dateStyle: 'short', timeStyle: 'short' })}
+                  </div>
+                </div>
+              </button>
+              <button
+                onClick={(e) => { e.stopPropagation(); deleteSession(session.id); }}
+                className="absolute right-2 top-1/2 -translate-y-1/2 p-1.5 text-slate-400 hover:text-red-500 hover:bg-red-50 rounded-lg opacity-0 group-hover:opacity-100 transition-opacity"
+                title="Delete Chat"
+              >
+                <Trash2 className="w-4 h-4" />
+              </button>
+            </div>
           ))}
         </div>
       </aside>
@@ -589,6 +644,25 @@ function AgentInvokeInner() {
 
           {/* Messages */}
           <div className="flex-1 overflow-y-auto pt-20 p-6 space-y-6">
+            {mcpHealth.length > 0 && (
+              <div className="max-w-3xl mx-auto w-full bg-white border border-slate-200 rounded-xl p-3 flex flex-wrap gap-2">
+                {mcpHealth.map((h) => {
+                  const ok = h.status === 'connected';
+                  const neutral = h.status === 'no_versions' || h.status === 'not_running';
+                  const dotColor = ok ? 'bg-emerald-500' : neutral ? 'bg-slate-400' : 'bg-red-500';
+                  return (
+                    <span
+                      key={h.toolId || h.toolName}
+                      title={h.error || (ok ? `Tools: ${h.loadedTools.join(', ')}` : h.status)}
+                      className={`inline-flex items-center gap-1.5 text-[11px] font-mono px-2 py-1 rounded-lg border ${ok ? 'border-emerald-100 bg-emerald-50 text-emerald-700' : neutral ? 'border-slate-200 bg-slate-50 text-slate-600' : 'border-red-100 bg-red-50 text-red-700'}`}
+                    >
+                      <span className={`w-1.5 h-1.5 rounded-full ${dotColor}`} />
+                      {h.toolName}: {h.status}
+                    </span>
+                  );
+                })}
+              </div>
+            )}
             {messages.length === 0 ? (
               <div className="h-full flex flex-col items-center justify-center text-center px-6">
                 <div className="w-12 h-12 rounded-2xl flex items-center justify-center overflow-hidden relative mb-4">
@@ -731,7 +805,14 @@ function AgentInvokeInner() {
                       </div>
                       <div className="flex flex-col min-w-0 w-full">
                         <span className="text-xs font-semibold text-slate-500 mb-1">Amadeus</span>
-                        
+
+                        {msg.unverifiedClaim && (
+                          <span className="inline-flex items-center gap-1.5 self-start text-[11px] font-medium text-amber-700 bg-amber-50 border border-amber-200 px-2 py-1 rounded-lg mb-2">
+                            <AlertTriangle className="w-3 h-3" />
+                            No tool was called this turn — verify this claim.
+                          </span>
+                        )}
+
                         {contentToRender && (
                           <span className="text-sm leading-relaxed whitespace-pre-wrap block text-slate-700">
                             {formatMessageContent(contentToRender)}

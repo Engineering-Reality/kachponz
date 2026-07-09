@@ -82,6 +82,13 @@ const EnvSchema = z.object({
   PAD_DISPATCH_URL: z.string().url().optional(),
   PAD_DISPATCH_AUTH_HEADER: z.string().optional(),
   PAD_DISPATCH_AUTH_VALUE: z.string().optional(),
+
+  // ─── MCP SSE dynamic port allocation ────────────────────────────────
+  // Overrides for config/port_range.json — same defaults as the legacy
+  // Python get_free_port() implementation.
+  MCP_HOST: z.string().optional(),
+  MCP_START_PORT: z.coerce.number().int().positive().optional(),
+  MCP_END_PORT: z.coerce.number().int().positive().optional(),
 });
 
 export type Env = z.infer<typeof EnvSchema>;

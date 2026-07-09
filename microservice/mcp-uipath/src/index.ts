@@ -6,6 +6,20 @@ import { z } from "zod";
 
 const app = express();
 
+/** Accepts either the real array/object, or a JSON string that parses to one. */
+function coerceJson<T extends z.ZodTypeAny>(inner: T) {
+  return z.preprocess((val) => {
+    if (typeof val === "string") {
+      try {
+        return JSON.parse(val);
+      } catch {
+        return val; // let the inner schema's own validation produce the real error
+      }
+    }
+    return val;
+  }, inner);
+}
+
 const rawArg = process.argv[2];
 if (rawArg && rawArg.trim().startsWith('{')) {
   try {
@@ -48,6 +62,8 @@ async function getUiPathToken(): Promise<string> {
 
   if (!clientId || !clientSecret) throw new Error("UIPATH_CLIENT_ID / SECRET not set");
 
+  process.stderr.write(`[mcp-uipath] Fetching fresh OAuth token (cache ${tokenCache ? "expired" : "empty"})\n`);
+
   const res = await fetch(`${baseUrl}/identity_/connect/token`, {
     method: "POST",
     headers: { "Content-Type": "application/x-www-form-urlencoded" },
@@ -55,7 +71,7 @@ async function getUiPathToken(): Promise<string> {
       grant_type: "client_credentials",
       client_id: clientId,
       client_secret: clientSecret,
-      scope: process.env.UIPATH_SCOPES ?? "OR.Jobs OR.Robots.Read OR.Execution",
+      scope: process.env.UIPATH_SCOPES ?? "OR.Jobs OR.Robots.Read OR.Execution OR.Folders.Read OR.Queues",
     }).toString(),
   });
 
@@ -76,7 +92,7 @@ server.tool(
   "Trigger a UiPath Automation Cloud job via Orchestrator API. Returns job ID and status.",
   {
     releaseKey: z.string().describe("Release key of the process to run (from UiPath Orchestrator)"),
-    arguments: z.record(z.any()).optional().describe("InputArguments JSON to pass to the process"),
+    arguments: coerceJson(z.record(z.any())).optional().describe("InputArguments JSON to pass to the process"),
     folderId: z.string().optional().describe("Orchestrator folder ID (Modern Folder). Defaults to env UIPATH_FOLDER_ID"),
   },
   async (args) => {
@@ -137,7 +153,9 @@ server.tool(
         ],
       };
     } catch (e) {
-      return { content: [{ type: "text", text: `Network error: ${e instanceof Error ? e.message : String(e)}` }] };
+      const detail = e instanceof Error ? e.message : String(e);
+      const cause = e instanceof Error && e.cause ? ` (cause: ${e.cause instanceof Error ? e.cause.message : String(e.cause)})` : "";
+      return { content: [{ type: "text", text: `Network error calling UiPath: ${detail}${cause}` }], isError: true };
     }
   }
 );
@@ -182,7 +200,9 @@ server.tool(
       const list = (data.value ?? []).map((r) => `• ${r.Name} (key: ${r.Key})`).join("\n");
       return { content: [{ type: "text", text: list || "No processes found in this folder." }] };
     } catch (e) {
-      return { content: [{ type: "text", text: `Network error: ${e instanceof Error ? e.message : String(e)}` }] };
+      const detail = e instanceof Error ? e.message : String(e);
+      const cause = e instanceof Error && e.cause ? ` (cause: ${e.cause instanceof Error ? e.cause.message : String(e.cause)})` : "";
+      return { content: [{ type: "text", text: `Network error calling UiPath: ${detail}${cause}` }], isError: true };
     }
   }
 );
@@ -229,7 +249,212 @@ server.tool(
         ],
       };
     } catch (e) {
-      return { content: [{ type: "text", text: `Network error: ${e instanceof Error ? e.message : String(e)}` }] };
+      const detail = e instanceof Error ? e.message : String(e);
+      const cause = e instanceof Error && e.cause ? ` (cause: ${e.cause instanceof Error ? e.cause.message : String(e.cause)})` : "";
+      return { content: [{ type: "text", text: `Network error calling UiPath: ${detail}${cause}` }], isError: true };
+    }
+  }
+);
+
+server.tool(
+  "list_uipath_queues",
+  "List queue definitions available in the current UiPath Orchestrator folder",
+  {
+    folderId: z.string().optional().describe("Folder ID, defaults to env"),
+  },
+  async (args) => {
+    const baseUrl = process.env.UIPATH_BASE_URL ?? "https://cloud.uipath.com";
+    const org = process.env.UIPATH_ORG ?? "";
+    const tenant = process.env.UIPATH_TENANT ?? "";
+    const folderId = args.folderId ?? process.env.UIPATH_FOLDER_ID ?? "0";
+
+    if (!org || !tenant) {
+      return { content: [{ type: "text", text: "Error: UIPATH_ORG and UIPATH_TENANT must be set." }] };
+    }
+
+    let token: string;
+    try {
+      token = await getUiPathToken();
+    } catch (e) {
+      return { content: [{ type: "text", text: `Auth failed: ${e instanceof Error ? e.message : String(e)}` }] };
+    }
+
+    try {
+      const res = await fetch(`${baseUrl}/${org}/${tenant}/orchestrator_/odata/QueueDefinitions`, {
+        headers: {
+          Authorization: `Bearer ${token}`,
+          "X-UIPATH-OrganizationUnitId": folderId,
+        },
+      });
+
+      const text = await res.text();
+      if (!res.ok) {
+        return { content: [{ type: "text", text: `UiPath QueueDefinitions failed (${res.status}): ${text.slice(0, 300)}` }] };
+      }
+
+      const data = JSON.parse(text) as {
+        value?: Array<{ Id: number; Name: string; Description?: string; SpecificContentSchema?: unknown }>;
+      };
+      const list = (data.value ?? [])
+        .map((q) => {
+          const schemaNote = q.SpecificContentSchema ? ` [schema: ${JSON.stringify(q.SpecificContentSchema)}]` : "";
+          return `• ${q.Name} (id: ${q.Id})${q.Description ? ` — ${q.Description}` : ""}${schemaNote}`;
+        })
+        .join("\n");
+      return { content: [{ type: "text", text: list || "No queues found in this folder." }] };
+    } catch (e) {
+      const detail = e instanceof Error ? e.message : String(e);
+      const cause = e instanceof Error && e.cause ? ` (cause: ${e.cause instanceof Error ? e.cause.message : String(e.cause)})` : "";
+      return { content: [{ type: "text", text: `Network error calling UiPath: ${detail}${cause}` }], isError: true };
+    }
+  }
+);
+
+server.tool(
+  "add_uipath_queue_item",
+  "Add a single item to a UiPath Orchestrator queue. " +
+    "Pass the row data directly as \"specificContent\" — do NOT nest it under an \"itemData\" wrapper, " +
+    "that wrapping is handled internally by this tool. " +
+    "Example call: { \"queueName\": \"TestQueue\", \"specificContent\": { \"Email\": \"a@b.com\", \"Name\": \"...\" } }",
+  {
+    queueName: z.string().describe("Exact name of the target queue, from list_uipath_queues"),
+    specificContent: coerceJson(z.record(z.any())).describe("Key-value payload for this queue item (the actual data row)"),
+    priority: z.enum(["Low", "Normal", "High"]).optional().default("Normal"),
+    reference: z.string().optional().describe("Optional human-readable reference/identifier for this item"),
+    folderId: z.string().optional(),
+  },
+  async (args) => {
+    const baseUrl = process.env.UIPATH_BASE_URL ?? "https://cloud.uipath.com";
+    const org = process.env.UIPATH_ORG ?? "";
+    const tenant = process.env.UIPATH_TENANT ?? "";
+    const folderId = args.folderId ?? process.env.UIPATH_FOLDER_ID ?? "0";
+
+    if (!org || !tenant) {
+      return { content: [{ type: "text", text: "Error: UIPATH_ORG and UIPATH_TENANT must be set." }] };
+    }
+
+    let token: string;
+    try {
+      token = await getUiPathToken();
+    } catch (e) {
+      return { content: [{ type: "text", text: `Auth failed: ${e instanceof Error ? e.message : String(e)}` }] };
+    }
+
+    const url = `${baseUrl}/${org}/${tenant}/orchestrator_/odata/Queues/UiPathODataSvc.AddQueueItem`;
+    const body = {
+      itemData: {
+        Name: args.queueName,
+        Priority: args.priority,
+        SpecificContent: args.specificContent,
+        Reference: args.reference,
+      },
+    };
+
+    try {
+      const res = await fetch(url, {
+        method: "POST",
+        headers: {
+          Authorization: `Bearer ${token}`,
+          "Content-Type": "application/json",
+          "X-UIPATH-OrganizationUnitId": folderId,
+        },
+        body: JSON.stringify(body),
+      });
+
+      const text = await res.text();
+      if (!res.ok) {
+        return { content: [{ type: "text", text: `UiPath AddQueueItem failed (${res.status}): ${text.slice(0, 300)}` }] };
+      }
+
+      const json = JSON.parse(text) as { Id?: number; Status?: string };
+      return {
+        content: [{
+          type: "text",
+          text: `✅ Queue item added to "${args.queueName}".\nItem ID: ${json.Id}\nStatus: ${json.Status ?? "New"}`,
+        }],
+      };
+    } catch (e) {
+      const detail = e instanceof Error ? e.message : String(e);
+      const cause = e instanceof Error && e.cause ? ` (cause: ${e.cause instanceof Error ? e.cause.message : String(e.cause)})` : "";
+      return { content: [{ type: "text", text: `Network error calling UiPath: ${detail}${cause}` }], isError: true };
+    }
+  }
+);
+
+server.tool(
+  "bulk_add_uipath_queue_items",
+  "Add multiple items to a UiPath Orchestrator queue in a single call. Use this instead of add_uipath_queue_item when you have an array of rows (e.g. from a parsed document or table). " +
+    "Each entry in \"items\" is a plain row object — do NOT nest it under an \"itemData\" or \"specificContent\" wrapper, " +
+    "that wrapping is handled internally by this tool. " +
+    "Example call: { \"queueName\": \"TestQueue\", \"items\": [ { \"Email\": \"a@b.com\", \"Name\": \"John\" }, { \"Email\": \"c@d.com\", \"Name\": \"Jane\" } ] }",
+  {
+    queueName: z.string().describe("Exact name of the target queue, from list_uipath_queues"),
+    items: coerceJson(z.array(z.record(z.any())).min(1)).describe("Array of row objects — each becomes one queue item's SpecificContent"),
+    commitType: z.enum(["AllOrNothing", "StopOnFirstFailure"]).optional().default("StopOnFirstFailure"),
+    priority: z.enum(["Low", "Normal", "High"]).optional().default("Normal"),
+    folderId: z.string().optional(),
+  },
+  async (args) => {
+    const baseUrl = process.env.UIPATH_BASE_URL ?? "https://cloud.uipath.com";
+    const org = process.env.UIPATH_ORG ?? "";
+    const tenant = process.env.UIPATH_TENANT ?? "";
+    const folderId = args.folderId ?? process.env.UIPATH_FOLDER_ID ?? "0";
+
+    if (!org || !tenant) {
+      return { content: [{ type: "text", text: "Error: UIPATH_ORG and UIPATH_TENANT must be set." }] };
+    }
+
+    let token: string;
+    try {
+      token = await getUiPathToken();
+    } catch (e) {
+      return { content: [{ type: "text", text: `Auth failed: ${e instanceof Error ? e.message : String(e)}` }] };
+    }
+
+    const url = `${baseUrl}/${org}/${tenant}/orchestrator_/odata/Queues/UiPathODataSvc.BulkAddQueueItems`;
+    const body = {
+      queueName: args.queueName,
+      commitType: args.commitType,
+      queueItems: args.items.map((row) => ({
+        Priority: args.priority,
+        SpecificContent: row,
+      })),
+    };
+
+    try {
+      const res = await fetch(url, {
+        method: "POST",
+        headers: {
+          Authorization: `Bearer ${token}`,
+          "Content-Type": "application/json",
+          "X-UIPATH-OrganizationUnitId": folderId,
+        },
+        body: JSON.stringify(body),
+      });
+
+      const text = await res.text();
+      if (!res.ok) {
+        return { content: [{ type: "text", text: `UiPath BulkAddQueueItems failed (${res.status}): ${text.slice(0, 300)}` }] };
+      }
+
+      const json = JSON.parse(text) as {
+        value?: Array<{ Status: string; ItemDetail?: { Id: number } }>;
+      };
+      const succeeded = (json.value ?? []).filter((r) => r.Status !== "Failed").length;
+      const failed = (json.value ?? []).length - succeeded;
+
+      return {
+        content: [{
+          type: "text",
+          text: failed === 0
+            ? `✅ ${succeeded} item(s) added to queue "${args.queueName}".`
+            : `⚠️ ${succeeded} item(s) added, ${failed} failed. Queue: "${args.queueName}". Raw: ${text.slice(0, 400)}`,
+        }],
+      };
+    } catch (e) {
+      const detail = e instanceof Error ? e.message : String(e);
+      const cause = e instanceof Error && e.cause ? ` (cause: ${e.cause instanceof Error ? e.cause.message : String(e.cause)})` : "";
+      return { content: [{ type: "text", text: `Network error calling UiPath: ${detail}${cause}` }], isError: true };
     }
   }
 );

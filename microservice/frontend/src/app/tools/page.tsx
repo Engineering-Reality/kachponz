@@ -28,7 +28,22 @@ export default function ToolsPage() {
   const [isModalOpen, setIsModalOpen] = useState(false);
   const [modalMode, setModalMode] = useState<"create" | "edit">("create");
   const [currentTool, setCurrentTool] = useState<any>(null);
-  const [formData, setFormData] = useState({ name: "", description: "", on_status: "Online", port: "", args: "", method: "sse" });
+  const [formData, setFormData] = useState({
+    name: "",
+    description: "",
+    on_status: "Online",
+    method: "sse",
+    command: "node",
+    argsText: "", // one CLI arg per line, joined into args[] on save
+    envText: "", // one KEY=value per line, joined into env{} on save
+  });
+  const [pasteCommand, setPasteCommand] = useState("");
+
+  // Live process state per tool_id, sourced from mcp_runtime_state via
+  // GET /orchestrator/mcp/status — the ONLY place a currently-live SSE port
+  // is recorded. Ports are assigned dynamically at process-start, so there is
+  // no static value to show until the tool has actually been started.
+  const [mcpStatus, setMcpStatus] = useState<Record<string, { port: number | null; status: string }>>({});
 
   const [isAuthModalOpen, setIsAuthModalOpen] = useState(false);
   const [authProvider, setAuthProvider] = useState<"uipath" | "pad" | "amadeus" | "">("");
@@ -57,32 +72,83 @@ export default function ToolsPage() {
     }
   };
 
-  useEffect(() => { fetchTools(); }, []);
+  const fetchMcpStatus = async () => {
+    try {
+      const res = await fetch(`${apiUrl}/orchestrator/mcp/status`, { headers });
+      if (!res.ok) return;
+      const rows: Array<{ toolId: string; port: number | null; status: string }> = await res.json();
+      const next: Record<string, { port: number | null; status: string }> = {};
+      for (const row of rows) next[row.toolId] = { port: row.port, status: row.status };
+      setMcpStatus(next);
+    } catch {
+      // Best-effort — the tools list itself still works if this polling fails.
+    }
+  };
 
+  useEffect(() => {
+    fetchTools();
+    fetchMcpStatus();
+    const interval = setInterval(fetchMcpStatus, 5000);
+    return () => clearInterval(interval);
+  }, []);
+
+  // Structured release shape: { method, command, args: string[], env: {} }.
+  // Legacy rows may still hold `args` as a single concatenated string —
+  // surfaced read-only (joined for display) rather than parsed/guessed.
   const parseVersions = (tool: any) => {
     try {
       const versions = typeof tool.versions === "string" ? JSON.parse(tool.versions) : tool.versions;
       if (versions?.length > 0) {
-        const latest = versions[versions.length - 1];
-        return { port: latest.released?.port || "—", args: latest.released?.args || "", method: latest.released?.method || "sse" };
+        const released = versions[versions.length - 1]?.released || {};
+        const args: string[] = Array.isArray(released.args) ? released.args : (released.args ? [String(released.args)] : []);
+        const env: Record<string, string> = released.env && typeof released.env === "object" ? released.env : {};
+        return {
+          port: released.port ?? "—",
+          command: released.command || "node",
+          args,
+          env,
+          method: released.method || "sse",
+          isLegacyStringArgs: typeof released.args === "string",
+        };
       }
     } catch { }
-    return { port: "—", args: "", method: "sse" };
+    return { port: "—", command: "node", args: [] as string[], env: {} as Record<string, string>, method: "sse", isLegacyStringArgs: false };
   };
 
   const openCreateModal = () => {
     setModalMode("create");
     setCurrentTool(null);
-    setFormData({ name: "", description: "", on_status: "Online", port: "", args: "", method: "sse" });
+    setFormData({ name: "", description: "", on_status: "Online", method: "sse", command: "node", argsText: "", envText: "" });
+    setPasteCommand("");
     setIsModalOpen(true);
   };
 
   const openEditModal = (tool: any) => {
     setModalMode("edit");
     setCurrentTool(tool);
-    const { port, args, method } = parseVersions(tool);
-    setFormData({ name: tool.name || "", description: tool.description || "", on_status: tool.on_status || "Online", port, args, method });
+    const { command, args, env, method } = parseVersions(tool);
+    setFormData({
+      name: tool.name || "",
+      description: tool.description || "",
+      on_status: tool.on_status || "Online",
+      method,
+      command,
+      argsText: args.join("\n"),
+      envText: Object.entries(env).map(([k, v]) => `${k}=${v}`).join("\n"),
+    });
+    setPasteCommand("");
     setIsModalOpen(true);
+  };
+
+  // Convenience: paste a full legacy command line (e.g. copied from an old
+  // tool's display, or from a UiPath setup doc) and split it into the
+  // structured command + args[] fields for review — never used at spawn time.
+  const applyPastedCommand = () => {
+    const tokens = splitCommandLine(pasteCommand.trim());
+    if (tokens.length === 0) return;
+    const [cmd, ...rest] = tokens;
+    setFormData((prev) => ({ ...prev, command: cmd, argsText: rest.join("\n") }));
+    setPasteCommand("");
   };
 
   const deleteTool = async (toolId: string) => {
@@ -94,14 +160,92 @@ export default function ToolsPage() {
     } catch (err: any) { alert(err.message); }
   };
 
+  const [restartingId, setRestartingId] = useState<string | null>(null);
+
+  // Manual escape hatch for cases the mtime auto-restart can't catch (e.g. env
+  // var / DB config changes with no entry-file change) — kills the tracked
+  // process and clears its runtime row; the daemon respawns it on its next
+  // sync tick (≤10s), same as any other lifecycle transition.
+  const restartTool = async (toolId: string) => {
+    setRestartingId(toolId);
+    try {
+      const res = await fetch(`${apiUrl}/orchestrator/mcp/${toolId}/restart`, { method: "POST", headers });
+      if (!res.ok) throw new Error("Failed to restart");
+      setTimeout(fetchMcpStatus, 2500);
+    } catch (err: any) {
+      alert(err.message);
+    } finally {
+      setRestartingId(null);
+    }
+  };
+
+  // Parse the textarea inputs into the structured args[] / env{} the API expects.
+  const parseArgsText = (text: string): string[] =>
+    text.split("\n").map((s) => s.trim()).filter(Boolean);
+
+  // Quote-aware split, used ONLY as a one-time convenience to help users
+  // migrate an old single-line command (e.g. copied from a legacy tool) into
+  // the structured command/args[] fields below for review before saving.
+  // This never runs at spawn time — the actual runtime path only ever reads
+  // the structured array, so a parsing edge case here just means the user
+  // has to tidy up a field, not a broken child process spawn.
+  const splitCommandLine = (input: string): string[] => {
+    const tokens: string[] = [];
+    let current = "";
+    let inSingleQuote = false;
+    let inDoubleQuote = false;
+    for (let i = 0; i < input.length; i++) {
+      const ch = input[i];
+      if (ch === "'" && !inDoubleQuote) { inSingleQuote = !inSingleQuote; continue; }
+      if (ch === '"' && !inSingleQuote) { inDoubleQuote = !inDoubleQuote; current += ch; continue; }
+      if (ch === " " && !inSingleQuote && !inDoubleQuote) {
+        if (current) { tokens.push(current); current = ""; }
+        continue;
+      }
+      current += ch;
+    }
+    if (current) tokens.push(current);
+    return tokens;
+  };
+
+  const parseEnvText = (text: string): Record<string, string> => {
+    const env: Record<string, string> = {};
+    for (const line of text.split("\n")) {
+      const idx = line.indexOf("=");
+      if (idx === -1) continue;
+      const key = line.slice(0, idx).trim();
+      const value = line.slice(idx + 1).trim();
+      if (key) env[key] = value;
+    }
+    return env;
+  };
+
   const handleSave = async (e: React.FormEvent) => {
     e.preventDefault();
     try {
+      const args = parseArgsText(formData.argsText);
+      const env = parseEnvText(formData.envText);
+
+      // Guard against the exact mistake that broke UiPath Iqbal: a whole
+      // command pasted onto a single line instead of split into separate
+      // args. A line with spaces that isn't a JSON blob is suspicious.
+      const suspicious = args.filter((a) => a.includes(" ") && !a.trim().startsWith("{"));
+      if (suspicious.length > 0) {
+        const proceed = confirm(
+          `This looks like a full command line on one Args row instead of separate lines:\n\n"${suspicious[0].slice(0, 80)}${suspicious[0].length > 80 ? "…" : ""}"\n\nEach argument should be its own line. Use "Split into fields" above, or continue anyway if this is intentional.`
+        );
+        if (!proceed) return;
+      }
+
+      // No `port` here — SSE ports are assigned dynamically at process-start
+      // by the orchestrator's port allocator and tracked in mcp_runtime_state,
+      // never submitted by the UI (see portprompt.md).
+      const released: any = { method: formData.method, command: formData.command || "node", args, env };
       const payload = {
         name: formData.name,
         description: formData.description,
         on_status: formData.on_status,
-        versions: [{ version: "1.0.0", released: { method: formData.method, port: formData.port, args: formData.args, env: {} } }],
+        versions: [{ version: "1.0.0", released }],
       };
       const url = modalMode === "create" ? `${apiUrl}/tools` : `${apiUrl}/tools/${currentTool.tool_id}`;
       const res = await fetch(url, {
@@ -121,38 +265,27 @@ export default function ToolsPage() {
     setTimeout(() => setCopiedId(null), 2000);
   };
 
-  const getJsonSnippet = (tool: any, port: string, args: string, method: string) => {
+  const getJsonSnippet = (tool: any, command: string, args: string[], method: string) => {
     const serverName = tool.name?.toLowerCase().replace(/\s+/g, "-") || "mcp-server";
     if (method === "sse") {
+      const live = mcpStatus[tool.tool_id];
+      const url = live?.status === "running" && live.port
+        ? `http://localhost:${live.port}/sse`
+        : "http://localhost:<port will be assigned at runtime — check the status panel after starting>/sse";
       return JSON.stringify({
         mcpServers: {
           [serverName]: {
             command: "npx",
-            args: ["-y", "@modelcontextprotocol/client-sse", `http://localhost:${port}/sse`]
+            args: ["-y", "@modelcontextprotocol/client-sse", url]
           }
         }
       }, null, 2);
     } else {
-      let parts = [];
-      // Handle quoted JSON arguments properly (crude parsing for the snippet)
-      if (args.includes("'")) {
-        const firstQuote = args.indexOf("'");
-        const lastQuote = args.lastIndexOf("'");
-        parts = args.substring(0, firstQuote).trim().split(" ");
-        parts.push(args.substring(firstQuote + 1, lastQuote));
-        const rest = args.substring(lastQuote + 1).trim();
-        if (rest) parts.push(...rest.split(" "));
-      } else {
-        parts = args.split(" ");
-      }
-      
-      const cmd = parts[0] || "node";
-      const cmdArgs = parts.slice(1);
       return JSON.stringify({
         mcpServers: {
           [serverName]: {
-            command: cmd,
-            args: cmdArgs
+            command: command || "node",
+            args
           }
         }
       }, null, 2);
@@ -181,28 +314,46 @@ export default function ToolsPage() {
             tenant: authFormData.tenant,
             clientId: authFormData.clientId,
             clientSecret: authFormData.clientSecret,
-            scopes: "OR.Jobs OR.Robots.Read OR.Execution",
+            scopes: "OR.Jobs OR.Robots.Read OR.Execution OR.Folders.Read OR.Queues",
             folderId: authFormData.folderId
           };
           payload = {
             name: "mcp-uipath",
             description: "UiPath MCP — RPA trigger and monitoring",
             on_status: "Online",
-            versions: [{ version: "1.0.0", released: { method: "stdio", port: "—", args: `node /home/firania/Downloads/ponzgen/microservice/mcp-uipath/build/index.js '${JSON.stringify(argsObj)}' --stdio`, env: {} } }]
+            versions: [{
+              version: "1.0.0",
+              released: {
+                method: "stdio",
+                command: "node",
+                args: [
+                  "/home/firania/Downloads/ponzgen/microservice/mcp-uipath/build/index.js",
+                  JSON.stringify(argsObj),
+                  "--stdio"
+                ],
+                env: {}
+              }
+            }]
           };
         } else if (authProvider === "pad") {
           payload = {
             name: "mcp-pad",
             description: "Power Automate Desktop MCP — Windows automation triggers",
             on_status: "Online",
-            versions: [{ version: "1.0.0", released: { method: "sse", port: "10003", args: "node /path/to/mcp-pad/build/index.js", env: {} } }]
+            versions: [{
+              version: "1.0.0",
+              released: { method: "sse", command: "node", args: ["/path/to/mcp-pad/build/index.js"], env: {} }
+            }]
           };
         } else if (authProvider === "amadeus") {
           payload = {
             name: "amadeus-mcp",
             description: "Amadeus Orchestrator MCP — transaction tracker & step dispatcher",
             on_status: "Online",
-            versions: [{ version: "1.0.0", released: { method: "sse", port: "10002", args: "node /path/to/amadeus-mcp/build/index.js", env: {} } }]
+            versions: [{
+              version: "1.0.0",
+              released: { method: "sse", command: "node", args: ["/path/to/amadeus-mcp/build/index.js"], env: {} }
+            }]
           };
         }
 
@@ -367,8 +518,10 @@ export default function ToolsPage() {
         <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
           {filteredTools.map((tool) => {
             const isActive = !tool.on_status?.toLowerCase().includes("offline");
-            const { port, args, method } = parseVersions(tool);
-            const jsonSnippet = getJsonSnippet(tool, port, args, method);
+            const { command, args, method, isLegacyStringArgs } = parseVersions(tool);
+            const argsDisplay = isLegacyStringArgs ? args.join(" ") : `${command} ${args.join(" ")}`.trim();
+            const jsonSnippet = getJsonSnippet(tool, command, args, method);
+            const liveStatus = mcpStatus[tool.tool_id];
 
             return (
               <div
@@ -377,6 +530,16 @@ export default function ToolsPage() {
               >
                 {/* Actions */}
                 <div className="absolute top-4 right-4 flex gap-1 opacity-0 group-hover:opacity-100 transition-opacity z-10">
+                  {isActive && (
+                    <button
+                      onClick={() => restartTool(tool.tool_id)}
+                      disabled={restartingId === tool.tool_id}
+                      title="Restart — kills the running process and lets the auto-manager respawn it on its next sync tick"
+                      className="p-1.5 bg-white border border-slate-200 text-slate-400 hover:text-blue-600 hover:border-blue-200 hover:bg-blue-50 rounded-lg shadow-sm transition-all disabled:opacity-40"
+                    >
+                      <RefreshCw className={`w-3.5 h-3.5 ${restartingId === tool.tool_id ? "animate-spin" : ""}`} />
+                    </button>
+                  )}
                   <button onClick={() => openEditModal(tool)} className="p-1.5 bg-white border border-slate-200 text-slate-400 hover:text-slate-700 hover:border-slate-300 rounded-lg shadow-sm transition-all">
                     <Edit2 className="w-3.5 h-3.5" />
                   </button>
@@ -411,12 +574,12 @@ export default function ToolsPage() {
                 <div className="space-y-3 mt-auto">
 
                   {/* CLI Command */}
-                  {args && (
+                  {argsDisplay && (
                     <div className="space-y-1">
                       <div className="flex justify-between items-center ui-label text-slate-400">
                         <span className="flex items-center gap-1"><Terminal className="w-3 h-3" /> Command Line Args</span>
                         <button
-                          onClick={() => copyToClipboard(args, `${tool.tool_id}-args`)}
+                          onClick={() => copyToClipboard(argsDisplay, `${tool.tool_id}-args`)}
                           className="flex items-center gap-1 text-slate-400 hover:text-slate-600 transition-colors"
                         >
                           {copiedId === `${tool.tool_id}-args` ? (
@@ -432,8 +595,11 @@ export default function ToolsPage() {
                           )}
                         </button>
                       </div>
+                      {isLegacyStringArgs && (
+                        <p className="text-[10px] text-amber-600 font-mono">Legacy format — re-save this tool to migrate to structured args.</p>
+                      )}
                       <code className="block text-[10px] font-mono bg-slate-900 border border-slate-950 rounded-xl p-3 text-slate-100 overflow-x-auto whitespace-nowrap shadow-inner">
-                        {args}
+                        {argsDisplay}
                       </code>
                     </div>
                   )}
@@ -464,11 +630,23 @@ export default function ToolsPage() {
                     </pre>
                   </div>
 
-                  {/* Port / Connection parameters */}
+                  {/* Live port / Connection parameters */}
                   <div className="grid grid-cols-2 gap-2 pt-2 border-t border-slate-100 text-xs font-mono">
                     <div className="flex justify-between border-r border-slate-100 pr-2">
-                      <span className="text-slate-400">Port / Host</span>
-                      <span className="text-slate-700 font-semibold">{port}</span>
+                      <span className="text-slate-400">Live Port</span>
+                      {method === "sse" ? (
+                        liveStatus?.status === "running" && liveStatus.port ? (
+                          <span className="text-green-700 font-semibold flex items-center gap-1">
+                            <span className="w-1.5 h-1.5 rounded-full bg-green-500 animate-pulse" /> :{liveStatus.port}
+                          </span>
+                        ) : (
+                          <span className="text-slate-400 font-semibold flex items-center gap-1">
+                            <span className="w-1.5 h-1.5 rounded-full bg-slate-300" /> stopped
+                          </span>
+                        )
+                      ) : (
+                        <span className="text-slate-400 font-semibold">n/a (stdio)</span>
+                      )}
                     </div>
                     <div className="flex justify-between pl-2">
                       <span className="text-slate-400">Node ID</span>
@@ -530,13 +708,61 @@ export default function ToolsPage() {
                   />
                 </div>
               </div>
-              <div>
-                <label className="form-label">Port / Connection URL</label>
-                <input value={formData.port} onChange={e => setFormData({ ...formData, port: e.target.value })} className="form-input rounded-xl border-slate-200" placeholder="e.g. 10002" />
+              {formData.method === "sse" && (
+                <div>
+                  <label className="form-label">Live Port</label>
+                  <div className="form-input rounded-xl border-slate-200 bg-slate-50 text-slate-400 flex items-center gap-2 cursor-not-allowed">
+                    {(() => {
+                      const live = currentTool ? mcpStatus[currentTool.tool_id] : undefined;
+                      if (live?.status === "running" && live.port) {
+                        return <><span className="w-1.5 h-1.5 rounded-full bg-green-500 animate-pulse" /> running on :{live.port}</>;
+                      }
+                      return <><span className="w-1.5 h-1.5 rounded-full bg-slate-300" /> not started yet — assigned automatically when the server starts</>;
+                    })()}
+                  </div>
+                </div>
+              )}
+              <div className="bg-slate-50 border border-dashed border-slate-200 rounded-xl p-3 space-y-2">
+                <label className="form-label">Have a full command line instead? <span className="normal-case font-normal text-slate-400">(e.g. copied from docs or an old tool)</span></label>
+                <div className="flex gap-2">
+                  <input
+                    value={pasteCommand}
+                    onChange={e => setPasteCommand(e.target.value)}
+                    className="form-input rounded-lg border-slate-200 font-mono text-xs flex-1"
+                    placeholder={`node /path/to/index.js '{"key":"value"}' --stdio`}
+                  />
+                  <button
+                    type="button"
+                    onClick={applyPastedCommand}
+                    disabled={!pasteCommand.trim()}
+                    className="btn-secondary text-xs px-3 rounded-lg disabled:opacity-40"
+                  >
+                    Split into fields
+                  </button>
+                </div>
+                <p className="text-[10px] text-slate-400">Paste here, click Split, then review the Command/Args below before saving — this never runs automatically, it just fills in the fields.</p>
               </div>
               <div>
-                <label className="form-label">Command Args (STDIO)</label>
-                <input value={formData.args} onChange={e => setFormData({ ...formData, args: e.target.value })} className="form-input rounded-xl border-slate-200" placeholder="e.g. node build/index.js" />
+                <label className="form-label">Command (executable)</label>
+                <input value={formData.command} onChange={e => setFormData({ ...formData, command: e.target.value })} className="form-input rounded-xl border-slate-200" placeholder="e.g. node" />
+              </div>
+              <div>
+                <label className="form-label">Args <span className="normal-case font-normal text-slate-400">(one per line — each is passed as a separate argv entry, no shell parsing)</span></label>
+                <textarea
+                  value={formData.argsText}
+                  onChange={e => setFormData({ ...formData, argsText: e.target.value })}
+                  className="form-input rounded-xl border-slate-200 h-24 resize-none font-mono text-xs"
+                  placeholder={"/absolute/path/to/build/index.js\n--stdio"}
+                />
+              </div>
+              <div>
+                <label className="form-label">Env <span className="normal-case font-normal text-slate-400">(one KEY=value per line)</span></label>
+                <textarea
+                  value={formData.envText}
+                  onChange={e => setFormData({ ...formData, envText: e.target.value })}
+                  className="form-input rounded-xl border-slate-200 h-16 resize-none font-mono text-xs"
+                  placeholder={"PORT=10005"}
+                />
               </div>
             </div>
             <div className="px-6 py-4 border-t border-slate-100 flex justify-end gap-3 bg-slate-50/50 rounded-b-2xl">

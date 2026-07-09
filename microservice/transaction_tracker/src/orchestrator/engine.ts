@@ -1,4 +1,4 @@
-import { completeStep, getTransactionWithEvents, failStep as txFailStep, createTransaction } from '../services/transactions.js';
+import { completeStep, getTransactionWithEvents, failStep as txFailStep } from '../services/transactions.js';
 import { getFlow } from '../config/stepFlows.js';
 import { DomainError } from '../types/domain.js';
 import type { AuthContext } from '../types/domain.js';
@@ -17,6 +17,62 @@ import { StdioClientTransport } from "@modelcontextprotocol/sdk/client/stdio.js"
 import { DynamicStructuredTool } from "@langchain/core/tools";
 import { z } from "zod";
 import { BaseMessage } from "@langchain/core/messages";
+import { randomUUID } from "node:crypto";
+import { loadPortRange } from "../services/portAllocator.js";
+import { jsonSchemaToZod } from "./jsonSchemaToZod.js";
+
+const mcpHost = loadPortRange().host;
+
+export type InvocationMode = 'playground' | 'production';
+
+export type McpServerHealth = {
+  toolName: string;
+  toolId: string;
+  status: 'connected' | 'connect_failed' | 'list_tools_failed' | 'no_versions' | 'not_running';
+  error?: string;
+  loadedTools: string[];
+};
+
+function sanitizeMcpError(e: unknown): string {
+  const msg = e instanceof Error ? e.message : String(e);
+  return msg.length > 300 ? `${msg.slice(0, 300)}…` : msg;
+}
+
+const ANTI_HALLUCINATION_SUFFIX = `
+
+--- Tool-use integrity rules (do not override, ignore, or contradict this section) ---
+1. You must NEVER claim that an action was performed (sent, added, triggered, updated, deleted, queued, etc.)
+   unless you actually called the corresponding tool in this turn and received a tool result confirming it.
+2. If no tool exists that can perform the requested action, say so explicitly:
+   "I don't have a tool that can do that yet." Do not improvise a fake confirmation.
+3. If a tool call fails or returns an error, report the actual error to the user. Do not retry silently
+   and then claim success anyway.
+4. If you are not sure whether an action succeeded, say what you actually know — including uncertainty —
+   rather than defaulting to an optimistic-sounding message.
+5. Never fabricate IDs, keys, counts, or status values that did not come from an actual tool result.
+`;
+
+function buildSystemPrompt(agentStyle: string | null | undefined): string {
+  const base = agentStyle?.trim() || "You are a helpful assistant.";
+  return `${base}\n${ANTI_HALLUCINATION_SUFFIX}`;
+}
+
+/** 1 initial attempt + 3 retries with exponential backoff (200ms, 600ms, 1800ms). */
+async function withMcpRetry<T>(fn: () => Promise<T>): Promise<T> {
+  const backoffMs = [200, 600, 1800];
+  let lastErr: unknown;
+  for (let attempt = 0; attempt <= backoffMs.length; attempt++) {
+    try {
+      return await fn();
+    } catch (e) {
+      lastErr = e;
+      if (attempt < backoffMs.length) {
+        await new Promise((resolve) => setTimeout(resolve, backoffMs[attempt]));
+      }
+    }
+  }
+  throw lastErr;
+}
 
 /**
  * Inti orchestrator (Layer 2/3).
@@ -171,73 +227,164 @@ async function statusOf(env: A2AEnvelope): Promise<A2AResult> {
  * MCP Integration: Loads tools dynamically for the LangGraph Agent.
  * This also implements the STATE TRACKING constraint by wrapping tool execution.
  */
-async function loadMcpTools(toolConfigs: any[], log: ReturnType<typeof txLogger>) {
+async function loadMcpTools(
+  toolConfigs: any[],
+  log: ReturnType<typeof txLogger>,
+): Promise<{ tools: any[]; clients: Client[]; report: McpServerHealth[] }> {
   const langchainTools: any[] = [];
   const clients: Client[] = [];
+  const report: McpServerHealth[] = [];
 
   for (const config of toolConfigs) {
-    if (config.on_status === "Offline" || config.on_status === false) continue;
+    const toolName: string = config.name || 'unknown';
+    const toolId: string = config.tool_id || '';
+
+    if (config.on_status === "Offline" || config.on_status === false) {
+      report.push({ toolName, toolId, status: 'no_versions', error: 'Tool is Offline', loadedTools: [] });
+      continue;
+    }
 
     let versions = config.versions;
     if (typeof versions === "string") {
       try { versions = JSON.parse(versions); } catch(e) {}
     }
-    
-    if (!versions || versions.length === 0) continue;
-    const release = versions[versions.length - 1]?.released;
-    if (!release) continue;
 
-    let transport;
-    if (release.method === "sse") {
-      const url = release.port.startsWith("http") ? release.port : `http://localhost:${release.port}/sse`;
-      transport = new SSEClientTransport(new URL(url));
-    } else if (release.method === "stdio") {
-      transport = new StdioClientTransport({
-        command: "node", // Defaulting to node for MCP standard adapters
-        args: [release.args]
-      });
+    if (!versions || versions.length === 0) {
+      report.push({ toolName, toolId, status: 'no_versions', error: 'No versions configured', loadedTools: [] });
+      continue;
+    }
+    const release = versions[versions.length - 1]?.released;
+    if (!release) {
+      report.push({ toolName, toolId, status: 'no_versions', error: 'No released config', loadedTools: [] });
+      continue;
     }
 
-    if (!transport) continue;
+    // Legacy rows may still have `args` as a single concatenated string and
+    // no `command` (the exact shape that caused bugfix1.md Bug 1). Do NOT
+    // silently fall back to an empty args array here — for stdio that spawns
+    // a bare `node` process with no script, which hangs forever waiting for
+    // an MCP handshake that will never come. Fail fast instead.
+    if (typeof release.args === 'string' || !release.command) {
+      report.push({
+        toolName,
+        toolId,
+        status: 'connect_failed',
+        error: 'Legacy args string detected — re-save this tool via /tools to migrate to the structured {command, args[]} format',
+        loadedTools: [],
+      });
+      continue;
+    }
 
-    const mcpClient = new Client({ name: "amadeus-orchestrator", version: "2.0.0" });
+    if (release.method !== "sse" && release.method !== "stdio") {
+      report.push({ toolName, toolId, status: 'no_versions', error: 'Unsupported or missing transport method', loadedTools: [] });
+      continue;
+    }
+
+    // For SSE, the only source of truth for "where is this tool actually
+    // listening right now" is mcp_runtime_state — it's written exclusively by
+    // the process manager that spawned (or failed to spawn) this exact
+    // process. tools.versions[...].released.port is legacy/display only and
+    // must never be used to build a connection URL.
+    let ssePort: number | null = null;
+    if (release.method === "sse") {
+      const runtime = await query<{ port: number | null; status: string }>(
+        `SELECT port, status FROM mcp_runtime_state WHERE tool_id = $1`,
+        [toolId],
+      );
+      const row = runtime.rows[0];
+      if (!row || row.status !== 'running' || !row.port) {
+        report.push({ toolName, toolId, status: 'not_running', error: 'SSE server is not currently running', loadedTools: [] });
+        continue;
+      }
+      ssePort = row.port;
+    }
+
+    const buildTransport = () => {
+      if (release.method === "sse") {
+        const url = `http://${mcpHost}:${ssePort}/sse`;
+        return new SSEClientTransport(new URL(url));
+      }
+      if (release.method === "stdio") {
+        return new StdioClientTransport({
+          command: release.command || "node",
+          args: Array.isArray(release.args) ? release.args : [],
+        });
+      }
+      return null;
+    };
+
+    // The SDK's Client throws "Already connected to a transport" if connect()
+    // is called twice on the same instance — even after a failed attempt. So
+    // each retry attempt must build a brand new Client + transport pair.
+    let mcpClient: Client;
+    try {
+      mcpClient = await withMcpRetry(async () => {
+        const client = new Client({ name: "amadeus-orchestrator", version: "2.0.0" });
+        const attemptTransport = buildTransport()!;
+        await client.connect(attemptTransport);
+        return client;
+      });
+    } catch (e) {
+      log.warn({ toolConfig: config.name, error: e }, `[MCP] Failed to connect to tool server`);
+      report.push({ toolName, toolId, status: 'connect_failed', error: sanitizeMcpError(e), loadedTools: [] });
+      continue;
+    }
+
+    // Only track the client for cleanup once it's actually connected.
     clients.push(mcpClient);
 
     try {
-      await mcpClient.connect(transport);
-      const { tools: mcpTools } = await mcpClient.listTools();
-      
+      const { tools: mcpTools } = await withMcpRetry(() => mcpClient.listTools());
+      const loadedNames: string[] = [];
+
       for (const mcpTool of mcpTools) {
+        loadedNames.push(mcpTool.name);
+        // The MCP server's listTools() response carries the tool's real input
+        // contract in inputSchema. Bind against that instead of a blanket
+        // passthrough — without it, models get zero structural guidance and
+        // guess at parameter names/shapes (see jsonah.md for the failure mode).
+        const realSchema = mcpTool.inputSchema
+          ? jsonSchemaToZod(mcpTool.inputSchema)
+          : z.record(z.any()); // fallback only if the server genuinely provides no schema
+        log.debug(
+          { tool: mcpTool.name, schema: (realSchema as any).shape ? Object.keys((realSchema as any).shape) : 'passthrough' },
+          'MCP tool schema bound',
+        );
         langchainTools.push(
           new DynamicStructuredTool({
             name: mcpTool.name,
             description: mcpTool.description || "MCP Tool",
-            schema: z.record(z.any()), // Pass-through Schema
+            schema: realSchema,
             func: async (args: any) => {
               // 1. Transaction Tracker Integration: Update state BEFORE tool yields
               log.info({ tool: mcpTool.name, action: "DRAFT_TO_PROCESSING" }, "Yielding to external MCP tool");
-              
+
               // 2. Execute MCP Server logic
               const res = await mcpClient.callTool({
                 name: mcpTool.name,
                 arguments: args
               });
-              
+
               // 3. Transaction Tracker Integration: Update state AFTER tool yields
               log.info({ tool: mcpTool.name, action: "PROCESSING_TO_AWAITING_CALLBACK" }, "External MCP tool completed");
-              
+
               return (res as any).content.map((c: any) => c.type === 'text' ? c.text : JSON.stringify(c)).join("\n");
             },
           })
         );
       }
+      report.push({ toolName, toolId, status: 'connected', loadedTools: loadedNames });
     } catch (e) {
-      log.warn({ toolConfig: config.name, error: e }, `[MCP] Failed to connect to tool server`);
+      log.warn({ toolConfig: config.name, error: e }, `[MCP] Failed to list tools from server`);
+      report.push({ toolName, toolId, status: 'list_tools_failed', error: sanitizeMcpError(e), loadedTools: [] });
     }
   }
 
-  // Fallback to prevent LangGraph errors if no tools load
-  if (langchainTools.length === 0) {
+  // Only fall back to a noop tool when the agent has NO tools registered on
+  // purpose (pure chat agent). If tools WERE registered but all failed to
+  // connect, the caller must fail loud (NO_TOOLS_AVAILABLE) instead of
+  // silently degrading to a useless placeholder.
+  if (toolConfigs.length === 0) {
     langchainTools.push(
       new DynamicStructuredTool({
         name: "noop_tool",
@@ -248,13 +395,19 @@ async function loadMcpTools(toolConfigs: any[], log: ReturnType<typeof txLogger>
     );
   }
 
-  return { tools: langchainTools, clients };
+  return { tools: langchainTools, clients, report };
 }
 
 /**
  * Universal LangGraph Engine.
  * Dynamically builds and runs a createReactAgent from a JSON Configuration.
  * Fully replaces the legacy Python dynamic eval generator.
+ *
+ * mode='playground': never touches the `transactions` table (no lookup, no
+ * completeStep/failStep writes) — used by the test-drive UI where the caller
+ * has no real backing transaction row.
+ * mode='production': `transactionId` must reference an existing transaction;
+ * behaves like the legacy flow (completeAndHandoff / failStep on the real row).
  */
 export async function runAgenticStep(
   auth: AuthContext,
@@ -263,39 +416,40 @@ export async function runAgenticStep(
   prompt?: string,
   messagesHistory?: any[],
   agentId?: string,
-): Promise<A2AResult> {
+  mode: InvocationMode = 'playground',
+): Promise<A2AResult & { mcpHealth?: McpServerHealth[] }> {
   let txId: string;
-  
-  if (!transactionId) {
-    // Try to get the latest transaction, or create a new one
-    const latestTx = await query("SELECT id FROM transactions ORDER BY created_at DESC LIMIT 1");
-    if (latestTx.rows[0]) {
-      txId = latestTx.rows[0].id;
-    } else {
-      const newTx = await createTransaction(auth, {
-        type: 'import_lc',
-        idempotencyKey: `auto-create-${Date.now()}`,
-        payload: { description: "Auto-created transaction for direct agent interaction" }
-      });
-      txId = newTx.id;
+  let step: string;
+
+  if (mode === 'production') {
+    if (!transactionId) {
+      throw new DomainError('TRANSACTION_NOT_FOUND', 'mode=production memerlukan transactionId', 400);
     }
+    let transaction;
+    try {
+      ({ transaction } = await getTransactionWithEvents(transactionId));
+    } catch (e) {
+      throw new DomainError('TRANSACTION_NOT_FOUND', 'Transaksi tidak ditemukan', 400, { transactionId });
+    }
+    txId = transaction.id;
+    step = transaction.current_step;
   } else {
-    txId = transactionId;
+    // playground: synthetic id for logging only, never written to the DB.
+    txId = `playground-${randomUUID()}`;
+    step = 'playground';
   }
 
   const log = txLogger(txId);
-  log.info("Starting Universal LangGraph Engine");
-
-  const { transaction } = await getTransactionWithEvents(txId);
-  const step = transaction.current_step;
+  log.info({ mode }, "Starting Universal LangGraph Engine");
 
   // 1. Resolve Agent Configuration from Database
-  // If agentId is passed, use it. Otherwise, try to use step as a UUID if it's a valid UUID, otherwise query by agent_name or step name.
+  // If agentId is passed, use it. In production mode without an agentId, fall
+  // back to treating `step` as either an agent UUID or a name/description match.
   let agentConfig;
   if (agentId) {
     const agentRes = await query("SELECT * FROM agents WHERE agent_id = $1 LIMIT 1", [agentId]);
     agentConfig = agentRes.rows[0];
-  } else {
+  } else if (mode === 'production') {
     const isUuid = /^[0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{12}$/.test(step);
     if (isUuid) {
       const agentRes = await query("SELECT * FROM agents WHERE agent_id = $1 LIMIT 1", [step]);
@@ -321,21 +475,33 @@ export async function runAgenticStep(
     toolConfigs = toolsRes.rows;
   }
 
-  // 3. Construct MCP Tools (Dynamic Adapters)
-  const { tools, clients } = await loadMcpTools(toolConfigs, log);
+  // 3. Construct MCP Tools (Dynamic Adapters) + connection health report
+  const { tools, clients, report } = await loadMcpTools(toolConfigs, log);
+
+  // Fail loud: the agent had tools registered, but none of them connected.
+  if (toolConfigs.length > 0 && tools.length === 0) {
+    for (const client of clients) { try { await client.close(); } catch { /* best effort */ } }
+    throw new DomainError(
+      'NO_TOOLS_AVAILABLE',
+      "None of the agent's registered MCP servers are reachable",
+      424,
+      { report },
+    );
+  }
 
   try {
     const inputMessages = messagesHistory && messagesHistory.length > 0 
       ? messagesHistory 
       : [{ role: "user", content: prompt || `Execute step ${step} for transaction ${txId}` }];
 
-    let requiresVision = false;
-    for (const msg of inputMessages) {
-      if (Array.isArray(msg.content) && msg.content.some((p: any) => p.type === 'image_url')) {
-        requiresVision = true;
-        break;
-      }
-    }
+    // Only the CURRENT turn decides whether vision is needed — an image
+    // earlier in the conversation (e.g. a PDF extracted three turns ago)
+    // must not permanently pin every later text-only turn to the vision
+    // model, which doesn't emit tool calls the same way and would silently
+    // break MCP tool use for the rest of the conversation.
+    const latestMessage = inputMessages[inputMessages.length - 1];
+    const requiresVision = Array.isArray(latestMessage?.content)
+      && latestMessage.content.some((p: any) => p.type === 'image_url');
 
     const resolvedModel = agentConfig.model && agentConfig.model !== "gpt-4o" 
       ? agentConfig.model 
@@ -354,7 +520,7 @@ export async function runAgenticStep(
     const agent = createReactAgent({
       llm,
       tools,
-      stateModifier: agentConfig.agent_style || "You are a helpful assistant.",
+      stateModifier: buildSystemPrompt(agentConfig.agent_style),
     });
 
     // 5. Invoke LangGraph
@@ -364,8 +530,22 @@ export async function runAgenticStep(
 
     const finalMessage = result.messages[result.messages.length - 1] as BaseMessage;
 
-    // 6. Complete and Handoff back to tracker
-    return completeAndHandoff(
+    // 6. Complete and Handoff back to tracker — production mode only.
+    // Playground mode never writes to the DB.
+    if (mode !== 'production') {
+      return {
+        accepted: true,
+        transactionId: txId,
+        currentStep: step,
+        status: 'playground',
+        nextStep: null,
+        nextActorHint: null,
+        idempotentReplay: false,
+        mcpHealth: report,
+      };
+    }
+
+    const handoffResult = await completeAndHandoff(
       auth,
       {
         protocol: 'amadeus.a2a/0',
@@ -383,9 +563,16 @@ export async function runAgenticStep(
       },
       log,
     );
+    return { ...handoffResult, mcpHealth: report };
   } catch (err: any) {
     log.error({ err }, "LangGraph execution failed");
-    
+
+    if (mode !== 'production') {
+      // No DB writes in playground mode — surface the failure directly.
+      if (err instanceof DomainError) throw err;
+      throw new DomainError('AGENT_EXECUTION_FAILED', err.message || "Unknown LangGraph execution failure", 500);
+    }
+
     // Convert failure into a failed step in the transaction tracker
     return failStep(
       auth,
@@ -413,6 +600,12 @@ export async function runAgenticStep(
 /**
  * Universal LangGraph Streaming Engine.
  * Streams node execution and agent updates chunk-by-chunk to the client using SSE.
+ *
+ * Agent config + tool resolution + MCP health checks all happen BEFORE any
+ * response bytes are written, so failure cases (unknown production
+ * transactionId, no agent found, all MCP tools unreachable) can return a
+ * normal JSON error response instead of having to fake it inside an SSE
+ * stream whose headers were already flushed.
  */
 export async function runAgenticStepStream(
   auth: AuthContext,
@@ -421,33 +614,42 @@ export async function runAgenticStepStream(
   prompt: string | undefined,
   messagesHistory: any[] | undefined,
   agentId: string | undefined,
+  mode: InvocationMode,
   reply: FastifyReply,
 ): Promise<void> {
-  let txId = transactionId || `test-${Date.now()}`;
-  let step = "test_step";
-  let transaction: any = null;
-  
-  if (transactionId && !transactionId.startsWith('invoke-')) {
-    try {
-      const res = await query("SELECT current_step FROM transactions WHERE id = $1", [txId]);
-      if (res.rows[0]) step = res.rows[0].current_step;
-    } catch (e) {}
+  const writeJsonError = (status: number, code: string, message: string, extra?: Record<string, unknown>) => {
+    reply.raw.writeHead(status, { 'Content-Type': 'application/json' });
+    reply.raw.end(JSON.stringify({ error: { code, message, ...extra } }));
+  };
+
+  let txId: string;
+  let step: string;
+
+  if (mode === 'production') {
+    if (!transactionId) {
+      writeJsonError(400, 'TRANSACTION_NOT_FOUND', 'mode=production memerlukan transactionId');
+      return;
+    }
+    const res = await query("SELECT current_step FROM transactions WHERE id = $1", [transactionId]);
+    if (!res.rows[0]) {
+      writeJsonError(400, 'TRANSACTION_NOT_FOUND', 'Transaksi tidak ditemukan', { transactionId });
+      return;
+    }
+    txId = transactionId;
+    step = res.rows[0].current_step;
+  } else {
+    txId = `playground-${randomUUID()}`;
+    step = 'playground';
   }
 
   const log = txLogger(txId);
-  log.info("Starting Universal LangGraph Engine in STREAMING mode");
-
-  reply.raw.setHeader('Content-Type', 'text/event-stream');
-  reply.raw.setHeader('Cache-Control', 'no-cache');
-  reply.raw.setHeader('Connection', 'keep-alive');
-  reply.raw.setHeader('Access-Control-Allow-Origin', '*');
-  reply.raw.flushHeaders();
+  log.info({ mode }, "Starting Universal LangGraph Engine in STREAMING mode");
 
   let agentConfig;
   if (agentId) {
     const agentRes = await query("SELECT * FROM agents WHERE agent_id = $1 LIMIT 1", [agentId]);
     agentConfig = agentRes.rows[0];
-  } else {
+  } else if (mode === 'production') {
     const isUuid = /^[0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{12}$/.test(step);
     if (isUuid) {
       const agentRes = await query("SELECT * FROM agents WHERE agent_id = $1 LIMIT 1", [step]);
@@ -459,9 +661,7 @@ export async function runAgenticStepStream(
   }
 
   if (!agentConfig) {
-    const errPayload = JSON.stringify({ error: `Agent not found for ${agentId || step}` });
-    reply.raw.write(`event: error\ndata: ${errPayload}\n\n`);
-    reply.raw.end();
+    writeJsonError(404, 'NO_AGENT', `Agent not found for ${agentId || step}`);
     return;
   }
 
@@ -471,20 +671,40 @@ export async function runAgenticStepStream(
     toolConfigs = toolsRes.rows;
   }
 
-  const { tools, clients } = await loadMcpTools(toolConfigs, log);
+  const { tools, clients, report } = await loadMcpTools(toolConfigs, log);
+
+  // Fail loud: the agent had tools registered, but none of them connected.
+  if (toolConfigs.length > 0 && tools.length === 0) {
+    for (const client of clients) { try { await client.close(); } catch { /* best effort */ } }
+    writeJsonError(424, 'NO_TOOLS_AVAILABLE', "None of the agent's registered MCP servers are reachable", { report });
+    return;
+  }
+
+  // Only now do we commit to opening the SSE stream.
+  reply.raw.setHeader('Content-Type', 'text/event-stream');
+  reply.raw.setHeader('Cache-Control', 'no-cache');
+  reply.raw.setHeader('Connection', 'keep-alive');
+  reply.raw.setHeader('Access-Control-Allow-Origin', '*');
+  reply.raw.flushHeaders();
+
+  reply.raw.write(`event: mcp_health\ndata: ${JSON.stringify({ servers: report })}\n\n`);
+  if ((reply.raw as any).flush) {
+    (reply.raw as any).flush();
+  }
 
   try {
     const inputMessages = messagesHistory && messagesHistory.length > 0 
       ? messagesHistory 
       : [{ role: "user", content: prompt || `Execute step ${step} for transaction ${txId}` }];
 
-    let requiresVision = false;
-    for (const msg of inputMessages) {
-      if (Array.isArray(msg.content) && msg.content.some((p: any) => p.type === 'image_url')) {
-        requiresVision = true;
-        break;
-      }
-    }
+    // Only the CURRENT turn decides whether vision is needed — an image
+    // earlier in the conversation (e.g. a PDF extracted three turns ago)
+    // must not permanently pin every later text-only turn to the vision
+    // model, which doesn't emit tool calls the same way and would silently
+    // break MCP tool use for the rest of the conversation.
+    const latestMessage = inputMessages[inputMessages.length - 1];
+    const requiresVision = Array.isArray(latestMessage?.content)
+      && latestMessage.content.some((p: any) => p.type === 'image_url');
 
     const resolvedModel = agentConfig.model && agentConfig.model !== "gpt-4o" 
       ? agentConfig.model 
@@ -506,7 +726,7 @@ export async function runAgenticStepStream(
     const agent = createReactAgent({
       llm,
       tools,
-      stateModifier: agentConfig.agent_style || "You are a helpful assistant.",
+      stateModifier: buildSystemPrompt(agentConfig.agent_style),
     });
     const agentInitTime = (Date.now() - agentInitStart) / 1000;
 
@@ -554,9 +774,8 @@ export async function runAgenticStepStream(
       }
     }
 
-    // Complete step in the DB if not a test transaction
-    const isTest = txId.startsWith('test-') || txId.startsWith('invoke-');
-    if (!isTest) {
+    // Complete step in the DB — production mode only.
+    if (mode === 'production') {
       try {
         await completeAndHandoff(
           auth,
@@ -588,9 +807,8 @@ export async function runAgenticStepStream(
     reply.raw.end();
   } catch (err: any) {
     log.error({ err }, "LangGraph streaming execution failed");
-    
-    const isTest = txId.startsWith('test-') || txId.startsWith('invoke-');
-    if (!isTest) {
+
+    if (mode === 'production') {
       try {
         await failStep(
           auth,
