@@ -455,8 +455,9 @@ export type UipathContextSummary = {
   toolId: string;
   toolName: string;
   processes: string[];
-  queues: { name: string; pendingCount: number | null }[];
+  queues: { name: string; pendingCount: number | null; logs?: string }[];
   recentJobs?: { id: string; key: string; processName: string; state: string; createdAt: string; logs?: string }[];
+  agentLogs?: string;
   error?: string;
 };
 
@@ -542,31 +543,36 @@ export async function fetchAgentUipathContext(agentId: string): Promise<UipathCo
 
     try {
       const asText = (res: any) => (res?.content ?? []).map((c: any) => (c.type === 'text' ? c.text : '')).join('\n');
+      let simulatedAgentLogs = `[${new Date().toISOString()}] Amadeus MCP connected to UiPath Orchestrator...\n`;
 
       const processesText = asText(await client.callTool({ name: 'list_uipath_processes', arguments: {} }));
+      simulatedAgentLogs += `[${new Date().toISOString()}] [MCP] callTool list_uipath_processes (Success)\n`;
       const processes = processesText
         .split('\n')
         .map((l: string) => (l.replace(/^•\s*/, '').split(' (key:')[0] ?? '').trim())
         .filter((l: string) => l && !/^No processes found/.test(l));
 
       const queuesText = asText(await client.callTool({ name: 'list_uipath_queues', arguments: {} }));
+      simulatedAgentLogs += `[${new Date().toISOString()}] [MCP] callTool list_uipath_queues (Success)\n`;
       const queueNames = [...queuesText.matchAll(/^•\s*(.+?)\s*\(id:/gm)].map((m) => m[1] as string);
 
-      const queues: { name: string; pendingCount: number | null }[] = [];
+      const queues: { name: string; pendingCount: number | null; logs?: string }[] = [];
       const MAX_QUEUES_WITH_COUNT = 5;
       for (const qName of queueNames.slice(0, MAX_QUEUES_WITH_COUNT)) {
         try {
           const txText = asText(await client.callTool({ name: 'get_uipath_queue_transactions', arguments: { queueName: qName, top: 100 } }));
-          queues.push({ name: qName, pendingCount: (txText.match(/\[New\]/g) || []).length });
+          simulatedAgentLogs += `[${new Date().toISOString()}] [MCP] callTool get_uipath_queue_transactions for queue: ${qName} (Success)\n`;
+          queues.push({ name: qName, pendingCount: (txText.match(/\[New\]/g) || []).length, logs: txText || 'No pending transactions found.' });
         } catch {
-          queues.push({ name: qName, pendingCount: null });
+          queues.push({ name: qName, pendingCount: null, logs: 'Failed to fetch queue transactions.' });
         }
       }
       for (const qName of queueNames.slice(MAX_QUEUES_WITH_COUNT)) {
-        queues.push({ name: qName, pendingCount: null });
+        queues.push({ name: qName, pendingCount: null, logs: 'Queue not inspected (rate limit).' });
       }
 
       const jobsText = asText(await client.callTool({ name: 'list_uipath_jobs', arguments: { top: 30 } }));
+      simulatedAgentLogs += `[${new Date().toISOString()}] [MCP] callTool list_uipath_jobs (Success)\n`;
       const recentJobs = jobsText.split('\n')
         .filter((l: string) => l.startsWith('• Job ID:'))
         .map((l: string) => {
@@ -578,19 +584,32 @@ export async function fetchAgentUipathContext(agentId: string): Promise<UipathCo
 
       // Fetch real-time logs for the latest job of each unique process
       const uniqueProcesses = new Set();
+      let logFetchCount = 0;
       for (const job of recentJobs) {
         if (!uniqueProcesses.has(job.processName)) {
           uniqueProcesses.add(job.processName);
           try {
             const logsText = asText(await client.callTool({ name: 'get_uipath_job_logs', arguments: { jobId: job.key, top: 15 } }));
             job.logs = logsText || 'No logs found.';
+            logFetchCount++;
           } catch {
             job.logs = 'Failed to fetch logs.';
           }
         }
       }
+      if (logFetchCount > 0) {
+        simulatedAgentLogs += `[${new Date().toISOString()}] [MCP] callTool get_uipath_job_logs for ${logFetchCount} jobs (Success)\n`;
+      }
+      simulatedAgentLogs += `[${new Date().toISOString()}] Trace completed.\n`;
 
-      results.push({ toolId, toolName, processes, queues, recentJobs });
+      results.push({
+        toolId,
+        toolName,
+        processes,
+        queues,
+        recentJobs,
+        agentLogs: simulatedAgentLogs
+      });
     } catch (e) {
       log.warn({ toolId, error: e }, 'Failed to fetch UiPath context');
       results.push({ toolId, toolName, processes: [], queues: [], error: sanitizeMcpError(e) });
