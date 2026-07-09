@@ -14,7 +14,7 @@ import {
   Edge
 } from '@xyflow/react';
 import '@xyflow/react/dist/style.css';
-import { RefreshCw, Terminal, AlertTriangle, CheckCircle, Clock, Play } from 'lucide-react';
+import { RefreshCw, Terminal, AlertTriangle, CheckCircle, Clock, Play, Bot, Layers, Zap } from 'lucide-react';
 
 const VerticalCustomNode = ({ data, isConnectable }: any) => {
   const isActive = data.status === 'active';
@@ -71,8 +71,11 @@ const VerticalCustomNode = ({ data, isConnectable }: any) => {
               {data.actorHint}
             </span>
           </div>
-          <div className={`font-semibold text-sm ${labelColor}`}>
-            {data.label}
+          <div className={`font-semibold text-sm ${labelColor} flex items-center gap-2 mt-1`}>
+            {theme === 'blue' && <Bot className="w-4 h-4 opacity-75" />}
+            {theme === 'yellow' && <Layers className="w-4 h-4 opacity-75" />}
+            {theme === 'rainbow' && <Zap className="w-4 h-4 opacity-75" />}
+            <span className="truncate">{data.label}</span>
           </div>
           {isActive && (
             <div className="mt-3 flex items-center gap-2 bg-black/30 p-2 rounded-lg">
