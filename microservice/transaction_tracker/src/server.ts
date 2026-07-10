@@ -158,9 +158,25 @@ async function main() {
     if (mcpManager) {
       mcpManager.kill('SIGTERM');
     }
-    await app.close();
-    await closePool();
-    process.exit(0);
+
+    // If app.close()/closePool() hangs, force exit instead of lingering
+    // and blocking the next `npm run dev` with EADDRINUSE.
+    const forceExitTimer = setTimeout(() => {
+      app.log.error('Graceful shutdown timed out after 5s — forcing exit.');
+      process.exit(1);
+    }, 5000);
+    forceExitTimer.unref();
+
+    try {
+      await app.close();
+      await closePool();
+      clearTimeout(forceExitTimer);
+      process.exit(0);
+    } catch (err) {
+      app.log.error({ err }, 'Error during shutdown');
+      clearTimeout(forceExitTimer);
+      process.exit(1);
+    }
   };
   process.on('SIGINT', () => void shutdown('SIGINT'));
   process.on('SIGTERM', () => void shutdown('SIGTERM'));
@@ -202,7 +218,18 @@ async function main() {
       });
     }
 
-  } catch (err) {
+  } catch (err: any) {
+    if (err?.code === 'EADDRINUSE') {
+      app.log.error(
+        `\n🔴 Port ${env.PORT} is already in use.\n` +
+        `   Another process (likely a previous "npm run dev" that didn't exit cleanly) is holding it.\n\n` +
+        `   Find and stop it:\n` +
+        `     lsof -i :${env.PORT}          # find the PID\n` +
+        `     kill -9 <pid>                 # stop it\n\n` +
+        `   Then run "npm run dev" again.\n`
+      );
+      process.exit(1);
+    }
     app.log.error({ err }, 'gagal start server');
     process.exit(1);
   }

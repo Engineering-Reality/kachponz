@@ -54,9 +54,52 @@ const ANTI_HALLUCINATION_SUFFIX = `
 5. Never fabricate IDs, keys, counts, or status values that did not come from an actual tool result.
 `;
 
-function buildSystemPrompt(agentStyle: string | null | undefined): string {
+// Explicit allowlist (not a secret-pattern blocklist) for env fields that are
+// safe to surface to the model as pre-resolved context. A blocklist can miss
+// a credential under an unexpected key name; this can only ever leak what's
+// been explicitly reviewed and added here.
+const NON_SECRET_CONTEXT_KEYS = [
+  'UIPATH_FOLDER_ID', 'UIPATH_ORG', 'UIPATH_TENANT', 'UIPATH_BASE_URL',
+];
+
+/**
+ * Builds a block describing pre-configured values the model already has
+ * access to via its tools' env config — so it stops asking the user for
+ * things like folderId that are already resolved server-side.
+ */
+function buildToolContextBlock(toolConfigs: any[]): string {
+  const blocks: string[] = [];
+
+  for (const row of toolConfigs) {
+    let versions = row.versions;
+    if (typeof versions === 'string') {
+      try { versions = JSON.parse(versions); } catch { continue; }
+    }
+    const env = versions?.[versions.length - 1]?.released?.env;
+    if (!env) continue;
+
+    const contextFields: string[] = [];
+    for (const key of NON_SECRET_CONTEXT_KEYS) {
+      if (env[key]) contextFields.push(`${key}: ${env[key]}`);
+    }
+
+    if (contextFields.length > 0) {
+      blocks.push(`Tool "${row.name}": ${contextFields.join(', ')} — already configured, use these automatically, do NOT ask the user for them.`);
+    }
+  }
+
+  if (blocks.length === 0) return '';
+
+  return `\n\n--- Pre-configured context for this agent's tools ---\n` +
+    blocks.join('\n') +
+    `\nUse these values automatically when calling tools. Only ask the user if a tool call ` +
+    `explicitly fails due to one of these values being wrong (e.g. a folder-access error) — ` +
+    `never ask preemptively for something listed above.\n`;
+}
+
+function buildSystemPrompt(agentStyle: string | null | undefined, toolContext: string): string {
   const base = agentStyle?.trim() || "You are a helpful assistant.";
-  return `${base}\n${ANTI_HALLUCINATION_SUFFIX}`;
+  return `${base}${toolContext}\n${ANTI_HALLUCINATION_SUFFIX}`;
 }
 
 /** 1 initial attempt + 3 retries with exponential backoff (200ms, 600ms, 1800ms). */
@@ -775,10 +818,12 @@ export async function runAgenticStep(
       }
     });
 
+    const toolContext = buildToolContextBlock(toolConfigs);
+
     const agent = createReactAgent({
       llm,
       tools,
-      stateModifier: buildSystemPrompt(agentConfig.agent_style),
+      stateModifier: buildSystemPrompt(agentConfig.agent_style, toolContext),
     });
 
     // 5. Invoke LangGraph
@@ -997,11 +1042,13 @@ export async function runAgenticStepStream(
     });
     const modelInitTime = (Date.now() - modelInitStart) / 1000;
 
+    const toolContext = buildToolContextBlock(toolConfigs);
+
     const agentInitStart = Date.now();
     const agent = createReactAgent({
       llm,
       tools,
-      stateModifier: buildSystemPrompt(agentConfig.agent_style),
+      stateModifier: buildSystemPrompt(agentConfig.agent_style, toolContext),
     });
     const agentInitTime = (Date.now() - agentInitStart) / 1000;
 
