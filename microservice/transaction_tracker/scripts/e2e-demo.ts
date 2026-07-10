@@ -3,14 +3,20 @@
  *
  * Menunjukkan satu "orchestrator agent" menggerakkan seluruh alur
  * settlement Import LC dari submitted sampai advised, menggunakan
- * amadeus-mcp + mcp-uipath sebagai tools (via HTTP langsung — bukan MCP
- * protocol; lihat catatan di README/demo_setup_guide.md soal kenapa).
+ * amadeus-orchestrator-mcp + amadeus-uipath-mcp sebagai tools (via HTTP
+ * langsung — bukan MCP protocol; lihat catatan di README/demo_setup_guide.md
+ * soal kenapa).
+ *
+ * Catatan: kedua MCP server sekarang paket npm mandiri, bukan folder di
+ * monorepo. Amadeus men-spawn-nya lewat `npx` saat tool diregistrasi di
+ * halaman Tools — tidak perlu `cd` ke folder lokal lagi.
  *
  * Jalankan:
  *   1. Start transaction_tracker:  cd transaction_tracker && npm run start
- *   2. Start amadeus-mcp:          cd amadeus-mcp && npm run start   (opsional untuk demo ini)
- *   3. Start mcp-uipath:           cd mcp-uipath && npm run start    (opsional, hanya DEMO_MODE=live)
- *   4. Jalankan demo:              npx tsx scripts/e2e-demo.ts
+ *   2. (opsional, untuk debug manual di luar Amadeus):
+ *        npx -y amadeus-orchestrator-mcp@latest
+ *        npx -y amadeus-uipath-mcp@latest       (hanya DEMO_MODE=live)
+ *   3. Jalankan demo:              npx tsx scripts/e2e-demo.ts
  *
  * Env:
  *   AMADEUS_API_BASE        default http://127.0.0.1:8080
@@ -18,7 +24,7 @@
  *   AMADEUS_SIGNING_SECRET  signing secret robot (WAJIB untuk financial steps)
  *   AMADEUS_SIGNATURE_PEPPER opsional, harus sama dengan SIGNATURE_PEPPER tracker
  *   DEMO_MODE               'simulate' (default) | 'live'
- *   UIPATH_*                hanya dipakai saat DEMO_MODE=live (lihat mcp-uipath/.env.example)
+ *   UIPATH_*                hanya dipakai saat DEMO_MODE=live (lihat README amadeus-uipath-mcp)
  *   UIPATH_RELEASE_MAP      "mt_converted=<key>;swift_released=<key>;settled=<key>"
  *
  * Output: log narasi step-by-step yang bisa di-screenshot.

@@ -368,7 +368,7 @@ export default function AmadeusDashboard() {
 
         {/* Footer note */}
         <p className="text-[10px] font-mono text-slate-400 text-center pb-4">
-          amadeus-mcp · port 10002 · SSE transport · app.py not modified · Opsi A (standalone)
+          amadeus-orchestrator-mcp · SSE transport · registered via Tools page · port auto-allocated
         </p>
       </div>
     </div>

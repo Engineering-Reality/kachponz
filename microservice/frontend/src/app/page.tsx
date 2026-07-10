@@ -558,7 +558,7 @@ export default function Home() {
                               </span>
                             </div>
                             <div className="p-3 bg-[#0d0d0d] font-mono text-[11.5px] text-white/50 leading-loose overflow-x-auto">
-                              <span className="text-indigo-400">"server_name"</span>: <span className="text-amber-300">"mcp-uipath"</span>,<br />
+                              <span className="text-indigo-400">"server_name"</span>: <span className="text-amber-300">"UiPath MCP"</span>,<br />
                               <span className="text-indigo-400">"tool_name"</span>: <span className="text-amber-300">"trigger_job"</span>,<br />
                               <span className="text-indigo-400">"arguments"</span>: {"{"}<br />
                               &nbsp;&nbsp;<span className="text-indigo-400">"processName"</span>: <span className="text-amber-300">"MT202_Converter"</span>,<br />
@@ -706,8 +706,8 @@ export default function Home() {
                 </p>
                 <ul className="space-y-1.5 text-xs font-mono text-slate-600">
                   <li><span className="text-blue-600 font-bold">transaction_tracker</span> — Fastify + Postgres, :8080</li>
-                  <li><span className="text-blue-600 font-bold">amadeus-mcp</span> — 8 MCP tools, SSE :10002</li>
-                  <li><span className="text-blue-600 font-bold">mcp-uipath</span> — real UiPath Cloud OAuth2, SSE :10001</li>
+                  <li><span className="text-blue-600 font-bold">MCP tools</span> — registered via the Tools page; Amadeus discovers &amp; spawns them dynamically (npx)</li>
+                  <li><span className="text-blue-600 font-bold">amadeus-orchestrator-mcp / amadeus-uipath-mcp</span> — self-contained npm packages, ports auto-allocated</li>
                   <li><span className="text-blue-600 font-bold">this console</span> — Next.js, :3000</li>
                 </ul>
                 <Link href="/docs/lc-settlement-stack" className="inline-flex items-center gap-1.5 text-xs font-semibold text-blue-600 pt-1">

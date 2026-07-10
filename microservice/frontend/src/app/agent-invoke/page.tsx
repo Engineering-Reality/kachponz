@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useEffect, Suspense, useRef } from 'react';
+import { useState, useEffect, useCallback, Suspense, useRef } from 'react';
 import { useSearchParams } from 'next/navigation';
 import {
   Bot,
@@ -91,16 +91,21 @@ function AgentInvokeInner() {
     localStorage.setItem('agent-sessions', JSON.stringify(newSessions));
   };
 
-  const switchSession = (id: string) => {
+  const switchSession = useCallback((id: string) => {
     setCurrentSessionId(id);
-    const session = sessions.find(s => s.id === id);
+    // Read directly from localStorage instead of relying on the potentially-stale
+    // `sessions` state — this eliminates the mount-time race condition where
+    // switchSession runs before setSessions(parsed) has re-rendered.
+    const raw = localStorage.getItem('agent-sessions');
+    const allSessions: ChatSession[] = raw ? JSON.parse(raw) : [];
+    const session = allSessions.find(s => s.id === id);
     if (session) {
       setMessages(session.messages);
       setSelectedAgent(session.agentId);
       setInput('');
       setAttachments([]);
     }
-  };
+  }, []);
 
   const startNewSession = () => {
     const newId = `session-${Date.now()}`;
@@ -585,7 +590,7 @@ function AgentInvokeInner() {
                         });
                       }
                     }}
-                    placeholder="Select an agent"
+                    placeholder={agents.length === 0 ? "Loading agents..." : "Select an agent"}
                     options={agents.map((agent) => ({ value: agent.agent_id, label: agent.agent_name }))}
                     className="relative z-10 !py-1 text-xs bg-white"
                     triggerClassName="rounded-[5px] border-transparent"

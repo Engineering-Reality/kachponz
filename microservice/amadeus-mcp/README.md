@@ -1,8 +1,12 @@
-# amadeus-mcp
+# amadeus-orchestrator-mcp
 
 **Amadeus Orchestrator MCP Server** — exposes 8 Model Context Protocol tools over **SSE** transport for controlling the `transaction_tracker` (Import LC / SKBDN / SBLC settlement pipeline).
 
 Port: **10002** | Transport: **SSE** | Protocol: **amadeus.a2a/0**
+
+This package is published as a self-contained CLI. The Amadeus orchestrator
+launches it with `npx -y amadeus-orchestrator-mcp@latest`, injecting the env
+vars below via the tool registration form on the Tools page.
 
 ---
 
@@ -35,11 +39,15 @@ npm run robot:register -- --name amadeus-mcp-service --types import_lc,skbdn,sbl
 
 ## Environment Variables
 
-| Variable | Default | Description |
-|---|---|---|
-| `PORT` | `10002` | SSE listen port |
-| `AMADEUS_API_BASE` | `http://127.0.0.1:8080` | transaction_tracker base URL |
-| `AMADEUS_ROBOT_KEY` | _(required)_ | Robot key from `registerRobot.ts` |
+This is the contract between the Amadeus orchestrator (which injects env) and
+this tool (which reads env). Fill these in the tool registration form.
+
+| Variable | Required | Default | Description |
+|---|---|---|---|
+| `AMADEUS_API_BASE` | no | `http://127.0.0.1:8080` | transaction_tracker base URL |
+| `AMADEUS_ROBOT_KEY` | **yes** | — | Robot key from `registerRobot.ts` (`X-Robot-Key`) |
+| `AMADEUS_SIGNATURE_PEPPER` | required for financial steps | — | HMAC pepper; must match tracker's `SIGNATURE_PEPPER` |
+| `PORT` | no | `10002` | SSE listen port — overridden by the Amadeus dynamic port allocator |
 
 ---
 
@@ -62,11 +70,11 @@ npm run robot:register -- --name amadeus-mcp-service --types import_lc,skbdn,sbl
 
 1. Open `http://localhost:3000/tools`
 2. Click **Register MCP** → modal opens
-3. Click the **"Amadeus MCP"** preset button (auto-fills all fields)
-4. Update `args` to the actual path: `node /absolute/path/to/microservice/amadeus-mcp/build/index.js`
+3. Click the **"Amadeus MCP"** preset button (auto-fills `command: "npx"`, `args: ["-y", "amadeus-orchestrator-mcp@latest"]`)
+4. Fill the env fields (`AMADEUS_ROBOT_KEY`, `AMADEUS_SIGNATURE_PEPPER`, …)
 5. Click **Register**
 
-The `mcp_auto_manager.py` will discover this row and spawn the server automatically on agent boot.
+The MCP auto-manager daemon will discover this row and spawn the server via `npx` automatically.
 
 ---
 

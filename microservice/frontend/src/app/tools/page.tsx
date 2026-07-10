@@ -352,16 +352,21 @@ export default function ToolsPage() {
             folderId: authFormData.folderId
           };
           payload = {
-            name: "mcp-uipath",
+            name: "UiPath MCP",
             description: "UiPath MCP — RPA trigger and monitoring",
             on_status: "Online",
             versions: [{
               version: "1.0.0",
               released: {
                 method: "stdio",
-                command: "node",
+                command: "npx",
+                // Credentials still travel as a JSON arg (not env) so the
+                // job-trace poller in mcpAutoManager can extract them per-tool
+                // via extractCredentialsFromToolRow. The package is resolved
+                // from the registry — no monorepo checkout required.
                 args: [
-                  "/home/firania/Downloads/ponzgen/microservice/mcp-uipath/build/index.js",
+                  "-y",
+                  "amadeus-uipath-mcp@latest",
                   JSON.stringify(argsObj),
                   "--stdio"
                 ],
@@ -381,12 +386,21 @@ export default function ToolsPage() {
           };
         } else if (authProvider === "amadeus") {
           payload = {
-            name: "amadeus-mcp",
+            name: "Amadeus MCP",
             description: "Amadeus Orchestrator MCP — transaction tracker & step dispatcher",
             on_status: "Online",
             versions: [{
               version: "1.0.0",
-              released: { method: "sse", command: "node", args: ["/path/to/amadeus-mcp/build/index.js"], env: {} }
+              released: {
+                method: "sse",
+                command: "npx",
+                args: ["-y", "amadeus-orchestrator-mcp@latest"],
+                env: {
+                  AMADEUS_API_BASE: "",
+                  AMADEUS_ROBOT_KEY: "",
+                  AMADEUS_SIGNATURE_PEPPER: ""
+                }
+              }
             }]
           };
         }
@@ -791,11 +805,46 @@ export default function ToolsPage() {
               </div>
               <div>
                 <label className="form-label">Env <span className="normal-case font-normal text-slate-400">(one KEY=value per line)</span></label>
+                {/* UiPath credential sub-form */}
+                {(formData.argsText.includes('uipath-mcp') || formData.argsText.includes('uipath')) && (
+                  <div className="space-y-2 border rounded-xl p-4 bg-amber-50/50 mb-3">
+                    <h4 className="text-sm font-semibold text-amber-800">🔒 UiPath Credentials</h4>
+                    <p className="text-[10px] text-amber-600">
+                      Stored securely in the database. Injected as environment variables at runtime — 
+                      never embedded in CLI arguments or visible in process listings.
+                    </p>
+                    {[
+                      { key: 'UIPATH_ORG', label: 'Organization slug', placeholder: 'e.g. anakindia' },
+                      { key: 'UIPATH_TENANT', label: 'Tenant slug', placeholder: 'e.g. DefaultTenant' },
+                      { key: 'UIPATH_CLIENT_ID', label: 'Client ID', placeholder: 'from External App registration' },
+                      { key: 'UIPATH_CLIENT_SECRET', label: 'Client Secret', placeholder: 'from External App registration', isSecret: true },
+                      { key: 'UIPATH_FOLDER_ID', label: 'Folder ID', placeholder: 'numeric, from URL ?fid=XXXXX' },
+                      { key: 'UIPATH_SCOPES', label: 'Scopes', placeholder: 'OR.Jobs OR.Robots.Read OR.Execution OR.Queues OR.Monitoring' },
+                    ].map(field => {
+                      // Parse current envText to get existing value for this key
+                      const envObj = parseEnvText(formData.envText);
+                      return (
+                        <input
+                          key={field.key}
+                          type={field.isSecret ? 'password' : 'text'}
+                          placeholder={`${field.label} (${field.placeholder})`}
+                          value={envObj[field.key] ?? ''}
+                          onChange={e => {
+                            const newEnv = { ...envObj, [field.key]: e.target.value };
+                            const newText = Object.entries(newEnv).filter(([,v]) => v).map(([k,v]) => `${k}=${v}`).join('\n');
+                            setFormData({ ...formData, envText: newText });
+                          }}
+                          className="form-input w-full rounded-lg border-amber-200 text-xs"
+                        />
+                      );
+                    })}
+                  </div>
+                )}
                 <textarea
                   value={formData.envText}
                   onChange={e => setFormData({ ...formData, envText: e.target.value })}
                   className="form-input rounded-xl border-slate-200 h-16 resize-none font-mono text-xs"
-                  placeholder={"PORT=10005"}
+                  placeholder={"UIPATH_ORG=anakindia\nUIPATH_TENANT=DefaultTenant\nUIPATH_CLIENT_ID=..."}
                 />
               </div>
             </div>

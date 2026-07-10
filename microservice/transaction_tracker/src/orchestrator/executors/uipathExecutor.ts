@@ -23,47 +23,26 @@
 import type { Executor, ExecutorContext, ExecutorOutcome } from './base.js';
 import { env } from '../../config/env.js';
 import { logger } from '../../lib/logger.js';
+import { getUiPathToken } from '../../lib/uipathAuth.js';
 
-interface TokenCache {
-  accessToken: string;
-  expiresAt: number; // ms epoch
-}
-let tokenCache: TokenCache | null = null;
-
+/**
+ * Ambil OAuth token untuk kredensial env-level. Executor ini selalu memakai
+ * satu set kredensial dari process.env, jadi cacheKey-nya konstan
+ * ('env-default'). Cache & flow OAuth2 di-share dengan poller mcpAutoManager
+ * lewat src/lib/uipathAuth.ts.
+ */
 async function getAccessToken(): Promise<string> {
-  const now = Date.now();
-  if (tokenCache && tokenCache.expiresAt > now + 30_000) {
-    return tokenCache.accessToken;
-  }
   if (!env.UIPATH_CLIENT_ID || !env.UIPATH_CLIENT_SECRET) {
     throw new Error('UIPATH_CLIENT_ID / UIPATH_CLIENT_SECRET belum diset');
   }
-
-  const body = new URLSearchParams({
-    grant_type: 'client_credentials',
-    client_id: env.UIPATH_CLIENT_ID,
-    client_secret: env.UIPATH_CLIENT_SECRET,
-    scope: env.UIPATH_SCOPES,
+  return getUiPathToken('env-default', {
+    baseUrl: env.UIPATH_BASE_URL,
+    org: env.UIPATH_ORG ?? '',
+    tenant: env.UIPATH_TENANT ?? '',
+    clientId: env.UIPATH_CLIENT_ID,
+    clientSecret: env.UIPATH_CLIENT_SECRET,
+    scopes: env.UIPATH_SCOPES,
   });
-
-  const res = await fetch(`${env.UIPATH_BASE_URL}/identity_/connect/token`, {
-    method: 'POST',
-    headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
-    body: body.toString(),
-  });
-  if (!res.ok) {
-    const t = await res.text().catch(() => '');
-    throw new Error(`UiPath OAuth2 gagal ${res.status}: ${t.slice(0, 300)}`);
-  }
-  const json = (await res.json()) as {
-    access_token: string;
-    expires_in: number;
-  };
-  tokenCache = {
-    accessToken: json.access_token,
-    expiresAt: now + json.expires_in * 1000,
-  };
-  return json.access_token;
 }
 
 /**

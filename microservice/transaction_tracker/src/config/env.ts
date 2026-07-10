@@ -62,13 +62,17 @@ const EnvSchema = z.object({
   QWEN_TIMEOUT_MS: z.coerce.number().int().positive().default(60_000),
 
   // ─── UiPath Automation Cloud ────────────────────────────────────────
+  // These env vars are ONLY needed for the legacy direct UiPath executor
+  // (non-MCP path, e.g. uipathExecutor.ts). For MCP-based invocation,
+  // credentials are stored per-tool in the database `tools.versions[].released.env`
+  // and injected at spawn time by mcpAutoManager.ts.
   UIPATH_BASE_URL: z.string().url().default('https://cloud.uipath.com'),
-  UIPATH_ORG: z.string().optional(), // slug org
-  UIPATH_TENANT: z.string().optional(), // slug tenant
+  UIPATH_ORG: z.string().optional(),
+  UIPATH_TENANT: z.string().optional(),
   UIPATH_CLIENT_ID: z.string().optional(),
   UIPATH_CLIENT_SECRET: z.string().optional(),
   UIPATH_SCOPES: z.string().default('OR.Jobs OR.Robots.Read OR.Execution'),
-  UIPATH_FOLDER_ID: z.string().default('0'), // OrganizationUnitId (Modern Folder)
+  UIPATH_FOLDER_ID: z.string().default('0'),
   /**
    * Peta step→releaseKey, format: "step:type=releaseKey;step2=releaseKey2"
    * Contoh: "mt_converted:import_lc=abc-123;swift_released=def-456"

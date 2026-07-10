@@ -6,6 +6,11 @@ import { config } from 'dotenv';
 import path from 'path';
 import { fileURLToPath } from 'url';
 import { PortAllocator, loadPortRange } from '../src/services/portAllocator.js';
+import {
+  getUiPathToken,
+  extractCredentialsFromToolRow,
+  type UiPathCredentials,
+} from '../src/lib/uipathAuth.js';
 
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
 config({ path: path.join(__dirname, '../.env') });
@@ -100,76 +105,19 @@ async function markStopped(toolIds: string[]): Promise<void> {
 // role in this codebase (see syncMcpServers below), so the poll tick lives
 // here rather than inventing a second scheduler. Each row carries its own
 // tool_id, so credentials are read straight from that tool's stored
-// registration config (same {command, args: [json, "--stdio"]} shape
-// mcp-uipath itself parses at boot) — this mirrors getUiPathToken() in
-// mcp-uipath/src/index.ts and getAccessToken() in uipathExecutor.ts, but
-// neither of those is reusable here: both are singleton, single-credential-set
-// caches, while polling must hold one token per UiPath tool/account.
-interface UipathCreds {
-  baseUrl: string;
-  org: string;
-  tenant: string;
-  clientId: string;
-  clientSecret: string;
-}
-const uipathTokenCache = new Map<string, { accessToken: string; expiresAt: number }>();
-
-function extractUipathCreds(toolRow: any): UipathCreds | null {
-  let versions = toolRow.versions;
-  if (typeof versions === 'string') {
-    try { versions = JSON.parse(versions); } catch { return null; }
-  }
-  const release = versions?.[versions.length - 1]?.released;
-  const rawCredsArg: string | undefined = Array.isArray(release?.args)
-    ? release.args.find((a: string) => typeof a === 'string' && a.trim().startsWith('{'))
-    : undefined;
-  if (!rawCredsArg) return null;
-  try {
-    const parsed = JSON.parse(rawCredsArg);
-    if (!parsed.clientId || !parsed.clientSecret || !parsed.org || !parsed.tenant) return null;
-    return {
-      baseUrl: parsed.baseUrl || 'https://cloud.uipath.com',
-      org: parsed.org,
-      tenant: parsed.tenant,
-      clientId: parsed.clientId,
-      clientSecret: parsed.clientSecret,
-    };
-  } catch {
-    return null;
-  }
-}
-
-async function getUipathTokenForTool(toolId: string, creds: UipathCreds): Promise<string> {
-  const now = Date.now();
-  const cached = uipathTokenCache.get(toolId);
-  if (cached && cached.expiresAt > now + 30_000) return cached.accessToken;
-
-  const res = await fetch(`${creds.baseUrl}/identity_/connect/token`, {
-    method: 'POST',
-    headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
-    body: new URLSearchParams({
-      grant_type: 'client_credentials',
-      client_id: creds.clientId,
-      client_secret: creds.clientSecret,
-      scope: 'OR.Jobs',
-    }).toString(),
-  });
-  if (!res.ok) {
-    const t = await res.text().catch(() => '');
-    throw new Error(`UiPath OAuth2 failed ${res.status}: ${t.slice(0, 200)}`);
-  }
-  const json = (await res.json()) as { access_token: string; expires_in: number };
-  uipathTokenCache.set(toolId, { accessToken: json.access_token, expiresAt: now + json.expires_in * 1000 });
-  return json.access_token;
-}
+// registration config (same {command, args: [json, ...]} shape the
+// amadeus-uipath-mcp npm package parses at boot). OAuth2 token acquisition and
+// credential extraction are shared with uipathExecutor.ts via
+// src/lib/uipathAuth.ts — the cache there is keyed per caller, so passing the
+// toolId as cacheKey gives us one token per UiPath tool/account.
 
 async function fetchJobStatus(
   toolId: string,
-  creds: UipathCreds,
+  creds: UiPathCredentials,
   jobId: string,
   folderId: string | null,
 ): Promise<{ state: string; info: string | null }> {
-  const token = await getUipathTokenForTool(toolId, creds);
+  const token = await getUiPathToken(toolId, creds);
   const res = await fetch(`${creds.baseUrl}/${creds.org}/${creds.tenant}/orchestrator_/odata/Jobs(${jobId})`, {
     headers: {
       Authorization: `Bearer ${token}`,
@@ -207,7 +155,7 @@ async function pollActiveJobTraces(): Promise<void> {
         continue;
       }
       const toolRow = toolsById.get(row.tool_id);
-      const creds = toolRow ? extractUipathCreds(toolRow) : null;
+      const creds = toolRow ? extractCredentialsFromToolRow(toolRow) : null;
       if (!creds) {
         console.warn(`[MCP AutoManager] Skipping poll for job ${row.job_id} — tool ${row.tool_id} has no usable UiPath credentials`);
         continue;

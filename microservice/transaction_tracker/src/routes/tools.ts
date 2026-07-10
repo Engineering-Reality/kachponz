@@ -3,6 +3,29 @@ import { z } from 'zod';
 import { query } from '../db/pool.js';
 import { DomainError } from '../types/domain.js';
 
+const SECRET_KEY_RE = /secret|password|token|key/i;
+
+function maskSecrets(env: Record<string, string>): Record<string, string> {
+  const masked: Record<string, string> = {};
+  for (const [k, v] of Object.entries(env)) {
+    masked[k] = SECRET_KEY_RE.test(k) && v.length > 6
+      ? v.slice(0, 6) + '••••••••'
+      : v;
+  }
+  return masked;
+}
+
+/** Reject credentials embedded in args — they must go in env instead. */
+function rejectCredsInArgs(args: string[]): string | null {
+  for (const arg of args) {
+    if (typeof arg === 'string' && /clientSecret|client_secret|password/i.test(arg)) {
+      return 'Credentials must be stored in the "env" field, not embedded in "args". ' +
+             'Move your clientId/clientSecret/etc. to env as UIPATH_CLIENT_ID, UIPATH_CLIENT_SECRET, etc.';
+    }
+  }
+  return null;
+}
+
 export const registerToolsRoutes: FastifyPluginAsync = async (app: FastifyInstance) => {
   // Structured MCP server release contract (see bugfix1.md Bug 1). `command`
   // is the executable, `args` is an array passed as-is to execvp — no shell
@@ -92,7 +115,21 @@ export const registerToolsRoutes: FastifyPluginAsync = async (app: FastifyInstan
       if (res.rows.length === 0) {
         throw new DomainError('NOT_FOUND', 'Tool tidak ditemukan', 404);
       }
-      return reply.code(200).send(res.rows[0]);
+      // Mask secrets in env before returning to frontend
+      const tool = { ...res.rows[0] };
+      try {
+        let versions = typeof tool.versions === 'string' ? JSON.parse(tool.versions) : tool.versions;
+        if (Array.isArray(versions)) {
+          versions = versions.map((v: any) => {
+            if (v?.released?.env) {
+              return { ...v, released: { ...v.released, env: maskSecrets(v.released.env) } };
+            }
+            return v;
+          });
+          tool.versions = versions;
+        }
+      } catch { /* leave as-is if parsing fails */ }
+      return reply.code(200).send(tool);
     }
   );
 
@@ -109,6 +146,19 @@ export const registerToolsRoutes: FastifyPluginAsync = async (app: FastifyInstan
     },
     async (request, reply) => {
       const body = request.body as z.infer<typeof toolCreateSchema>;
+
+      // Phase 3a: Reject credentials in args
+      if (Array.isArray(body.versions)) {
+        for (const v of body.versions) {
+          const released = (v as any)?.released;
+          if (released?.args) {
+            const rejection = rejectCredsInArgs(released.args);
+            if (rejection) {
+              throw new DomainError('CREDENTIALS_IN_ARGS', rejection, 400);
+            }
+          }
+        }
+      }
       
       const res = await query(
         `INSERT INTO tools (name, description, versions, on_status)
@@ -139,6 +189,19 @@ export const registerToolsRoutes: FastifyPluginAsync = async (app: FastifyInstan
     async (request, reply) => {
       const { id } = request.params as { id: string };
       const body = request.body as z.infer<typeof toolUpdateSchema>;
+
+      // Phase 3a: Reject credentials in args
+      if (Array.isArray(body.versions)) {
+        for (const v of body.versions) {
+          const released = (v as any)?.released;
+          if (released?.args) {
+            const rejection = rejectCredsInArgs(released.args);
+            if (rejection) {
+              throw new DomainError('CREDENTIALS_IN_ARGS', rejection, 400);
+            }
+          }
+        }
+      }
       
       // We do a simple dynamic update
       const fields: string[] = [];

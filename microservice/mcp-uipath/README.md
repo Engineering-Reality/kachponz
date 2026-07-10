@@ -1,9 +1,30 @@
-# mcp-uipath
+# amadeus-uipath-mcp
 
 MCP server that bridges to the UiPath Automation Cloud Orchestrator API. Exposes
 six tools over SSE: `trigger_uipath_job`, `list_uipath_processes`,
 `get_uipath_job_status`, `list_uipath_queues`, `add_uipath_queue_item`, and
 `bulk_add_uipath_queue_items`.
+
+This package is published as a self-contained CLI. The Amadeus orchestrator
+launches it with `npx -y amadeus-uipath-mcp@latest`, injecting the env vars
+below via the tool registration form on the Tools page. No monorepo checkout is
+required to run it.
+
+## Environment Variables
+
+This is the contract between the Amadeus orchestrator (which injects env) and
+this tool (which reads env). Fill these in the tool registration form.
+
+| Variable | Required | Default | Example |
+|---|---|---|---|
+| `UIPATH_BASE_URL` | no | `https://cloud.uipath.com` | `https://cloud.uipath.com` |
+| `UIPATH_ORG` | **yes** | — | `acme-org` |
+| `UIPATH_TENANT` | **yes** | — | `DefaultTenant` |
+| `UIPATH_CLIENT_ID` | **yes** | — | `1a2b3c4d-...` |
+| `UIPATH_CLIENT_SECRET` | **yes** | — | `s3cr3t...` |
+| `UIPATH_FOLDER_ID` | **yes** | — | `123456` (numeric, from Orchestrator URL `?fid=XXXXXX`) |
+| `UIPATH_SCOPES` | no | `OR.Jobs OR.Robots.Read OR.Execution OR.Queues OR.Monitoring` | `OR.Jobs OR.Queues` |
+| `PORT` | no | `10001` | overridden by the Amadeus dynamic port allocator |
 
 ## Getting UiPath credentials to test against
 
