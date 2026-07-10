@@ -387,7 +387,7 @@ async function loadMcpTools(
             schema: realSchema,
             func: async (args: any) => {
               // 1. Transaction Tracker Integration: Update state BEFORE tool yields
-              log.info({ tool: mcpTool.name, action: "DRAFT_TO_PROCESSING" }, "Yielding to external MCP tool");
+              log.info({ tool: mcpTool.name, action: "DRAFT_TO_PROCESSING" }, "🔌 Yielding to external MCP tool");
 
               // 2. Execute MCP Server logic
               const res = await mcpClient.callTool({
@@ -396,7 +396,7 @@ async function loadMcpTools(
               });
 
               // 3. Transaction Tracker Integration: Update state AFTER tool yields
-              log.info({ tool: mcpTool.name, action: "PROCESSING_TO_AWAITING_CALLBACK" }, "External MCP tool completed");
+              log.info({ tool: mcpTool.name, action: "PROCESSING_TO_AWAITING_CALLBACK" }, "🔌 External MCP tool completed");
 
               // UiPath job trace write-back: reads only res._meta (never res.content),
               // so this can never leak into what the LLM sees.
@@ -698,7 +698,7 @@ export async function runAgenticStep(
   }
 
   const log = txLogger(txId);
-  log.info({ mode }, "Starting Universal LangGraph Engine");
+  log.info({ mode }, "🤖 Starting Universal LangGraph Engine");
 
   // 1. Resolve Agent Configuration from Database
   // If agentId is passed, use it. In production mode without an agentId, fall
@@ -823,7 +823,7 @@ export async function runAgenticStep(
     );
     return { ...handoffResult, mcpHealth: report };
   } catch (err: any) {
-    log.error({ err }, "LangGraph execution failed");
+    log.error({ err }, "🤖 LangGraph execution failed");
 
     if (mode !== 'production') {
       // No DB writes in playground mode — surface the failure directly.
@@ -915,7 +915,7 @@ export async function runAgenticStepStream(
   }
 
   const log = txLogger(txId);
-  log.info({ mode }, "Starting Universal LangGraph Engine in STREAMING mode");
+  log.info({ mode }, "🤖 Starting Universal LangGraph Engine in STREAMING mode");
 
   let agentConfig;
   if (agentId) {
@@ -1081,7 +1081,7 @@ export async function runAgenticStepStream(
     reply.raw.write(`event: complete\ndata: ${JSON.stringify({ output: finalAgentOutput })}\n\n`);
     reply.raw.end();
   } catch (err: any) {
-    log.error({ err }, "LangGraph streaming execution failed");
+    log.error({ err }, "🤖 LangGraph streaming execution failed");
 
     if (mode === 'production') {
       try {

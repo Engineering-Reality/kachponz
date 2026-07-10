@@ -57,7 +57,9 @@ function redactArgs(args: string[]): string[] {
 }
 
 function logPrefix(toolName: string, port?: number | null): string {
-  return port ? `[${toolName}:${port}]` : `[${toolName}]`;
+  const coloredName = `\x1b[36m${toolName}\x1b[0m`;
+  const icon = '🔌';
+  return port ? `${icon} [${coloredName}:\x1b[33m${port}\x1b[0m]` : `${icon} [${coloredName}]`;
 }
 
 async function getExcludedPorts(): Promise<Set<number>> {
@@ -151,13 +153,13 @@ async function pollActiveJobTraces(): Promise<void> {
 
     for (const row of rows) {
       if (!row.tool_id) {
-        console.warn(`[MCP AutoManager] Skipping poll for job ${row.job_id} — no tool_id on record, can't resolve credentials`);
+        console.warn(`⚙️  [\x1b[35mMCP AutoManager\x1b[0m] Skipping poll for job ${row.job_id} — no tool_id on record, can't resolve credentials`);
         continue;
       }
       const toolRow = toolsById.get(row.tool_id);
       const creds = toolRow ? extractCredentialsFromToolRow(toolRow) : null;
       if (!creds) {
-        console.warn(`[MCP AutoManager] Skipping poll for job ${row.job_id} — tool ${row.tool_id} has no usable UiPath credentials`);
+        console.warn(`⚙️  [\x1b[35mMCP AutoManager\x1b[0m] Skipping poll for job ${row.job_id} — tool ${row.tool_id} has no usable UiPath credentials`);
         continue;
       }
       try {
@@ -167,11 +169,11 @@ async function pollActiveJobTraces(): Promise<void> {
           status.state, status.info,
         ]);
       } catch (e) {
-        console.warn(`[MCP AutoManager] Failed to poll job trace ${row.job_id}:`, e instanceof Error ? e.message : e);
+        console.warn(`⚙️  [\x1b[35mMCP AutoManager\x1b[0m] Failed to poll job trace ${row.job_id}:`, e instanceof Error ? e.message : e);
       }
     }
   } catch (err) {
-    console.error('[MCP AutoManager] Error polling UiPath job traces:', err);
+    console.error('⚙️  [\x1b[35mMCP AutoManager\x1b[0m] Error polling UiPath job traces:', err);
   }
 }
 
@@ -227,7 +229,7 @@ async function startSseTool(tool: any, release: any): Promise<void> {
     try {
       port = await portAllocator.allocate(excludePorts);
     } catch (err) {
-      console.error(`[MCP AutoManager] ${logPrefix(tool.name)} port allocation failed:`, err);
+      console.error(`⚙️  [\x1b[35mMCP AutoManager\x1b[0m] ${logPrefix(tool.name)} port allocation failed:`, err);
       await upsertRuntimeState({
         toolId,
         method: 'sse',
@@ -400,9 +402,7 @@ async function syncMcpServers() {
       // Legacy rows may still have `args` as a single concatenated string and
       // no `command` — do NOT attempt to parse/guess those, just skip.
       if (typeof release.args === 'string' || !release.command) {
-        console.error(
-          `[MCP AutoManager] Legacy args string detected for tool ${tool.name}; migrate to structured {command, args[]} format`,
-        );
+        console.error(`⚙️  [\x1b[35mMCP AutoManager\x1b[0m] Legacy args string detected for tool ${tool.name}; migrate to structured {command, args[]} format`);
         continue;
       }
 
@@ -420,9 +420,7 @@ async function syncMcpServers() {
         const currentMtime = statEntryMtime(release.args);
         const recordedMtime = recordedEntryMtimes.get(toolId) ?? null;
         if (currentMtime !== null && recordedMtime !== null && currentMtime > recordedMtime) {
-          console.log(
-            `[MCP AutoManager] Restarting ${tool.name} — build changed since process start (spawned against mtime ${recordedMtime}, current mtime ${currentMtime})`,
-          );
+          console.log(`⚙️  [\x1b[35mMCP AutoManager\x1b[0m] Restarting ${tool.name} — build changed since process start (spawned against mtime ${recordedMtime}, current mtime ${currentMtime})`);
           const active = activeProcesses.get(toolId);
           if (active) {
             active.child.removeAllListeners('exit');
@@ -448,7 +446,7 @@ async function syncMcpServers() {
     const stoppedIds: string[] = [];
     for (const [toolId, { child, port }] of activeProcesses.entries()) {
       if (!expectedServerIds.has(toolId)) {
-        console.log(`[MCP AutoManager:${port}] Stopping obsolete MCP process for tool ${toolId}`);
+        console.log(`⚙️  [\x1b[35mMCP AutoManager:\x1b[33m${port}\x1b[0m] Stopping obsolete MCP process for tool ${toolId}`);
         child.removeAllListeners('exit');
         child.kill('SIGTERM');
         activeProcesses.delete(toolId);
@@ -469,10 +467,20 @@ syncMcpServers(); // Initial check
 setInterval(pollActiveJobTraces, 15000);
 pollActiveJobTraces(); // Initial check
 
-console.log('[MCP AutoManager] Daemon started. Monitoring database for Online MCP servers...');
+const AMADEUS_ASCII = `
+\x1b[38;5;51m      █████╗ ███╗   ███╗█████╗ ██████╗ ███████╗██╗   ██╗███████╗\x1b[97m   +--------+\x1b[0m
+\x1b[38;5;75m     ██╔══██╗████╗ ████║██╔══██╗██╔══██╗██╔════╝██║   ██║██╔════╝\x1b[97m   |\\ +--+ /|\x1b[0m
+\x1b[38;5;201m     ███████║██╔████╔██║███████║██║  ██║█████╗  ██║   ██║███████╗\x1b[97m   | \\|  |/ |\x1b[0m
+\x1b[38;5;205m     ██╔══██║██║╚██╔╝██║██╔══██║██║  ██║██╔══╝  ██║   ██║╚════██║\x1b[97m   | /|  |\\ |\x1b[0m
+\x1b[38;5;214m     ██║  ██║██║ ╚═╝ ██║██║  ██║██████╔╝███████╗╚██████╔╝███████║\x1b[97m   |/ +--+ \\|\x1b[0m
+\x1b[38;5;226m     ╚═╝  ╚═╝╚═╝     ╚═╝╚═╝  ╚═╝╚═════╝ ╚══════╝ ╚═════╝ ╚══════╝\x1b[97m   +--------+\x1b[0m
+`;
+
+console.log(AMADEUS_ASCII);
+console.log('⚙️  [\x1b[35mMCP AutoManager\x1b[0m] Daemon started. Monitoring database for Online MCP servers...');
 
 async function shutdown() {
-  console.log('[MCP AutoManager] Shutting down all MCP servers...');
+  console.log('⚙️  [\x1b[35mMCP AutoManager\x1b[0m] Shutting down all MCP servers...');
   const ownedIds = [...activeProcesses.keys()];
   for (const { child } of activeProcesses.values()) {
     child.removeAllListeners('exit');

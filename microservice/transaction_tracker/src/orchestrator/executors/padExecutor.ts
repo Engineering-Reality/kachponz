@@ -78,7 +78,7 @@ export function makePadExecutor(params: {
 
       // Mode queued: hanya catat intent — operator/scheduler manual yang jalankan.
       if (mode === 'queued_only') {
-        log.info({ localJobId, flowName: params.flowName }, 'PAD job di-queue (mode: queued_only)');
+        log.info({ localJobId, flowName: params.flowName }, '📥 PAD job di-queue (mode: queued_only)');
         return {
           kind: 'dispatched',
           externalJobId: localJobId,
@@ -136,7 +136,7 @@ export function makePadExecutor(params: {
         };
       }
 
-      log.info({ localJobId, mode }, 'PAD job dispatched');
+      log.info({ localJobId, mode }, '📤 PAD job dispatched');
       return {
         kind: 'dispatched',
         externalJobId: localJobId,

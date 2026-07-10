@@ -169,7 +169,7 @@ export function makeUipathExecutor(params: {
       const job = json.value?.[0];
       const externalJobId = job ? String(job.Id) : undefined;
 
-      log.info({ externalJobId, releaseKey }, 'UiPath job dispatched');
+      log.info({ externalJobId, releaseKey }, '📤 UiPath job dispatched');
 
       return {
         kind: 'dispatched',
