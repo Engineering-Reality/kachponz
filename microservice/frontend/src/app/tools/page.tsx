@@ -3,6 +3,7 @@
 import { useEffect, useState } from "react";
 import { RainbowRibbonLoader } from "@/components/RainbowRibbonLoader";
 import { Select } from "@/components/Select";
+import { McpManagerBanner } from "@/components/McpManagerBanner";
 import {
   RefreshCw,
   Plus,
@@ -432,6 +433,8 @@ export default function ToolsPage() {
 
   return (
     <div className="p-8 max-w-6xl mx-auto">
+      <McpManagerBanner />
+
       {/* Page Header */}
       <div className="page-header border-b border-slate-100 pb-6 mb-6">
         <div>

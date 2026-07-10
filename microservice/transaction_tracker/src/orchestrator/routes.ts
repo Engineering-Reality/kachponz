@@ -14,6 +14,7 @@ import type { A2AEnvelope } from './a2a/protocol.js';
 import { handleRpc } from './a2a/rpcHandler.js';
 import { streamHandler } from './a2a/streamHandler.js';
 import { buildAgentCard } from './a2a/agentCard.js';
+import { getMcpManagerState } from './mcpManagerState.js';
 
 // Daftarkan agent bawaan sekali saat modul dimuat.
 try {
@@ -150,6 +151,16 @@ export async function registerOrchestratorRoutes(app: FastifyInstance): Promise<
           lastError: r.last_error,
         })),
       );
+    });
+
+    // GET /orchestrator/mcp/manager-status — is the mcpAutoManager child
+    // process (spawned by server.ts) actually alive? If it crashed at boot
+    // (e.g. a broken import), no MCP tool server is ever spawned and every
+    // tool call fails with a generic connection error — this endpoint lets
+    // the frontend surface that immediately instead of the user discovering
+    // it three tool calls into a chat.
+    typedSecured.get('/orchestrator/mcp/manager-status', async (_req, reply) => {
+      return reply.send(getMcpManagerState());
     });
 
     // POST /orchestrator/mcp/:toolId/restart — manual restart escape hatch for

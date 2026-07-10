@@ -19,6 +19,7 @@ import { Select } from '@/components/Select';
 import { EditableJsonTable } from '@/components/EditableJsonTable';
 import { AgentContextPanel } from '@/components/AgentContextPanel';
 import { UiPathLiveGraph } from '@/components/UiPathLiveGraph';
+import { McpManagerBanner } from '@/components/McpManagerBanner';
 import { MessageSquarePlus, MessageSquare } from 'lucide-react';
 
 export interface ChatSession {
@@ -638,6 +639,9 @@ function AgentInvokeInner() {
           
 {/* Messages */}
           <div className="flex-1 overflow-y-auto pt-6 p-6 space-y-6">
+            <div className="max-w-3xl mx-auto w-full">
+              <McpManagerBanner />
+            </div>
             {mcpHealth.length > 0 && (
               <div className="max-w-3xl mx-auto w-full bg-white border border-slate-200 rounded-xl p-3 flex flex-wrap gap-2">
                 {mcpHealth.map((h) => {

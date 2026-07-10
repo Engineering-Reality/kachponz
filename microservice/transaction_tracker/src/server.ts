@@ -136,6 +136,7 @@ export async function buildServer() {
 import { spawn, ChildProcess } from 'child_process';
 import path from 'path';
 import { fileURLToPath } from 'url';
+import { setMcpManagerRunning, setMcpManagerCrashed, getMcpManagerState } from './orchestrator/mcpManagerState.js';
 
 let mcpManager: ChildProcess | null = null;
 
@@ -175,6 +176,29 @@ async function main() {
       mcpManager = spawn('tsx', [path.join(__dirname, '../scripts/mcpAutoManager.ts')], {
         stdio: 'inherit',
         env: process.env
+      });
+
+      // If the process is still alive 5s after spawn, treat it as up. If it
+      // exits before that (e.g. ERR_MODULE_NOT_FOUND on boot), that's a
+      // startup crash — mark it loudly instead of letting it fail silently
+      // until the first tool call hits a generic "fetch failed".
+      const earlyExitTimer = setTimeout(() => {
+        if (!getMcpManagerState().crashedEarly) setMcpManagerRunning();
+      }, 5000);
+
+      mcpManager.on('exit', (code, signal) => {
+        clearTimeout(earlyExitTimer);
+        if (code !== 0 && code !== null) {
+          const early = !getMcpManagerState().running;
+          const message = `MCP Auto Manager exited with code ${code}${signal ? ` (signal ${signal})` : ''}`;
+          setMcpManagerCrashed(message, early);
+          app.log.error(
+            { code, signal },
+            '🔴 MCP Auto Manager crashed — NO MCP tool servers will be available. ' +
+            'Every tool call (UiPath, etc.) will fail with a generic connection error until this is fixed. ' +
+            'Check the stack trace immediately above this line for the actual cause.'
+          );
+        }
       });
     }
 
