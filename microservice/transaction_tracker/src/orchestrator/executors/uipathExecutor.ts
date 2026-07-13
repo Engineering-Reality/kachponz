@@ -23,7 +23,7 @@
 import type { Executor, ExecutorContext, ExecutorOutcome } from './base.js';
 import { env } from '../../config/env.js';
 import { logger } from '../../lib/logger.js';
-import { getUiPathToken } from '../../lib/uipathAuth.js';
+import { getUiPathToken, UipathAuthError } from '../../lib/uipathAuth.js';
 
 /**
  * Ambil OAuth token untuk kredensial env-level. Executor ini selalu memakai
@@ -113,6 +113,20 @@ export function makeUipathExecutor(params: {
       try {
         token = await getAccessToken();
       } catch (e) {
+        if (e instanceof UipathAuthError) {
+          const humanReason = {
+            network: 'Tidak bisa reach UiPath identity endpoint (network/DNS/TLS)',
+            credentials: 'Kredensial UiPath ditolak oleh identity server',
+            server: 'UiPath identity service tidak sehat (5xx)',
+            rate_limit: 'Rate limit UiPath identity — coba lagi nanti',
+          }[e.cause];
+          log.warn({ authFailureCause: e.cause }, 'UiPath OAuth ditolak, executor menolak dispatch');
+          return {
+            kind: 'refused',
+            reason: `${humanReason}: ${e.message}`,
+            resultData: { authFailureCause: e.cause },
+          };
+        }
         return {
           kind: 'failed',
           reason: `Gagal ambil OAuth token UiPath: ${e instanceof Error ? e.message : String(e)}`,

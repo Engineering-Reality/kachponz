@@ -15,6 +15,7 @@ import { handleRpc } from './a2a/rpcHandler.js';
 import { streamHandler } from './a2a/streamHandler.js';
 import { buildAgentCard } from './a2a/agentCard.js';
 import { getMcpManagerState } from './mcpManagerState.js';
+import { resetUiPathTokenCache } from '../lib/uipathAuth.js';
 
 // Daftarkan agent bawaan sekali saat modul dimuat.
 try {
@@ -118,38 +119,58 @@ export async function registerOrchestratorRoutes(app: FastifyInstance): Promise<
       });
     });
 
-    // GET /orchestrator/mcp/status — live process state for every MCP tool
-    // that has ever been (re)started, sourced from mcp_runtime_state (the
-    // only place a currently-live SSE port is ever recorded). Polled by the
-    // Tools page to show "running on :PORT" / "stopped" without the user
-    // having to track ports themselves.
+    // GET /orchestrator/mcp/status — live process state for every registered
+    // MCP tool. LEFT JOINs mcp_runtime_state rather than INNER JOINing it
+    // (the old shape) because that table only ever gets a row for 'sse'
+    // tools — the daemon (scripts/mcpAutoManager.ts) explicitly skips
+    // writing one for 'stdio' tools, which are spawned on-demand per
+    // connection by StdioClientTransport (engine.ts) and have no
+    // port/pid/daemon-tracked process to report. Under the old INNER JOIN,
+    // stdio tools simply didn't appear in this endpoint's response at all;
+    // now they appear with a status that says what's actually true instead
+    // of being indistinguishable from "never started".
     typedSecured.get('/orchestrator/mcp/status', async (_req, reply) => {
       const res = await query<{
         tool_id: string;
         tool_name: string;
-        method: string;
+        versions: unknown;
+        mrs_method: string | null;
         port: number | null;
-        status: string;
+        status: string | null;
         pid: number | null;
         started_at: string | null;
         last_error: string | null;
       }>(
-        `SELECT t.tool_id, t.name AS tool_name, mrs.method, mrs.port, mrs.status, mrs.pid, mrs.started_at, mrs.last_error
-         FROM mcp_runtime_state mrs
-         JOIN tools t ON t.tool_id = mrs.tool_id
+        `SELECT t.tool_id, t.name AS tool_name, t.versions,
+                mrs.method AS mrs_method, mrs.port, mrs.status, mrs.pid, mrs.started_at, mrs.last_error
+         FROM tools t
+         LEFT JOIN mcp_runtime_state mrs ON mrs.tool_id = t.tool_id
          ORDER BY t.name ASC`,
       );
       return reply.send(
-        res.rows.map((r) => ({
-          toolId: r.tool_id,
-          toolName: r.tool_name,
-          method: r.method,
-          port: r.port,
-          status: r.status,
-          pid: r.pid,
-          startedAt: r.started_at,
-          lastError: r.last_error,
-        })),
+        res.rows.map((r) => {
+          let versions: any = r.versions;
+          if (typeof versions === 'string') {
+            try { versions = JSON.parse(versions); } catch { versions = null; }
+          }
+          const release = versions?.[versions.length - 1]?.released;
+          // mrs.method (actual runtime-recorded value) takes priority over the
+          // tool's stored config — it's the ground truth for what's currently
+          // live, and could momentarily differ from a since-edited tool row.
+          const method: string | null = r.mrs_method ?? release?.method ?? null;
+          const status = r.status ?? (method === 'stdio' ? 'stdio (spawned on demand)' : 'stopped');
+
+          return {
+            toolId: r.tool_id,
+            toolName: r.tool_name,
+            method,
+            port: r.port,
+            status,
+            pid: r.pid,
+            startedAt: r.started_at,
+            lastError: r.last_error,
+          };
+        }),
       );
     });
 
@@ -199,6 +220,19 @@ export async function registerOrchestratorRoutes(app: FastifyInstance): Promise<
       );
 
       return reply.code(202).send({ status: 'restarting' });
+    });
+
+    // POST /orchestrator/uipath-auth/reset — clears getUiPathToken's success
+    // AND negative-failure cache (src/lib/uipathAuth.ts) for a cacheKey (or
+    // every key if omitted), so Jandy can force a fresh token fetch right
+    // after fixing UIPATH_CLIENT_ID/SECRET without waiting out the 60s
+    // credentials negative-cache window or restarting the process.
+    typedSecured.post('/orchestrator/uipath-auth/reset', {
+      schema: { body: z.object({ cacheKey: z.string().min(1).optional() }).strict().optional() },
+    }, async (req, reply) => {
+      const body = req.body as { cacheKey?: string } | undefined;
+      resetUiPathTokenCache(body?.cacheKey);
+      return reply.send({ reset: true, cacheKey: body?.cacheKey ?? 'all' });
     });
 
     // ── EXECUTOR endpoints (meta-orchestrator: LLM + UiPath + PAD) ──────

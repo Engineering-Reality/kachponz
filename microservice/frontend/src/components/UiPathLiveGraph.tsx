@@ -118,7 +118,9 @@ export function UiPathLiveGraph({
 }) {
   const [contextData, setContextData] = useState<any>(null);
   const [loading, setLoading] = useState(true);
-  
+  const [fetchError, setFetchError] = useState<string | null>(null);
+  const [consecutiveFailures, setConsecutiveFailures] = useState(0);
+
   const [selectedNode, setSelectedNode] = useState<{ id: string; type: 'Agent' | 'Queue' | 'Process'; name: string } | null>(null);
 
   const [nodes, setNodes, onNodesChange] = useNodesState<Node>([]);
@@ -130,29 +132,60 @@ export function UiPathLiveGraph({
       setLoading(false);
       return;
     }
-    
+
     let isMounted = true;
+    let timeoutId: ReturnType<typeof setTimeout>;
+    // Source of truth for the backoff decision in scheduleNext — a ref
+    // (not the consecutiveFailures state) so the setTimeout closure always
+    // reads the latest count instead of the value captured when it was
+    // scheduled.
+    const failuresRef = { current: 0 };
+
+    const endpoint = `${apiUrl}/orchestrator/agents/${agentId}/uipath-context`;
+
     const fetchContext = async () => {
       try {
-        const res = await fetch(`${apiUrl}/orchestrator/agents/${agentId}/uipath-context`, {
+        const res = await fetch(endpoint, {
           headers: { 'X-Robot-Key': robotKey }
         });
-        if (!res.ok) return;
+        if (!res.ok) {
+          if (isMounted) {
+            failuresRef.current += 1;
+            setFetchError(`Backend returned ${res.status}`);
+            setConsecutiveFailures(failuresRef.current);
+          }
+          return;
+        }
         const data = await res.json();
         if (isMounted) {
           setContextData(data);
           setLoading(false);
+          setFetchError(null);
+          failuresRef.current = 0;
+          setConsecutiveFailures(0);
         }
       } catch (e) {
-        console.error("Failed fetching live trace", e);
+        if (isMounted) {
+          failuresRef.current += 1;
+          setFetchError(e instanceof Error ? e.message : 'Unknown fetch error');
+          setConsecutiveFailures(failuresRef.current);
+        }
+        console.error(`[UiPathLiveGraph] fetch failed for agent ${agentId} (${endpoint}):`, e);
       }
     };
 
-    fetchContext();
-    const interval = setInterval(fetchContext, 4000);
+    const scheduleNext = () => {
+      const nextInterval = failuresRef.current >= 3 ? 15000 : 4000;
+      timeoutId = setTimeout(async () => {
+        await fetchContext();
+        if (isMounted) scheduleNext();
+      }, nextInterval);
+    };
+
+    fetchContext().then(() => { if (isMounted) scheduleNext(); });
     return () => {
       isMounted = false;
-      clearInterval(interval);
+      clearTimeout(timeoutId);
     };
   }, [agentId, apiUrl, robotKey]);
 
@@ -288,6 +321,15 @@ export function UiPathLiveGraph({
     setEdges(newEdges);
   }, [contextData, selectedNode, agentId, setNodes, setEdges]);
 
+  // Only after 2 consecutive failures — a single transient blip shouldn't
+  // flicker a banner in and out on every normal network hiccup.
+  const errorBanner = fetchError && consecutiveFailures >= 2 ? (
+    <div className="mx-3 mt-3 flex items-start gap-2 rounded-lg border border-red-200 bg-red-50 px-3 py-2 text-xs text-red-700 shrink-0">
+      <AlertTriangle className="w-3.5 h-3.5 shrink-0 mt-0.5" />
+      <span>Live trace unavailable — backend unreachable. <span className="opacity-75">{fetchError}</span></span>
+    </div>
+  ) : null;
+
   if (!agentId) {
     return (
       <div className="h-full flex items-center justify-center text-slate-400 text-xs p-6 text-center">
@@ -298,8 +340,11 @@ export function UiPathLiveGraph({
 
   if (loading && !contextData) {
     return (
-      <div className="h-full flex items-center justify-center p-6 text-slate-400">
-        <RefreshCw className="w-5 h-5 animate-spin" />
+      <div className="h-full flex flex-col">
+        {errorBanner}
+        <div className="flex-1 flex items-center justify-center p-6 text-slate-400">
+          <RefreshCw className="w-5 h-5 animate-spin" />
+        </div>
       </div>
     );
   }
@@ -317,14 +362,17 @@ export function UiPathLiveGraph({
 
   if (allProcesses.length === 0) {
     return (
-      <div className="h-full flex flex-col items-center justify-center p-8 text-center opacity-60">
-        <div className="w-16 h-16 rounded-full bg-slate-100 border-2 border-slate-200 border-dashed flex items-center justify-center mb-4">
-          <Terminal className="w-6 h-6 text-slate-300" />
+      <div className="h-full flex flex-col">
+        {errorBanner}
+        <div className="flex-1 flex flex-col items-center justify-center p-8 text-center opacity-60">
+          <div className="w-16 h-16 rounded-full bg-slate-100 border-2 border-slate-200 border-dashed flex items-center justify-center mb-4">
+            <Terminal className="w-6 h-6 text-slate-300" />
+          </div>
+          <h3 className="text-sm font-semibold text-slate-700 mb-1">No Processes Found</h3>
+          <p className="text-xs text-slate-500 max-w-[200px]">
+            This agent doesn't have any UiPath processes available in its folder.
+          </p>
         </div>
-        <h3 className="text-sm font-semibold text-slate-700 mb-1">No Processes Found</h3>
-        <p className="text-xs text-slate-500 max-w-[200px]">
-          This agent doesn't have any UiPath processes available in its folder.
-        </p>
       </div>
     );
   }
@@ -342,7 +390,9 @@ export function UiPathLiveGraph({
           <p className="text-[10px] text-slate-500 mt-1 font-mono truncate max-w-[150px]">Processes: {allProcesses.length}</p>
         </div>
       </div>
-      
+
+      {errorBanner}
+
       <div className="flex-1 overflow-hidden flex flex-col relative">
         
         <svg style={{ position: 'absolute', width: 0, height: 0 }}>

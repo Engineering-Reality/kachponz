@@ -23,6 +23,8 @@ import {
   Send,
 } from "lucide-react";
 
+const EMPTY_EVENTS: any[] = [];
+
 const NAV_APPS = [
   {
     href: "/dashboard",
@@ -208,38 +210,6 @@ export default function Home() {
 
   return (
     <div className="min-h-screen bg-white text-slate-900 overflow-x-hidden">
-      {/* Conversation Hero Asset — animation styles */}
-      <style jsx global>{`
-        @keyframes float-soft {
-          0%, 100% { transform: translateY(0); }
-          50% { transform: translateY(-12px); }
-        }
-        @keyframes msg-in {
-          from { opacity: 0; transform: translateY(10px) scale(0.97); }
-          to { opacity: 1; transform: translateY(0) scale(1); }
-        }
-        @keyframes typing-bounce {
-          0%, 80%, 100% { transform: translateY(0); opacity: 0.35; }
-          40% { transform: translateY(-4px); opacity: 1; }
-        }
-        .float-soft { animation: float-soft 7s ease-in-out infinite; }
-        .chat-msg { animation: msg-in 0.55s cubic-bezier(0.16, 1, 0.3, 1) both; }
-        .typing-dot { animation: typing-bounce 1.2s ease-in-out infinite; }
-
-        .scroll-reveal {
-          opacity: 0;
-          transform: translateY(60px) scale(0.9) perspective(1000px) rotateX(-15deg);
-          transition-property: opacity, transform;
-          transition-duration: 1.2s;
-          transition-timing-function: cubic-bezier(0.19, 1, 0.22, 1);
-          transform-origin: top center;
-        }
-        .reveal-active {
-          opacity: 1;
-          transform: translateY(0) scale(1) perspective(1000px) rotateX(0deg);
-        }
-      `}</style>
-
       {/* Header */}
       <header className="h-16 border-b border-white/10 surface-dark sticky top-0 z-50">
         <div className="max-w-6xl mx-auto px-6 h-full flex items-center justify-between">
@@ -446,7 +416,7 @@ export default function Home() {
                 current_step: LC_STEPS[tickerActive],
                 status: tickerActive === LC_STEPS.length - 1 ? 'completed' : 'pending'
               }}
-              events={[]}
+              events={EMPTY_EVENTS}
             />
           </div>
           <p className="text-xs text-slate-400 mt-4 text-center">

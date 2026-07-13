@@ -9,6 +9,8 @@
  *        - `dispatched`  → JANGAN majukan state; robot yang lapor via A2A.
  *        - `failed`      → catat via failStep (bila tersedia) atau lempar
  *                          error terstruktur.
+ *        - `refused`     → executor menolak dispatch tanpa mencoba (mis. auth
+ *                          ditolak) — sama seperti `failed`, TIDAK majukan state.
  */
 
 import { completeStep, getTransactionWithEvents } from '../../services/transactions.js';
@@ -79,6 +81,19 @@ export async function dispatchCurrentStep(
       executor: decision.executor.descriptor.id,
       step,
       currentStepAfter: step,
+      status: transaction.status,
+      reason: outcome.reason,
+      resultData: outcome.resultData,
+    };
+  }
+
+  if (outcome.kind === 'refused') {
+    log.warn({ reason: outcome.reason }, 'executor menolak dispatch');
+    return {
+      outcome: 'refused',
+      executor: decision.executor.descriptor.id,
+      step,
+      currentStepAfter: step, // TIDAK maju — executor menolak, bukan robot yang lapor
       status: transaction.status,
       reason: outcome.reason,
       resultData: outcome.resultData,

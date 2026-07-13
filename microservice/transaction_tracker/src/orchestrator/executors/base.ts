@@ -44,6 +44,14 @@ export type ExecutorOutcome =
       kind: 'failed';
       reason: string;
       resultData?: Record<string, unknown>;
+    }
+  | {
+      /** Executor actively declined to dispatch (e.g. auth rejected) — distinct
+       * from `failed` so callers can tell "we tried and it broke" from "we
+       * refused to even try". Never counts as a successful dispatch. */
+      kind: 'refused';
+      reason: string;
+      resultData?: Record<string, unknown>;
     };
 
 export interface ExecutorCapability {

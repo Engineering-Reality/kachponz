@@ -1,5 +1,21 @@
 This is a [Next.js](https://nextjs.org) project bootstrapped with [`create-next-app`](https://nextjs.org/docs/app/api-reference/cli/create-next-app).
 
+## Required environment variables
+
+Create `microservice/frontend/.env.local` with:
+
+```bash
+NEXT_PUBLIC_API_URL=http://127.0.0.1:8081   # must match the port transaction_tracker's server.ts actually binds to
+NEXT_PUBLIC_ROBOT_KEY=<a real service_accounts robot key, not the "amadeus_local_dev" code fallback>
+```
+
+If `NEXT_PUBLIC_API_URL` is missing or points at the wrong port, every request from
+this app fails with a bare `TypeError: Failed to fetch` in the browser console —
+that error is also what you get for CORS rejections, DNS failures, and connection
+refused, so a port mismatch here is easy to misdiagnose as a backend bug. Check
+`transaction_tracker`'s actual bound port (its startup log prints it) before
+assuming anything else is wrong.
+
 ## Getting Started
 
 First, run the development server:

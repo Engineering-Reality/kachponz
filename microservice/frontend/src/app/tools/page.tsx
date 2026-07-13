@@ -33,7 +33,7 @@ export default function ToolsPage() {
     name: "",
     description: "",
     on_status: "Online",
-    method: "sse",
+    method: "stdio",
     command: "node",
     argsText: "", // one CLI arg per line, joined into args[] on save
     envText: "", // one KEY=value per line, joined into env{} on save
@@ -123,7 +123,7 @@ export default function ToolsPage() {
   const openCreateModal = () => {
     setModalMode("create");
     setCurrentTool(null);
-    setFormData({ name: "", description: "", on_status: "Online", method: "sse", command: "node", argsText: "", envText: "" });
+    setFormData({ name: "", description: "", on_status: "Online", method: "stdio", command: "node", argsText: "", envText: "" });
     setPasteCommand("");
     setIsModalOpen(true);
   };

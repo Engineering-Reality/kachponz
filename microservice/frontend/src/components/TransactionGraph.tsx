@@ -207,16 +207,6 @@ export function TransactionGraph({ tx, events }: { tx: any, events: any[] }) {
           </linearGradient>
         </defs>
       </svg>
-      <style dangerouslySetInnerHTML={{ __html: `
-        @keyframes rainbow-dash {
-          0% {
-            stroke-dashoffset: 100;
-          }
-          100% {
-            stroke-dashoffset: 0;
-          }
-        }
-      `}} />
       <div className="flex-1 h-full">
         <ReactFlow
           nodes={nodes}

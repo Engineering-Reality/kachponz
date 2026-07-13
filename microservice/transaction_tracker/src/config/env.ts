@@ -61,6 +61,12 @@ const EnvSchema = z.object({
   QWEN_LLM_MODEL: z.string().default('qwen-plus'),
   QWEN_TIMEOUT_MS: z.coerce.number().int().positive().default(60_000),
 
+  // Hard wall-clock ceiling on a single runAgenticStep call (invoke or
+  // stream). Paired with recursionLimit so a stuck multi-step UiPath chain
+  // can't burn tokens/hold a connection indefinitely. 15 min default is
+  // generous for one disposable-email→login→OTP→survey chain + one retry.
+  AGENT_WALL_CLOCK_TIMEOUT_MS: z.coerce.number().int().positive().default(15 * 60_000),
+
   // ─── UiPath Automation Cloud ────────────────────────────────────────
   // These env vars are ONLY needed for the legacy direct UiPath executor
   // (non-MCP path, e.g. uipathExecutor.ts). For MCP-based invocation,
