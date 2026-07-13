@@ -7,7 +7,9 @@
     "node": ">=20.0.0 <23"
   },
   "scripts": {
-    "dev": "tsx watch src/server.ts",
+    "dev": "concurrently --kill-others-on-fail --names SERVER,MCP-MGR --prefix-colors cyan,magenta \"tsx watch src/server.ts\" \"tsx watch scripts/mcpAutoManager.ts\"",
+    "dev:server": "tsx watch src/server.ts",
+    "mcp:manager": "tsx watch scripts/mcpAutoManager.ts",
     "build": "tsc -p tsconfig.json",
     "start": "node dist/server.js",
     "migrate:up": "node-pg-migrate up -m migrations -j ts --tsconfig tsconfig.migrate.json",
@@ -41,6 +43,7 @@
   "devDependencies": {
     "@types/node": "^22.10.2",
     "@types/pg": "^8.11.10",
+    "concurrently": "^10.0.3",
     "ts-node": "^10.9.2",
     "tsx": "^4.19.2",
     "typescript": "^5.7.2",

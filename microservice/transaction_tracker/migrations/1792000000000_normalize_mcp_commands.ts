@@ -3,8 +3,12 @@ import { MigrationBuilder } from 'node-pg-migrate';
 /**
  * Normalizes legacy tool commands in the tools table.
  * 1. Converts flat string args (e.g. "npx -y ...") into structured { command: "npx", args: ["-y", "..."] }
- * 2. Normalizes hardcoded local paths for amadeus-mcp and mcp-uipath into their npx equivalents
+ * 2. Normalizes hardcoded local paths for amadeus-mcp into their npx equivalents
  * 3. Changes method to 'stdio' for standard npx tools that don't support SSE natively
+ *
+ * IMPORTANT: Does NOT touch tools that already have env vars set (UIPATH_CLIENT_ID etc.).
+ * Those are correctly registered with env-based credentials and the local build path —
+ * the correct format per engine.ts StdioClientTransport env injection.
  */
 export async function up(pgm: MigrationBuilder): Promise<void> {
   pgm.sql(`
@@ -18,6 +22,7 @@ export async function up(pgm: MigrationBuilder): Promise<void> {
       v_method TEXT;
       v_idx INT;
       v_args_text TEXT;
+      v_env JSONB;
     BEGIN
       FOR r IN SELECT tool_id, name, versions FROM tools LOOP
         v_versions := r.versions;
@@ -30,6 +35,7 @@ export async function up(pgm: MigrationBuilder): Promise<void> {
         v_args := v_release -> 'args';
         v_command := v_release ->> 'command';
         v_method := v_release ->> 'method';
+        v_env := v_release -> 'env';
         
         -- Default: keep existing
         v_args_text := '';
@@ -68,9 +74,25 @@ export async function up(pgm: MigrationBuilder): Promise<void> {
         ELSIF jsonb_typeof(v_args) = 'array' THEN
           IF jsonb_array_length(v_args) > 0 THEN
             v_args_text := v_args ->> 0;
+
+            -- mcp-uipath local build path:
+            -- ONLY rewrite if there are NO env-based credentials (legacy JSON-blob format).
+            -- Tools registered via the auth modal already have UIPATH_CLIENT_ID etc. in env
+            -- and must NOT be touched — their local path + env vars IS the correct format.
             IF v_args_text LIKE '%mcp-uipath/build/index.js%' THEN
-              v_release := jsonb_set(v_release, '{command}', '"npx"');
-              v_release := jsonb_set(v_release, '{args}', '["-y", "amadeus-uipath-mcp@latest"]'::jsonb);
+              IF v_env IS NULL
+                 OR (v_env->>'UIPATH_CLIENT_ID' IS NULL AND v_env->>'UIPATH_ORG' IS NULL) THEN
+                -- Truly legacy registration (JSON blob in args, no env) — migrate to npx.
+                -- NOTE: credentials will be lost; user must re-register via /tools auth modal.
+                v_release := jsonb_set(v_release, '{command}', '"node"');
+                -- Keep existing args (local path) but clear out so user must re-register.
+                -- Do NOT replace with broken npx amadeus-uipath-mcp@latest (not on registry).
+                RAISE NOTICE 'Tool % has local mcp-uipath path but no env credentials — user must re-register via /tools auth modal.', r.name;
+              ELSE
+                -- Has credentials in env — this is the correct new format, leave it alone.
+                RAISE NOTICE 'Skipping tool % — already has env-based credentials (new format).', r.name;
+                CONTINUE;
+              END IF;
             ELSIF v_args_text LIKE '%amadeus-mcp/build/index.js%' THEN
               v_release := jsonb_set(v_release, '{command}', '"npx"');
               v_release := jsonb_set(v_release, '{args}', '["-y", "amadeus-mcp@latest"]'::jsonb);
@@ -92,3 +114,4 @@ export async function up(pgm: MigrationBuilder): Promise<void> {
 export async function down(_pgm: MigrationBuilder): Promise<void> {
   // Irreversible normalization
 }
+

@@ -48,8 +48,9 @@ export default function ToolsPage() {
 
   const [isAuthModalOpen, setIsAuthModalOpen] = useState(false);
   const [authProvider, setAuthProvider] = useState<"uipath" | "pad" | "amadeus" | "">("");
-  const [authFormData, setAuthFormData] = useState({ clientId: "", clientSecret: "", org: "", tenant: "", folderId: "" });
+  const [authFormData, setAuthFormData] = useState({ connectionName: "", clientId: "", clientSecret: "", org: "", tenant: "", folderId: "", transportMethod: "stdio" as "stdio" | "sse" });
   const [isAuthenticating, setIsAuthenticating] = useState(false);
+  const [authConnectError, setAuthConnectError] = useState<string | null>(null);
   const [folderOptions, setFolderOptions] = useState<{ id: string; fullyQualifiedName: string }[]>([]);
   const [isTestingFolders, setIsTestingFolders] = useState(false);
   const [folderTestError, setFolderTestError] = useState<string | null>(null);
@@ -298,9 +299,10 @@ export default function ToolsPage() {
 
   const openAuthModal = (provider: "uipath" | "pad" | "amadeus") => {
     setAuthProvider(provider);
-    setAuthFormData({ clientId: "", clientSecret: "", org: "", tenant: "", folderId: "" });
+    setAuthFormData({ connectionName: "", clientId: "", clientSecret: "", org: "", tenant: "", folderId: "", transportMethod: "stdio" });
     setFolderOptions([]);
     setFolderTestError(null);
+    setAuthConnectError(null);
     setIsAuthModalOpen(true);
   };
 
@@ -336,91 +338,97 @@ export default function ToolsPage() {
   const handleAuthConnect = async (e: React.FormEvent) => {
     e.preventDefault();
     setIsAuthenticating(true);
-    
-    // Simulate OAuth delay
-    setTimeout(async () => {
-      try {
-        let payload: any = {};
-        
-        if (authProvider === "uipath") {
-          const argsObj = {
-            baseUrl: "https://cloud.uipath.com",
-            org: authFormData.org,
-            tenant: authFormData.tenant,
-            clientId: authFormData.clientId,
-            clientSecret: authFormData.clientSecret,
-            scopes: "OR.Jobs OR.Robots.Read OR.Execution OR.Folders.Read OR.Queues",
-            folderId: authFormData.folderId
-          };
-          payload = {
-            name: "UiPath MCP",
-            description: "UiPath MCP — RPA trigger and monitoring",
-            on_status: "Online",
-            versions: [{
-              version: "1.0.0",
-              released: {
-                method: "stdio",
-                command: "npx",
-                // Credentials still travel as a JSON arg (not env) so the
-                // job-trace poller in mcpAutoManager can extract them per-tool
-                // via extractCredentialsFromToolRow. The package is resolved
-                // from the registry — no monorepo checkout required.
-                args: [
-                  "-y",
-                  "amadeus-uipath-mcp@latest",
-                  JSON.stringify(argsObj),
-                  "--stdio"
-                ],
-                env: {}
-              }
-            }]
-          };
-        } else if (authProvider === "pad") {
-          payload = {
-            name: "mcp-pad",
-            description: "Power Automate Desktop MCP — Windows automation triggers",
-            on_status: "Online",
-            versions: [{
-              version: "1.0.0",
-              released: { method: "sse", command: "node", args: ["/path/to/mcp-pad/build/index.js"], env: {} }
-            }]
-          };
-        } else if (authProvider === "amadeus") {
-          payload = {
-            name: "Amadeus MCP",
-            description: "Amadeus Orchestrator MCP — transaction tracker & step dispatcher",
-            on_status: "Online",
-            versions: [{
-              version: "1.0.0",
-              released: {
-                method: "sse",
-                command: "npx",
-                args: ["-y", "amadeus-orchestrator-mcp@latest"],
-                env: {
-                  AMADEUS_API_BASE: "",
-                  AMADEUS_ROBOT_KEY: "",
-                  AMADEUS_SIGNATURE_PEPPER: ""
-                }
-              }
-            }]
-          };
-        }
+    setAuthConnectError(null);
+    try {
+      let payload: any = {};
+      const toolName = authFormData.connectionName.trim() || (authProvider === "uipath" ? "UiPath MCP" : authProvider === "amadeus" ? "Amadeus MCP" : "mcp-pad");
 
-        const res = await fetch(`${apiUrl}/tools`, {
-          method: "POST",
-          headers: { ...headers, "Content-Type": "application/json" },
-          body: JSON.stringify(payload),
-        });
-        if (!res.ok) throw new Error("Failed to connect integration");
-        
-        setIsAuthModalOpen(false);
-        setIsAuthenticating(false);
-        fetchTools();
-      } catch (err: any) {
-        alert(err.message);
-        setIsAuthenticating(false);
+      if (authProvider === "uipath") {
+        // STDIO: spawned on-demand per agent invoke by engine.ts (StdioClientTransport).
+        //        McpAutoManager skips STDIO tools — no persistent process, no port.
+        // SSE:   spawned as a persistent HTTP server by McpAutoManager.
+        //        Appears in /orchestrator/mcp/status with a live port.
+        const isStdio = authFormData.transportMethod === "stdio";
+        const mcpArgs = isStdio
+          ? ["/home/firania/Downloads/ponzgen/microservice/mcp-uipath/build/index.js", "--stdio"]
+          : ["/home/firania/Downloads/ponzgen/microservice/mcp-uipath/build/index.js"]; // no --stdio = SSE/HTTP mode
+        payload = {
+          name: toolName,
+          description: `UiPath MCP [${isStdio ? "STDIO" : "SSE"}] — Org: ${authFormData.org} / Tenant: ${authFormData.tenant} / Folder: ${authFormData.folderId}`,
+          on_status: "Online",
+          versions: [{
+            version: "1.0.0",
+            released: {
+              method: authFormData.transportMethod,
+              command: "node",
+              args: mcpArgs,
+              env: {
+                UIPATH_BASE_URL: "https://cloud.uipath.com",
+                UIPATH_ORG: authFormData.org,
+                UIPATH_TENANT: authFormData.tenant,
+                UIPATH_CLIENT_ID: authFormData.clientId,
+                UIPATH_CLIENT_SECRET: authFormData.clientSecret,
+                UIPATH_FOLDER_ID: authFormData.folderId,
+                UIPATH_SCOPES: "OR.Jobs OR.Robots.Read OR.Execution OR.Folders.Read OR.Queues OR.Monitoring",
+              }
+            }
+          }]
+        };
+      } else if (authProvider === "pad") {
+        payload = {
+          name: toolName,
+          description: "Power Automate Desktop MCP — Windows automation triggers",
+          on_status: "Online",
+          versions: [{
+            version: "1.0.0",
+            released: { method: "sse", command: "node", args: ["/path/to/mcp-pad/build/index.js"], env: {} }
+          }]
+        };
+      } else if (authProvider === "amadeus") {
+        payload = {
+          name: toolName,
+          description: "Amadeus Orchestrator MCP — transaction tracker & step dispatcher",
+          on_status: "Online",
+          versions: [{
+            version: "1.0.0",
+            released: {
+              method: "sse",
+              command: "npx",
+              args: ["-y", "amadeus-orchestrator-mcp@latest"],
+              env: {
+                AMADEUS_API_BASE: "",
+                AMADEUS_ROBOT_KEY: "",
+                AMADEUS_SIGNATURE_PEPPER: ""
+              }
+            }
+          }]
+        };
       }
-    }, 2000);
+
+      const res = await fetch(`${apiUrl}/tools`, {
+        method: "POST",
+        headers: { ...headers, "Content-Type": "application/json" },
+        body: JSON.stringify(payload),
+      });
+
+      if (!res.ok) {
+        let errMsg = `Server error ${res.status}`;
+        try {
+          const errBody = await res.json();
+          errMsg = errBody?.message || errBody?.error || errMsg;
+        } catch {
+          errMsg = await res.text().then(t => t.slice(0, 200)) || errMsg;
+        }
+        throw new Error(errMsg);
+      }
+
+      setIsAuthModalOpen(false);
+      fetchTools();
+    } catch (err: any) {
+      setAuthConnectError(err.message || "Failed to connect integration");
+    } finally {
+      setIsAuthenticating(false);
+    }
   };
 
   const filteredTools = tools.filter(t => {
@@ -877,10 +885,62 @@ export default function ToolsPage() {
             
             <form onSubmit={handleAuthConnect} className="flex-1 flex flex-col">
               <div className="p-6 space-y-4">
+                {/* Inline error banner — replaces browser alert() */}
+                {authConnectError && (
+                  <div className="flex items-start gap-2.5 bg-red-50 border border-red-200 rounded-xl p-3 text-sm">
+                    <XCircle className="w-4 h-4 text-red-500 mt-0.5 shrink-0" />
+                    <div>
+                      <p className="font-semibold text-red-700">Connection failed</p>
+                      <p className="text-red-600 text-xs mt-0.5 font-mono break-all">{authConnectError}</p>
+                    </div>
+                  </div>
+                )}
                 {authProvider === "uipath" ? (
                   <>
-                    <div className="bg-slate-50 p-3 rounded-xl border border-slate-100 text-xs text-slate-500 mb-2">
-                      Please enter your UiPath External Application credentials to generate the MCP connection token.
+                    <div className="bg-slate-50 p-3 rounded-xl border border-slate-100 text-xs text-slate-500">
+                      Enter your UiPath External Application credentials. Credentials are stored as environment variables — never exposed in process listings.
+                    </div>
+                    <div>
+                      <label className="form-label">Transport Method</label>
+                      <div className="flex gap-2">
+                        {([
+                          { value: "stdio", label: "STDIO", desc: "On-demand, stateless", icon: "⚡" },
+                          { value: "sse",   label: "SSE",   desc: "Persistent HTTP server", icon: "📡" },
+                        ] as const).map(opt => (
+                          <button
+                            key={opt.value}
+                            type="button"
+                            onClick={() => setAuthFormData({ ...authFormData, transportMethod: opt.value })}
+                            className={`flex-1 flex flex-col items-center gap-0.5 py-2.5 px-3 rounded-xl border text-xs font-semibold transition-all ${
+                              authFormData.transportMethod === opt.value
+                                ? "bg-slate-900 border-slate-900 text-white shadow-md"
+                                : "bg-white border-slate-200 text-slate-500 hover:border-slate-300 hover:text-slate-700"
+                            }`}
+                          >
+                            <span className="text-base">{opt.icon}</span>
+                            <span>{opt.label}</span>
+                            <span className={`font-normal text-[10px] ${authFormData.transportMethod === opt.value ? "text-slate-300" : "text-slate-400"}`}>{opt.desc}</span>
+                          </button>
+                        ))}
+                      </div>
+                      {authFormData.transportMethod === "stdio" ? (
+                        <p className="text-[10px] text-slate-400 mt-1.5">
+                          <span className="font-semibold text-slate-600">STDIO</span> — Spawned on-demand saat agent dipanggil. Tidak butuh port. Cocok untuk UiPath, stateless tools.
+                        </p>
+                      ) : (
+                        <p className="text-[10px] text-orange-600 mt-1.5">
+                          <span className="font-semibold">SSE</span> — Dijalankan sebagai HTTP server permanen oleh McpAutoManager. Akan muncul di status panel dengan live port. Cocok jika butuh warm-up cepat atau state persistent.
+                        </p>
+                      )}
+                    </div>
+                    <div>
+                      <label className="form-label">Connection Name <span className="normal-case font-normal text-slate-400">(how it appears in the registry)</span></label>
+                      <input
+                        value={authFormData.connectionName}
+                        onChange={e => { setAuthFormData({ ...authFormData, connectionName: e.target.value }); setAuthConnectError(null); }}
+                        className="form-input rounded-xl border-slate-200"
+                        placeholder="e.g. UiPath Queue, UiPath RPA Prod"
+                      />
                     </div>
                     <div className="grid grid-cols-2 gap-3">
                       <div>
@@ -894,11 +954,11 @@ export default function ToolsPage() {
                     </div>
                     <div>
                       <label className="form-label">Client ID (App ID)</label>
-                      <input required value={authFormData.clientId} onChange={e => setAuthFormData({ ...authFormData, clientId: e.target.value })} className="form-input rounded-xl border-slate-200" placeholder="UUID format" />
+                      <input required value={authFormData.clientId} onChange={e => { setAuthFormData({ ...authFormData, clientId: e.target.value }); setAuthConnectError(null); }} className="form-input rounded-xl border-slate-200" placeholder="e.g. 0b7fd08e-3614-4687-bacc-5f2446049e6b" />
                     </div>
                     <div>
                       <label className="form-label">Client Secret</label>
-                      <input required type="password" value={authFormData.clientSecret} onChange={e => setAuthFormData({ ...authFormData, clientSecret: e.target.value })} className="form-input rounded-xl border-slate-200" placeholder="••••••••••••••••" />
+                      <input required type="password" value={authFormData.clientSecret} onChange={e => { setAuthFormData({ ...authFormData, clientSecret: e.target.value }); setAuthConnectError(null); }} className="form-input rounded-xl border-slate-200" placeholder="••••••••••••••••" />
                     </div>
                     <div>
                       <label className="form-label">Folder ID</label>

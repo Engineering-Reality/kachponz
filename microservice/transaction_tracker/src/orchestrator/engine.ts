@@ -233,7 +233,7 @@ async function failStep(
   if (!env.reason) {
     throw new DomainError('REASON_REQUIRED', 'task.failed wajib menyertakan reason', 422);
   }
-  
+
   const result = await txFailStep(auth, env.transactionId, {
     step: env.step,
     idempotencyKey: env.idempotencyKey,
@@ -319,7 +319,7 @@ async function loadMcpTools(
 
     let versions = config.versions;
     if (typeof versions === "string") {
-      try { versions = JSON.parse(versions); } catch(e) {}
+      try { versions = JSON.parse(versions); } catch (e) { }
     }
 
     if (!versions || versions.length === 0) {
@@ -364,7 +364,19 @@ async function loadMcpTools(
         `SELECT port, status FROM mcp_runtime_state WHERE tool_id = $1`,
         [toolId],
       );
-      const row = runtime.rows[0];
+      let row = runtime.rows[0];
+      
+      // SSE Ready-Wait: If the McpAutoManager is currently spinning this up,
+      // give it a brief grace period instead of immediately failing the agent invoke.
+      if (row?.status === 'starting') {
+        await new Promise(r => setTimeout(r, 1500));
+        const retry = await query<{ port: number | null; status: string }>(
+          `SELECT port, status FROM mcp_runtime_state WHERE tool_id = $1`,
+          [toolId]
+        );
+        row = retry.rows[0];
+      }
+
       if (!row || row.status !== 'running' || !row.port) {
         report.push({ toolName, toolId, status: 'not_running', error: 'SSE server is not currently running', loadedTools: [] });
         continue;
@@ -381,6 +393,7 @@ async function loadMcpTools(
         return new StdioClientTransport({
           command: release.command || "node",
           args: Array.isArray(release.args) ? release.args : [],
+          env: { ...process.env, ...(release.env || {}) },
         });
       }
       return null;
@@ -539,7 +552,11 @@ async function connectToMcpToolById(toolId: string, clientName: string): Promise
   const buildTransport = () =>
     release.method === 'sse'
       ? new SSEClientTransport(new URL(`http://${mcpHost}:${ssePort}/sse`))
-      : new StdioClientTransport({ command: release.command || 'node', args: Array.isArray(release.args) ? release.args : [] });
+      : new StdioClientTransport({ 
+          command: release.command || 'node', 
+          args: Array.isArray(release.args) ? release.args : [],
+          env: { ...process.env, ...(release.env || {}) },
+        });
 
   return withMcpRetry(async () => {
     const c = new Client({ name: clientName, version: '1.0.0' });
@@ -556,7 +573,18 @@ async function connectToMcpToolById(toolId: string, clientName: string): Promise
  * connect/transport logic as loadMcpTools() rather than duplicating the raw
  * UiPath HTTP calls a second time.
  */
+// ── Context panel cache ─────────────────────────────────────────────────────
+// UiPathLiveGraph polls every 4 seconds. Without a cache, every tick spawns
+// a fresh MCP connection (or hammers the SSE server) and hits the UiPath API.
+// 30 seconds is long enough to be cheap, short enough to feel live.
+const _uipathContextCache = new Map<string, { data: UipathContextSummary[]; ts: number }>();
+const CONTEXT_TTL_MS = 30_000;
+
 export async function fetchAgentUipathContext(agentId: string): Promise<UipathContextSummary[]> {
+  // Serve from cache if fresh — prevents 4-second poll from hammering UiPath API
+  const cached = _uipathContextCache.get(agentId);
+  if (cached && Date.now() - cached.ts < CONTEXT_TTL_MS) return cached.data;
+
   const agentRes = await query<{ tools: string[] | null }>(
     'SELECT tools FROM agents WHERE agent_id = $1',
     [agentId],
@@ -564,8 +592,14 @@ export async function fetchAgentUipathContext(agentId: string): Promise<UipathCo
   const agentRow = agentRes.rows[0];
   if (!agentRow?.tools || agentRow.tools.length === 0) return [];
 
+  // With the 30-second cache in place, it is safe to allow STDIO tools here.
+  // We will only spawn a short-lived Node process once every 30 seconds per agent
+  // instead of every 4 seconds, satisfying the user requirement that STDIO tools
+  // should also fully support the Live Graph and Context Panel.
   const toolsRes = await query<any>(
-    `SELECT * FROM tools WHERE tool_id = ANY($1::uuid[]) AND name ILIKE '%uipath%'`,
+    `SELECT * FROM tools
+     WHERE tool_id = ANY($1::uuid[])
+       AND name ILIKE '%uipath%'`,
     [agentRow.tools],
   );
 
@@ -586,9 +620,20 @@ export async function fetchAgentUipathContext(agentId: string): Promise<UipathCo
 
     try {
       const asText = (res: any) => (res?.content ?? []).map((c: any) => (c.type === 'text' ? c.text : '')).join('\n');
+
+      // Guard: MCP tools return error messages as plain text content (not exceptions).
+      // Without this, 'Error: UIPATH_ORG must be set.' propagates into allProcesses[0]
+      // and renders as the 'Name' field in UiPathLiveGraph.
+      const assertNotMcpError = (text: string, label: string) => {
+        if (text.trim().startsWith('Error:') || /must be set/i.test(text)) {
+          throw new Error(`${label} returned credential error: ${text.trim().slice(0, 200)}`);
+        }
+      };
+
       let simulatedAgentLogs = `[${new Date().toISOString()}] Amadeus MCP connected to UiPath Orchestrator...\n`;
 
       const processesText = asText(await client.callTool({ name: 'list_uipath_processes', arguments: {} }));
+      assertNotMcpError(processesText, 'list_uipath_processes');
       simulatedAgentLogs += `[${new Date().toISOString()}] [MCP] callTool list_uipath_processes (Success)\n`;
       const processes = processesText
         .split('\n')
@@ -596,6 +641,7 @@ export async function fetchAgentUipathContext(agentId: string): Promise<UipathCo
         .filter((l: string) => l && !/^No processes found/.test(l));
 
       const queuesText = asText(await client.callTool({ name: 'list_uipath_queues', arguments: {} }));
+      assertNotMcpError(queuesText, 'list_uipath_queues');
       simulatedAgentLogs += `[${new Date().toISOString()}] [MCP] callTool list_uipath_queues (Success)\n`;
       const queueNames = [...queuesText.matchAll(/^•\s*(.+?)\s*\(id:/gm)].map((m) => m[1] as string);
 
@@ -661,6 +707,8 @@ export async function fetchAgentUipathContext(agentId: string): Promise<UipathCo
     }
   }
 
+  // Store in cache — even a partial/empty result is cached to avoid stampedes
+  _uipathContextCache.set(agentId, { data: results, ts: Date.now() });
   return results;
 }
 
@@ -791,8 +839,8 @@ export async function runAgenticStep(
   }
 
   try {
-    const inputMessages = messagesHistory && messagesHistory.length > 0 
-      ? messagesHistory 
+    const inputMessages = messagesHistory && messagesHistory.length > 0
+      ? messagesHistory
       : [{ role: "user", content: prompt || `Execute step ${step} for transaction ${txId}` }];
 
     // Only the CURRENT turn decides whether vision is needed — an image
@@ -804,8 +852,8 @@ export async function runAgenticStep(
     const requiresVision = Array.isArray(latestMessage?.content)
       && latestMessage.content.some((p: any) => p.type === 'image_url');
 
-    const resolvedModel = agentConfig.model && agentConfig.model !== "gpt-4o" 
-      ? agentConfig.model 
+    const resolvedModel = agentConfig.model && agentConfig.model !== "gpt-4o"
+      ? agentConfig.model
       : (requiresVision ? "qwen-vl-max" : (process.env.QWEN_LLM_MODEL || "qwen-max"));
 
     // 4. Instantiate LangGraph createReactAgent In-Memory
@@ -895,7 +943,7 @@ export async function runAgenticStep(
   } finally {
     // 7. Graceful Cleanup of MCP SDK Clients
     for (const client of clients) {
-      try { await client.close(); } catch(e) {}
+      try { await client.close(); } catch (e) { }
     }
   }
 }
@@ -1013,8 +1061,8 @@ export async function runAgenticStepStream(
   }
 
   try {
-    const inputMessages = messagesHistory && messagesHistory.length > 0 
-      ? messagesHistory 
+    const inputMessages = messagesHistory && messagesHistory.length > 0
+      ? messagesHistory
       : [{ role: "user", content: prompt || `Execute step ${step} for transaction ${txId}` }];
 
     // Only the CURRENT turn decides whether vision is needed — an image
@@ -1026,8 +1074,8 @@ export async function runAgenticStepStream(
     const requiresVision = Array.isArray(latestMessage?.content)
       && latestMessage.content.some((p: any) => p.type === 'image_url');
 
-    const resolvedModel = agentConfig.model && agentConfig.model !== "gpt-4o" 
-      ? agentConfig.model 
+    const resolvedModel = agentConfig.model && agentConfig.model !== "gpt-4o"
+      ? agentConfig.model
       : (requiresVision ? "qwen-vl-max" : (process.env.QWEN_LLM_MODEL || "qwen-max"));
 
     const modelInitStart = Date.now();
@@ -1156,7 +1204,7 @@ export async function runAgenticStepStream(
     reply.raw.end();
   } finally {
     for (const client of clients) {
-      try { await client.close(); } catch(e) {}
+      try { await client.close(); } catch (e) { }
     }
   }
 }

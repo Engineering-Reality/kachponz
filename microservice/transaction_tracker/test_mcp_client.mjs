@@ -6,7 +6,7 @@ async function testMcp() {
   const url = `http://127.0.0.1:${port}/sse`;
   const transport = new SSEClientTransport(new URL(url));
   const client = new Client({ name: 'test', version: '1.0' });
-  
+
   try {
     await client.connect(transport);
     console.log("Connected successfully!");

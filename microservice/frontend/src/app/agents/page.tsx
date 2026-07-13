@@ -110,6 +110,16 @@ export default function AgentsPage() {
     return { successRate: successRate.toFixed(1), latency: latency.toFixed(1), runs };
   };
 
+  /** Extracts transport method from a tool's versions JSONB. Returns 'sse' | 'stdio' | '?' */
+  const getToolMethod = (tool: any): string => {
+    try {
+      const versions = typeof tool.versions === 'string' ? JSON.parse(tool.versions) : tool.versions;
+      return versions?.[versions.length - 1]?.released?.method ?? '?';
+    } catch {
+      return '?';
+    }
+  };
+
   const filteredAgents = agents.filter(agent => {
     const matchesSearch = agent.agent_name?.toLowerCase().includes(searchQuery.toLowerCase()) ||
       agent.description?.toLowerCase().includes(searchQuery.toLowerCase());
@@ -290,15 +300,21 @@ export default function AgentsPage() {
                   </div>
                   {assignedTools.length > 0 ? (
                     <div className="flex flex-wrap gap-1.5">
-                      {assignedTools.map((tool: any) => (
-                        <span
-                          key={tool.tool_id}
-                          className="badge badge-blue text-[9px] px-2 py-0.5 rounded-lg border border-blue-100 flex items-center gap-1"
-                        >
-                          <Wrench className="w-2.5 h-2.5 opacity-60" />
-                          {tool.name}
-                        </span>
-                      ))}
+                      {assignedTools.map((tool: any) => {
+                        const method = getToolMethod(tool);
+                        const methodIcon = method === 'stdio' ? '⚡' : method === 'sse' ? '📡' : '';
+                        return (
+                          <span
+                            key={tool.tool_id}
+                            title={`Transport: ${method.toUpperCase()}`}
+                            className="badge badge-blue text-[9px] px-2 py-0.5 rounded-lg border border-blue-100 flex items-center gap-1"
+                          >
+                            <Wrench className="w-2.5 h-2.5 opacity-60" />
+                            {methodIcon && <span className="text-[10px]">{methodIcon}</span>}
+                            {tool.name}
+                          </span>
+                        );
+                      })}
                     </div>
                   ) : (
                     <p className="text-xs text-slate-400 italic">No tools assigned to this agent.</p>
@@ -364,14 +380,23 @@ export default function AgentsPage() {
                   <MultiSelect
                     values={formData.tools}
                     onChange={(vals) => setFormData({ ...formData, tools: vals })}
-                    options={toolsList.map((tool) => ({
-                      value: tool.tool_id,
-                      label: tool.name,
-                      hint: tool.on_status || "Online",
-                    }))}
+                    options={toolsList.map((tool) => {
+                      const method = getToolMethod(tool);
+                      const methodIcon = method === 'stdio' ? '⚡' : method === 'sse' ? '📡' : '?';
+                      return {
+                        value: tool.tool_id,
+                        label: `${methodIcon} ${tool.name}`,
+                        hint: `${method.toUpperCase()} · ${tool.on_status || 'Online'}`,
+                      };
+                    })}
                     placeholder="Select MCP tools…"
                     triggerClassName="rounded-xl"
                   />
+                  {/* Legend */}
+                  <p className="text-[10px] text-slate-400 mt-1.5 flex items-center gap-3">
+                    <span>⚡ STDIO — spawned on-demand</span>
+                    <span>📡 SSE — persistent HTTP server</span>
+                  </p>
                 </div>
               </form>
             </div>
