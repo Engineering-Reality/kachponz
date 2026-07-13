@@ -559,7 +559,7 @@ function extractAuthFailureCause(message: string): UipathContextSummary['authFai
  * (context panel, dashboard drill-down) don't need a full agent run. Caller
  * owns closing the returned client.
  */
-async function connectToMcpToolById(toolId: string, clientName: string): Promise<Client> {
+export async function connectToMcpToolById(toolId: string, clientName: string): Promise<Client> {
   const toolRes = await query<any>('SELECT * FROM tools WHERE tool_id = $1', [toolId]);
   const toolRow = toolRes.rows[0];
   if (!toolRow) throw new Error('Tool not found');

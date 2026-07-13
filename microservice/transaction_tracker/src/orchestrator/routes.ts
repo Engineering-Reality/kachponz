@@ -16,6 +16,8 @@ import { streamHandler } from './a2a/streamHandler.js';
 import { buildAgentCard } from './a2a/agentCard.js';
 import { getMcpManagerState } from './mcpManagerState.js';
 import { resetUiPathTokenCache } from '../lib/uipathAuth.js';
+import { getRecipeById } from './recipes/registry.js';
+import { runRecipeStream } from './recipes/executor.js';
 
 // Daftarkan agent bawaan sekali saat modul dimuat.
 try {
@@ -110,6 +112,33 @@ export async function registerOrchestratorRoutes(app: FastifyInstance): Promise<
       }
       const result = await runAgenticStep(req.auth!, body.transactionId, body.idempotencyKey, body.prompt, body.messages, body.agentId, body.mode, body.sessionLabel);
       return reply.send(result);
+    });
+
+    // POST /orchestrator/recipes/:recipeId/run — Recipe Executor (Loop Mode).
+    // A separate, additive execution path from /orchestrator/run-agentic: a
+    // deterministic state machine runs the mechanical trigger->wait->verify
+    // chain with no LLM call, calling the model only at bounded fault-
+    // classification decision points. See loop.md for the full rationale.
+    typedSecured.post('/orchestrator/recipes/:recipeId/run', {
+      schema: {
+        params: z.object({ recipeId: SAFE_SLUG }).strict(),
+        body: z.object({
+          agentId: z.string().uuid(),
+          iterations: z.number().int().min(1).max(20),
+          folderId: z.string().optional(),
+        }).strict(),
+      },
+    }, async (req, reply) => {
+      const { recipeId } = req.params as { recipeId: string };
+      const body = req.body as { agentId: string; iterations: number; folderId?: string };
+
+      const recipe = getRecipeById(recipeId);
+      if (!recipe) {
+        return reply.code(404).send({ error: { code: 'RECIPE_NOT_FOUND', message: `No recipe registered for id ${recipeId}` } });
+      }
+
+      reply.hijack();
+      await runRecipeStream(recipe, { agentId: body.agentId, iterations: body.iterations, folderId: body.folderId }, reply);
     });
 
     // GET /orchestrator/agents — daftar agent terdaftar & kapabilitasnya.
