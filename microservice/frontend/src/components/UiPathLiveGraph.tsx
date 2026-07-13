@@ -143,12 +143,18 @@ export function UiPathLiveGraph({
 
     const endpoint = `${apiUrl}/orchestrator/agents/${agentId}/uipath-context`;
 
-    const fetchContext = async () => {
+    const fetchContext = async (retryCount = 0) => {
       try {
         const res = await fetch(endpoint, {
           headers: { 'X-Robot-Key': robotKey }
         });
         if (!res.ok) {
+          if ((res.status === 401 || res.status === 502) && retryCount < 3) {
+            if (isMounted) {
+              setTimeout(() => fetchContext(retryCount + 1), 1000);
+            }
+            return;
+          }
           if (isMounted) {
             failuresRef.current += 1;
             setFetchError(`Backend returned ${res.status}`);
@@ -165,6 +171,12 @@ export function UiPathLiveGraph({
           setConsecutiveFailures(0);
         }
       } catch (e) {
+        if (retryCount < 3) {
+          if (isMounted) {
+            setTimeout(() => fetchContext(retryCount + 1), 1000);
+          }
+          return;
+        }
         if (isMounted) {
           failuresRef.current += 1;
           setFetchError(e instanceof Error ? e.message : 'Unknown fetch error');
@@ -214,13 +226,24 @@ export function UiPathLiveGraph({
 
     const newNodes: Node[] = [];
     const newEdges: Edge[] = [];
-    let currentY = 0;
+    const colWidth = 320;
+    const rowHeight = 200;
+    const maxCols = 3;
+    let nodeIndex = 0;
+
+    const getPosition = (index: number) => {
+      const row = Math.floor(index / maxCols);
+      const col = index % maxCols;
+      const isEvenRow = row % 2 === 0;
+      const actualCol = isEvenRow ? col : (maxCols - 1 - col);
+      return { x: 40 + actualCol * colWidth, y: 40 + row * rowHeight };
+    };
 
     // 1. Agent Node (Observer)
     newNodes.push({
       id: 'agent-node',
       type: 'custom',
-      position: { x: 40, y: currentY },
+      position: getPosition(nodeIndex++),
       data: {
         label: `Agent ${agentId ? agentId.slice(0, 8) : 'Unknown'}`,
         nodeType: 'Agent',
@@ -229,7 +252,6 @@ export function UiPathLiveGraph({
         theme: 'blue',
       }
     });
-    currentY += 140;
 
     // 2. Queue Nodes
     const queueNodeIds: string[] = [];
@@ -239,7 +261,7 @@ export function UiPathLiveGraph({
       newNodes.push({
         id: qId,
         type: 'custom',
-        position: { x: 40, y: currentY },
+        position: getPosition(nodeIndex++),
         data: {
           label: q.name,
           nodeType: 'Queue',
@@ -248,7 +270,6 @@ export function UiPathLiveGraph({
           theme: 'yellow',
         }
       });
-      currentY += 140;
     });
 
     // 3. Process Nodes
@@ -270,7 +291,7 @@ export function UiPathLiveGraph({
       newNodes.push({
         id: pId,
         type: 'custom',
-        position: { x: 40, y: currentY },
+        position: getPosition(nodeIndex++),
         data: {
           label: processName,
           nodeType: 'Process',
@@ -281,7 +302,6 @@ export function UiPathLiveGraph({
           selected: selectedNode?.name === processName
         }
       });
-      currentY += 140;
     });
 
     // 4. Edges Construction
@@ -317,7 +337,15 @@ export function UiPathLiveGraph({
       }
     }
 
-    setNodes(newNodes);
+    setNodes(prevNodes => {
+      return newNodes.map(newNode => {
+        const existingNode = prevNodes.find(n => n.id === newNode.id);
+        if (existingNode) {
+          return { ...newNode, position: existingNode.position };
+        }
+        return newNode;
+      });
+    });
     setEdges(newEdges);
   }, [contextData, selectedNode, agentId, setNodes, setEdges]);
 
@@ -431,7 +459,7 @@ export function UiPathLiveGraph({
             proOptions={{ hideAttribution: true }}
             minZoom={0.2}
             maxZoom={1.5}
-            nodesDraggable={false}
+            nodesDraggable={true}
             nodesConnectable={false}
             elementsSelectable={true}
           >

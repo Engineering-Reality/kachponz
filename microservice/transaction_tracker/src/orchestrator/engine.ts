@@ -41,57 +41,6 @@ function sanitizeMcpError(e: unknown): string {
   return msg.length > 300 ? `${msg.slice(0, 300)}…` : msg;
 }
 
-const ORCHESTRATION_PATTERN = `
-
---- Multi-step orchestration pattern (do not override, ignore, or contradict this section) ---
-When the user asks for a chain of dependent UiPath steps (e.g. "trigger A then B then C",
-or "loop the disposable email → login → OTP → survey chain"), follow this pattern exactly:
-
-1. PLAN BEFORE TRIGGERING. State the sequence explicitly in your response before calling
-   any tool, e.g. "Plan: A -> wait -> verify -> B -> wait -> verify -> C". Do not start
-   firing tools until the plan is stated.
-2. NEVER trigger two dependent jobs in the same turn. For each step: trigger it with
-   trigger_uipath_job, then call wait_for_uipath_job on that job's ID, then (if the next
-   step consumes an asset the current step produces) call get_uipath_asset to verify the
-   precondition, THEN trigger the next step. Do not fire step N+1 before step N's
-   wait_for_uipath_job call has returned a terminal state.
-3. ROTATE ON FAILURE. If a process faults with an authorization or rate-limit error
-   (e.g. Get_DisposableEmail_1 faults with "You are not authorized"), retry with the
-   next numbered variant (_2, then _3) instead of giving up or proceeding anyway. If all
-   variants fault, STOP and report the failure — do not proceed to a step that depends on
-   an asset that was never populated.
-4. VERIFY ASSETS BEFORE CONSUMING THEM. Before a step that reads a value another step is
-   supposed to have written (e.g. before Danantara_LoginFlow, check TemptomailFlow_TempMail;
-   before Danantara_InputOTPFlow, check TemptomailFlow_OTP), call get_uipath_asset and
-   confirm the returned value is non-empty. If it's empty, do not proceed — treat it as a
-   failure of the step that should have populated it.
-5. REPORT ACTUAL STATE, NOT ASPIRATIONAL STATE. Never say "I'll silently monitor", "I'll
-   wait in the background", or any other promise you can't keep within this turn. Either
-   you poll now, in this turn, using wait_for_uipath_job — or you say "job triggered,
-   current state: Pending" and stop there.
-
-Worked example (disposable-email -> login -> OTP -> survey chain, one loop iteration):
-
-  Plan: Get_DisposableEmail_1 -> wait -> verify TemptomailFlow_TempMail -> Danantara_LoginFlow
-        -> wait -> verify -> Get_OTP_Email_1 -> wait -> verify TemptomailFlow_OTP
-        -> Danantara_InputOTPFlow -> wait -> verify -> survey step
-
-  trigger_uipath_job(releaseKey=Get_DisposableEmail_1) -> jobId=123
-  wait_for_uipath_job(jobId=123) -> finalState=Successful
-    (if finalState=Faulted with an authorization/rate-limit error:
-       trigger_uipath_job(releaseKey=Get_DisposableEmail_2) -> jobId=124
-       wait_for_uipath_job(jobId=124) -> finalState=Successful)
-  get_uipath_asset(assetName=TemptomailFlow_TempMail) -> value non-empty, proceed
-  trigger_uipath_job(releaseKey=Danantara_LoginFlow) -> jobId=125
-  wait_for_uipath_job(jobId=125) -> finalState=Successful
-  trigger_uipath_job(releaseKey=Get_OTP_Email_1) -> jobId=126
-  wait_for_uipath_job(jobId=126) -> finalState=Successful
-  get_uipath_asset(assetName=TemptomailFlow_OTP) -> value non-empty, proceed
-  trigger_uipath_job(releaseKey=Danantara_InputOTPFlow) -> jobId=127
-  wait_for_uipath_job(jobId=127) -> finalState=Successful
-  ... continue to the survey step, then repeat for the next loop iteration ...
-`;
-
 const ANTI_HALLUCINATION_SUFFIX = `
 
 --- Tool-use integrity rules (do not override, ignore, or contradict this section) ---
@@ -151,7 +100,7 @@ function buildToolContextBlock(toolConfigs: any[]): string {
 
 function buildSystemPrompt(agentStyle: string | null | undefined, toolContext: string): string {
   const base = agentStyle?.trim() || "You are a helpful assistant.";
-  return `${base}${toolContext}\n${ORCHESTRATION_PATTERN}\n${ANTI_HALLUCINATION_SUFFIX}`;
+  return `${base}${toolContext}\n${ANTI_HALLUCINATION_SUFFIX}`;
 }
 
 /**

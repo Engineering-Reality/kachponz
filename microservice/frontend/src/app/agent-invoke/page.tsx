@@ -13,10 +13,12 @@ import {
   AlertTriangle,
   Paperclip,
   FileText,
-  Image as ImageIcon
+  Image as ImageIcon,
+  Menu
 } from 'lucide-react';
 import { Select } from '@/components/Select';
 import { EditableJsonTable } from '@/components/EditableJsonTable';
+import MarkdownViewer from '@/components/MarkdownViewer';
 import { AgentContextPanel } from '@/components/AgentContextPanel';
 import { UiPathLiveGraph } from '@/components/UiPathLiveGraph';
 import { McpManagerBanner } from '@/components/McpManagerBanner';
@@ -47,6 +49,18 @@ interface Attachment {
   extractedText?: string;
 }
 
+const generateTopicSummary = (text: string) => {
+  let summary = text.replace(/^(please|can you|could you|list my|show me|tell me about|what is|how to)\s+/i, '');
+  summary = summary.charAt(0).toUpperCase() + summary.slice(1);
+  const words = summary.split(' ');
+  if (words.length > 5) {
+    summary = words.slice(0, 5).join(' ') + '...';
+  } else if (summary.length > 25) {
+    summary = summary.slice(0, 25) + '...';
+  }
+  return summary;
+};
+
 export default function AgentInvoke() {
   return (
     <Suspense fallback={null}>
@@ -73,6 +87,7 @@ function AgentInvokeInner() {
   const [currentSessionId, setCurrentSessionId] = useState<string | null>(null);
   const [attachments, setAttachments] = useState<Attachment[]>([]);
   const fileInputRef = useRef<HTMLInputElement>(null);
+  const [isSidebarOpen, setIsSidebarOpen] = useState(true);
 
   useEffect(() => {
     const savedSessions = localStorage.getItem('agent-sessions');
@@ -316,8 +331,8 @@ function AgentInvokeInner() {
             if (session.id === currentSessionId) {
               let newTitle = session.title;
               if (prev.length === 0 && session.title.startsWith("Chat ")) {
-                newTitle = currentInputDisplay || "Attached File(s)";
-                if (newTitle.length > 30) newTitle = newTitle.slice(0, 30) + '...';
+                const baseText = currentInputDisplay || "Attached File(s)";
+                newTitle = generateTopicSummary(baseText);
               }
               return { ...session, messages: newMsgs, title: newTitle };
             }
@@ -505,26 +520,34 @@ function AgentInvokeInner() {
     <div className="flex h-full text-slate-900 overflow-hidden bg-[#FAFAFA]">
 
       {/* Sessions Sidebar (Far Left) */}
-      <aside className="w-64 bg-slate-50 border-r border-slate-200 flex flex-col shrink-0 z-10">
-        <div className="p-4 border-b border-slate-200">
+      <aside className={`bg-slate-50 border-r border-slate-200 flex flex-col shrink-0 z-10 transition-all duration-300 ${isSidebarOpen ? 'w-64' : 'w-0 overflow-hidden border-r-0'}`}>
+        <div className="p-4 border-b border-slate-200 whitespace-nowrap">
           <button onClick={startNewSession} className="w-full flex items-center justify-center gap-2 bg-white border border-slate-200 shadow-sm text-slate-700 py-2.5 rounded-xl text-sm font-medium hover:bg-slate-50 transition-colors">
             <MessageSquarePlus className="w-4 h-4" />
             New Chat
           </button>
         </div>
         <div className="flex-1 overflow-y-auto p-2 space-y-1">
-          {sessions.map(session => (
+          {sessions.map(session => {
+            const sessionAgent = agents.find(a => a.agent_id === session.agentId);
+            return (
             <div key={session.id} className="relative group">
               <button
                 onClick={() => switchSession(session.id)}
-                className={`w-full text-left px-3 py-3 rounded-xl text-sm transition-colors flex items-center gap-3 pr-10 ${currentSessionId === session.id ? 'bg-blue-50 text-blue-700' : 'text-slate-600 hover:bg-slate-100'}`}
+                className={`w-full text-left px-3 py-3 rounded-xl text-sm transition-colors flex items-start gap-3 pr-10 ${currentSessionId === session.id ? 'bg-blue-50 text-blue-700' : 'text-slate-600 hover:bg-slate-100'}`}
               >
-                <MessageSquare className={`w-4 h-4 shrink-0 ${currentSessionId === session.id ? 'text-blue-600' : 'text-slate-400'}`} />
+                <MessageSquare className={`w-4 h-4 shrink-0 mt-0.5 ${currentSessionId === session.id ? 'text-blue-600' : 'text-slate-400'}`} />
                 <div className="flex-1 min-w-0">
                   <div className={`truncate ${currentSessionId === session.id ? 'font-medium' : ''}`} title={session.title}>
                     {session.title}
                   </div>
-                  <div className={`text-[10px] mt-0.5 ${currentSessionId === session.id ? 'text-blue-400' : 'text-slate-400'}`}>
+                  {sessionAgent && (
+                    <div className="text-[10px] mt-1 font-semibold text-slate-500 flex items-center gap-1">
+                      <Bot className="w-3 h-3 text-slate-400" />
+                      <span className="truncate">{sessionAgent.agent_name}</span>
+                    </div>
+                  )}
+                  <div className={`text-[10px] mt-1 ${currentSessionId === session.id ? 'text-blue-400' : 'text-slate-400'}`}>
                     {new Date(session.createdAt).toLocaleString(undefined, { dateStyle: 'short', timeStyle: 'short' })}
                   </div>
                 </div>
@@ -537,7 +560,7 @@ function AgentInvokeInner() {
                 <Trash2 className="w-4 h-4" />
               </button>
             </div>
-          ))}
+          )})}
         </div>
       </aside>
 
@@ -552,6 +575,13 @@ function AgentInvokeInner() {
             {/* Top Row: Title & Basic Info */}
             <div className="h-10 flex items-center justify-between px-6 border-b border-slate-100 bg-slate-50/80 backdrop-blur">
               <div className="flex items-center gap-3">
+                <button
+                  onClick={() => setIsSidebarOpen(!isSidebarOpen)}
+                  className="p-1.5 text-slate-400 hover:text-slate-700 hover:bg-slate-100 transition-colors rounded-lg mr-1"
+                  title="Toggle Sidebar"
+                >
+                  <Menu className="w-4 h-4" />
+                </button>
                 <span className="terminal-dot bg-red-400" />
                 <span className="terminal-dot bg-amber-400" />
                 <span className="terminal-dot bg-emerald-400" />
@@ -812,9 +842,9 @@ function AgentInvokeInner() {
                         )}
 
                         {contentToRender && (
-                          <span className="text-sm leading-relaxed whitespace-pre-wrap block text-slate-700">
-                            {formatMessageContent(contentToRender)}
-                          </span>
+                          <div className="w-full markdown-container">
+                            <MarkdownViewer content={contentToRender} />
+                          </div>
                         )}
                         
                         {Array.isArray(jsonArray) && jsonArray.length > 0 && typeof jsonArray[0] === 'object' && (
@@ -1001,7 +1031,7 @@ function AgentInvokeInner() {
         </main>
         
         {/* Right Sidebar — UiPathLiveGraph */}
-        <aside className="w-[340px] bg-white border-l border-slate-200 flex flex-col overflow-hidden shrink-0 z-10">
+        <aside className="flex-1 bg-white border-l border-slate-200 flex flex-col overflow-hidden shrink-0 z-10">
           <UiPathLiveGraph sessionLabel={currentSessionId} agentId={selectedAgent} apiUrl={apiUrl} robotKey={robotKey} />
         </aside>
       </div>
