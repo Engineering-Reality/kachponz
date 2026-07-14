@@ -537,10 +537,7 @@ export default function ToolsPage() {
               <button
                 key={tab.id}
                 onClick={() => setMethodFilter(tab.id)}
-                className={`text-xs font-semibold px-3 py-1.5 rounded-lg border transition-all ${methodFilter === tab.id
-                  ? "bg-slate-900 border-slate-950 text-white shadow-sm"
-                  : "bg-white border-slate-200 text-slate-500 hover:text-slate-700 hover:bg-slate-50"
-                  }`}
+                className={`text-xs font-semibold px-3 py-1.5 rounded-lg border transition-all ${methodFilter === tab.id ? "bg-slate-900 border-slate-950 text-white shadow-sm" : "bg-white border-slate-200 text-slate-500 hover:text-slate-700 hover:bg-slate-50" }`}
               >
                 {tab.label}
               </button>
@@ -553,7 +550,7 @@ export default function ToolsPage() {
       {loading ? (
         <div className="flex flex-col items-center justify-center py-24">
           <RainbowRibbonLoader />
-          <p className="mt-4 text-xs font-mono text-slate-400 uppercase tracking-widest">Loading Smithery Registry…</p>
+          <p className="mt-4 text-xs font-mono text-slate-400">Loading Smithery Registry…</p>
         </div>
       ) : error ? (
         <div className="rounded-xl border border-red-100 bg-red-50 p-6 text-sm text-red-700">
@@ -619,7 +616,7 @@ export default function ToolsPage() {
                         <span className={`w-1.5 h-1.5 rounded-full mr-1 inline-block ${isActive ? "bg-green-500 animate-pulse" : "bg-slate-400"}`} />
                         {isActive ? "Active" : "Offline"}
                       </span>
-                      <span className="text-[10px] font-mono text-slate-400">Transport: <span className="uppercase font-bold text-slate-600">{method}</span></span>
+                      <span className="text-[10px] font-mono text-slate-400">Transport: <span className="font-bold text-slate-600">{method}</span></span>
                     </div>
                   </div>
                 </div>
@@ -911,11 +908,7 @@ export default function ToolsPage() {
                             key={opt.value}
                             type="button"
                             onClick={() => setAuthFormData({ ...authFormData, transportMethod: opt.value })}
-                            className={`flex-1 flex flex-col items-center gap-0.5 py-2.5 px-3 rounded-xl border text-xs font-semibold transition-all ${
-                              authFormData.transportMethod === opt.value
-                                ? "bg-slate-900 border-slate-900 text-white shadow-md"
-                                : "bg-white border-slate-200 text-slate-500 hover:border-slate-300 hover:text-slate-700"
-                            }`}
+                            className={`flex-1 flex flex-col items-center gap-0.5 py-2.5 px-3 rounded-xl border text-xs font-semibold transition-all ${ authFormData.transportMethod === opt.value ? "bg-slate-900 border-slate-900 text-white shadow-md" : "bg-white border-slate-200 text-slate-500 hover:border-slate-300 hover:text-slate-700" }`}
                           >
                             <span className="text-base">{opt.icon}</span>
                             <span>{opt.label}</span>

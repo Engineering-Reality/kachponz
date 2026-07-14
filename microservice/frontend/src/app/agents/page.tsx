@@ -165,7 +165,7 @@ export default function AgentsPage() {
             <Bot className="w-4 h-4 text-slate-400 absolute left-3 top-3" />
           </div>
           <div className="flex items-center gap-2 w-full md:w-auto overflow-x-auto pb-1 md:pb-0">
-            <span className="text-xs font-mono uppercase tracking-wider text-slate-400 mr-2 flex-shrink-0">Filter Status:</span>
+            <span className="text-xs font-mono text-slate-400 mr-2 flex-shrink-0">Filter Status:</span>
             {[
               { id: "all", label: `All (${agents.length})` },
               { id: "online", label: `Online (${agents.filter(a => a.on_status).length})` },
@@ -174,10 +174,7 @@ export default function AgentsPage() {
               <button
                 key={tab.id}
                 onClick={() => setStatusFilter(tab.id)}
-                className={`text-xs font-semibold px-3 py-1.5 rounded-lg border transition-all ${statusFilter === tab.id
-                  ? "bg-violet-50 border-violet-200 text-violet-700 shadow-sm"
-                  : "bg-white border-slate-200 text-slate-500 hover:text-slate-700 hover:bg-slate-50"
-                  }`}
+                className={`text-xs font-semibold px-3 py-1.5 rounded-lg border transition-all ${statusFilter === tab.id ? "bg-violet-50 border-violet-200 text-violet-700 shadow-sm" : "bg-white border-slate-200 text-slate-500 hover:text-slate-700 hover:bg-slate-50" }`}
               >
                 {tab.label}
               </button>
@@ -190,7 +187,7 @@ export default function AgentsPage() {
       {loading ? (
         <div className="flex flex-col items-center justify-center py-24">
           <RainbowRibbonLoader />
-          <p className="mt-4 text-xs font-mono text-slate-400 uppercase tracking-widest">Loading Agent Garden…</p>
+          <p className="mt-4 text-xs font-mono text-slate-400">Loading Agent Garden…</p>
         </div>
       ) : error ? (
         <div className="rounded-xl border border-red-100 bg-red-50 p-6 text-sm text-red-700">
@@ -267,7 +264,7 @@ export default function AgentsPage() {
 
                 {/* System Prompt Code Box */}
                 <div className="mb-4 bg-slate-50 border border-slate-100 rounded-xl p-3 flex flex-col gap-1">
-                  <div className="flex justify-between items-center text-[9px] font-mono uppercase tracking-wider text-slate-400">
+                  <div className="flex justify-between items-center text-[9px] font-mono text-slate-400">
                     <span>System Prompt / Personality</span>
                     <span>Configuration</span>
                   </div>
@@ -279,15 +276,15 @@ export default function AgentsPage() {
                 {/* Garden Metrics Row */}
                 <div className="grid grid-cols-3 gap-2 py-3 border-t border-b border-slate-100 mb-4 bg-slate-50/50 rounded-xl px-2">
                   <div className="text-center">
-                    <p className="text-[9px] font-mono uppercase tracking-wider text-slate-400">Invocations</p>
+                    <p className="text-[9px] font-mono text-slate-400">Invocations</p>
                     <p className="text-sm font-bold text-slate-800 mt-0.5">{metrics.runs} runs</p>
                   </div>
                   <div className="text-center border-x border-slate-100">
-                    <p className="text-[9px] font-mono uppercase tracking-wider text-slate-400">Avg Latency</p>
+                    <p className="text-[9px] font-mono text-slate-400">Avg Latency</p>
                     <p className="text-sm font-bold text-slate-800 mt-0.5">{metrics.latency}s</p>
                   </div>
                   <div className="text-center">
-                    <p className="text-[9px] font-mono uppercase tracking-wider text-slate-400">Success Rate</p>
+                    <p className="text-[9px] font-mono text-slate-400">Success Rate</p>
                     <p className="text-sm font-bold text-slate-800 mt-0.5">{metrics.successRate}%</p>
                   </div>
                 </div>
@@ -321,7 +318,7 @@ export default function AgentsPage() {
                   )}
                   <div className="mt-4 pt-3 border-t border-slate-100 flex justify-end">
                     <Link
-                      href={`/agent-invoke?agent=${encodeURIComponent(agent.agent_name || "")}`}
+                      href={`/playground?agent=${encodeURIComponent(agent.agent_name || "")}`}
                       className="text-xs font-semibold text-violet-600 hover:underline"
                     >
                       → Invoke

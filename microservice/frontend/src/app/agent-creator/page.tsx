@@ -90,11 +90,7 @@ export default function AgentCreator() {
                   </div>
                 )}
                 <div
-                  className={`px-4 py-3 rounded-2xl max-w-[80%] text-sm leading-relaxed shadow-sm ${
-                    msg.role === "user"
-                      ? "bg-slate-900 text-white rounded-tr-sm"
-                      : "bg-white border border-slate-200 text-slate-800 rounded-tl-sm"
-                  }`}
+                  className={`px-4 py-3 rounded-2xl max-w-[80%] text-sm leading-relaxed shadow-sm ${ msg.role === "user" ? "bg-slate-900 text-white rounded-tr-sm" : "bg-white border border-slate-200 text-slate-800 rounded-tl-sm" }`}
                 >
                   {msg.content}
                 </div>

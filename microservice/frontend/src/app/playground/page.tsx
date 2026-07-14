@@ -87,15 +87,51 @@ const generateTopicSummary = (text: string) => {
   return summary;
 };
 
-export default function AgentInvoke() {
+function groupSessionsByDate(sessions: ChatSession[]) {
+  const groups: Record<string, ChatSession[]> = {
+    'Today': [],
+    'Yesterday': [],
+    'Previous 7 Days': [],
+    'Previous 30 Days': [],
+    'Older': []
+  };
+
+  const now = new Date();
+  const today = new Date(now.getFullYear(), now.getMonth(), now.getDate());
+  const yesterday = new Date(today);
+  yesterday.setDate(today.getDate() - 1);
+  const last7Days = new Date(today);
+  last7Days.setDate(today.getDate() - 7);
+  const last30Days = new Date(today);
+  last30Days.setDate(today.getDate() - 30);
+
+  sessions.forEach(session => {
+    const d = new Date(session.createdAt);
+    if (d >= today) {
+      groups['Today'].push(session);
+    } else if (d >= yesterday) {
+      groups['Yesterday'].push(session);
+    } else if (d >= last7Days) {
+      groups['Previous 7 Days'].push(session);
+    } else if (d >= last30Days) {
+      groups['Previous 30 Days'].push(session);
+    } else {
+      groups['Older'].push(session);
+    }
+  });
+
+  return groups;
+}
+
+export default function Playground() {
   return (
     <Suspense fallback={null}>
-      <AgentInvokeInner />
+      <PlaygroundInner />
     </Suspense>
   );
 }
 
-function AgentInvokeInner() {
+function PlaygroundInner() {
   const searchParams = useSearchParams();
   const preselectAgent = searchParams.get('agent');
   const [input, setInput] = useState('');
@@ -231,7 +267,7 @@ function AgentInvokeInner() {
     fetchAgentsAndTools();
   }, [apiUrl, robotKey]);
 
-  // Pre-select agent from ?agent= query param (e.g. /agent-invoke?agent=orchestrator)
+  // Pre-select agent from ?agent= query param (e.g. /playground?agent=orchestrator)
   // by loose name match, since we don't know the generated agent_id ahead of time.
   useEffect(() => {
     if (!preselectAgent || selectedAgent || agents.length === 0) return;
@@ -630,40 +666,36 @@ function AgentInvokeInner() {
             New Chat
           </button>
         </div>
-        <div className="flex-1 overflow-y-auto p-2 space-y-1">
-          {sessions.map(session => {
-            const sessionAgent = agents.find(a => a.agent_id === session.agentId);
+        <div className="flex-1 overflow-y-auto p-2 space-y-4">
+          {Object.entries(groupSessionsByDate(sessions)).map(([groupName, groupSessions]) => {
+            if (groupSessions.length === 0) return null;
             return (
-            <div key={session.id} className="relative group">
-              <button
-                onClick={() => switchSession(session.id)}
-                className={`w-full text-left px-3 py-3 rounded-xl text-sm transition-colors flex items-start gap-3 pr-10 ${currentSessionId === session.id ? 'bg-blue-50 text-blue-700' : 'text-slate-600 hover:bg-slate-100'}`}
-              >
-                <MessageSquare className={`w-4 h-4 shrink-0 mt-0.5 ${currentSessionId === session.id ? 'text-blue-600' : 'text-slate-400'}`} />
-                <div className="flex-1 min-w-0">
-                  <div className={`truncate ${currentSessionId === session.id ? 'font-medium' : ''}`} title={session.title}>
-                    {session.title}
-                  </div>
-                  {sessionAgent && (
-                    <div className="text-[10px] mt-1 font-semibold text-slate-500 flex items-center gap-1">
-                      <Bot className="w-3 h-3 text-slate-400" />
-                      <span className="truncate">{sessionAgent.agent_name}</span>
-                    </div>
-                  )}
-                  <div className={`text-[10px] mt-1 ${currentSessionId === session.id ? 'text-blue-400' : 'text-slate-400'}`}>
-                    {new Date(session.createdAt).toLocaleString(undefined, { dateStyle: 'short', timeStyle: 'short' })}
-                  </div>
+              <div key={groupName} className="space-y-1">
+                <div className="px-3 py-1 text-[11px] font-semibold text-slate-400">
+                  {groupName}
                 </div>
-              </button>
-              <button
-                onClick={(e) => { e.stopPropagation(); deleteSession(session.id); }}
-                className="absolute right-2 top-1/2 -translate-y-1/2 p-1.5 text-slate-400 hover:text-red-500 hover:bg-red-50 rounded-lg opacity-0 group-hover:opacity-100 transition-opacity"
-                title="Delete Chat"
-              >
-                <Trash2 className="w-4 h-4" />
-              </button>
-            </div>
-          )})}
+                {groupSessions.map(session => (
+                  <div key={session.id} className="relative group px-1">
+                    <button
+                      onClick={() => switchSession(session.id)}
+                      className={`w-full text-left px-3 py-2 rounded-xl text-[13px] transition-colors flex items-center gap-2 pr-8 ${currentSessionId === session.id ? 'bg-slate-200/50 text-slate-900 font-medium' : 'text-slate-600 hover:bg-slate-200/30'}`}
+                    >
+                      <div className="flex-1 min-w-0 truncate" title={session.title}>
+                        {session.title}
+                      </div>
+                    </button>
+                    <button
+                      onClick={(e) => { e.stopPropagation(); deleteSession(session.id); }}
+                      className={`absolute right-3 top-1/2 -translate-y-1/2 p-1.5 text-slate-400 hover:text-red-500 rounded-lg transition-opacity ${currentSessionId === session.id ? 'opacity-100' : 'opacity-0 group-hover:opacity-100'}`}
+                      title="Delete Chat"
+                    >
+                      <Trash2 className="w-3.5 h-3.5" />
+                    </button>
+                  </div>
+                ))}
+              </div>
+            );
+          })}
         </div>
       </aside>
 
@@ -794,12 +826,7 @@ function AgentInvokeInner() {
                     <h3 className="text-sm font-semibold text-slate-800">Danantara Survey Loop</h3>
                     <p className="text-xs text-slate-500 mt-0.5">Recipe Executor — deterministic run, no chat turns.</p>
                   </div>
-                  <span className={`text-[10px] font-semibold px-2 py-1 rounded-full ${
-                    recipeState?.status === 'completed' ? 'bg-emerald-50 text-emerald-700 border border-emerald-200'
-                    : recipeState?.status === 'failed' ? 'bg-red-50 text-red-700 border border-red-200'
-                    : recipeRunning ? 'bg-amber-50 text-amber-700 border border-amber-200'
-                    : 'bg-slate-50 text-slate-500 border border-slate-200'
-                  }`}>
+                  <span className={`text-[10px] font-semibold px-2 py-1 rounded-full ${ recipeState?.status === 'completed' ? 'bg-emerald-50 text-emerald-700 border border-emerald-200' : recipeState?.status === 'failed' ? 'bg-red-50 text-red-700 border border-red-200' : recipeRunning ? 'bg-amber-50 text-amber-700 border border-amber-200' : 'bg-slate-50 text-slate-500 border border-slate-200' }`}>
                     {recipeState?.status ?? (recipeRunning ? 'starting' : 'idle')}
                   </span>
                 </div>
@@ -872,11 +899,7 @@ function AgentInvokeInner() {
                         {recipeState.iterationResults.map((r) => (
                           <div
                             key={r.iteration}
-                            className={`flex items-start gap-2 text-xs p-2.5 rounded-lg border ${
-                              r.status === 'success' ? 'border-emerald-100 bg-emerald-50 text-emerald-700'
-                              : r.status === 'failed' ? 'border-red-100 bg-red-50 text-red-700'
-                              : 'border-amber-100 bg-amber-50 text-amber-700'
-                            }`}
+                            className={`flex items-start gap-2 text-xs p-2.5 rounded-lg border ${ r.status === 'success' ? 'border-emerald-100 bg-emerald-50 text-emerald-700' : r.status === 'failed' ? 'border-red-100 bg-red-50 text-red-700' : 'border-amber-100 bg-amber-50 text-amber-700' }`}
                           >
                             <span className="font-mono font-semibold shrink-0">#{r.iteration}</span>
                             <span className="flex-1">{r.detail}</span>

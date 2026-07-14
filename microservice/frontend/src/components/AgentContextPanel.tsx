@@ -94,7 +94,7 @@ export function AgentContextPanel({ agentId, apiUrl, robotKey }: AgentContextPan
             {t.error ? (
               <div className="flex items-start gap-1.5">
                 {t.authFailureCause && (
-                  <span className={`shrink-0 px-1.5 py-0.5 rounded text-[10px] font-medium uppercase tracking-wide ${AUTH_FAILURE_BADGE[t.authFailureCause].className}`}>
+                  <span className={`shrink-0 px-1.5 py-0.5 rounded text-[10px] font-medium tracking-wide ${AUTH_FAILURE_BADGE[t.authFailureCause].className}`}>
                     {AUTH_FAILURE_BADGE[t.authFailureCause].label}
                   </span>
                 )}

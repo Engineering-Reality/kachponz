@@ -60,8 +60,8 @@ export function ParticleBackground() {
         this.x += this.vx;
         this.y += this.vy;
         
-        if (this.x < 0 || this.x > canvas.width) this.vx *= -1;
-        if (this.y < 0 || this.y > canvas.height) this.vy *= -1;
+        if (this.x < 0 || this.x > canvas!.width) this.vx *= -1;
+        if (this.y < 0 || this.y > canvas!.height) this.vy *= -1;
         
         const dx = mouse.x - this.x;
         const dy = mouse.y - this.y;
@@ -96,7 +96,7 @@ export function ParticleBackground() {
 
     const init = () => {
       particles = [];
-      const numParticles = Math.min(Math.floor((canvas.width * canvas.height) / 10000), 120);
+      const numParticles = Math.min(Math.floor((canvas!.width * canvas!.height) / 10000), 120);
       for (let i = 0; i < numParticles; i++) {
         particles.push(new Particle());
       }
@@ -106,7 +106,7 @@ export function ParticleBackground() {
     window.addEventListener("resize", setSize);
 
     const animate = () => {
-      ctx.clearRect(0, 0, canvas.width, canvas.height);
+      ctx.clearRect(0, 0, canvas!.width, canvas!.height);
       
       for (let i = 0; i < particles.length; i++) {
         particles[i].update();

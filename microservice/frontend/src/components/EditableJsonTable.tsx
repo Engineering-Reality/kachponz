@@ -38,7 +38,7 @@ export function EditableJsonTable({ initialData, onSave }: EditableJsonTableProp
   return (
     <div className="mt-4 bg-white border border-slate-200 rounded-xl overflow-hidden shadow-sm relative">
       <div className="flex justify-between items-center bg-slate-50 border-b border-slate-200 px-3 py-2">
-        <span className="text-xs font-semibold text-slate-500 uppercase tracking-wider">Extracted Data</span>
+        <span className="text-xs font-semibold text-slate-500">Extracted Data</span>
         <div className="flex gap-2">
           {!isEditing ? (
             <button 
@@ -70,7 +70,7 @@ export function EditableJsonTable({ initialData, onSave }: EditableJsonTableProp
           <thead className="bg-slate-50/50 border-b border-slate-100">
             <tr>
               {keys.map(k => (
-                <th key={k} className="px-3 py-2 font-semibold text-slate-600 uppercase tracking-wider whitespace-nowrap">
+                <th key={k} className="px-3 py-2 font-semibold text-slate-600 whitespace-nowrap">
                   {k}
                 </th>
               ))}

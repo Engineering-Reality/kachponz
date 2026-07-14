@@ -113,7 +113,7 @@ graph TD
     UMCP <-->|"OAuth2 + OData"| Cloud
 ```
 
-When accessed via the **Agent Invoke** surface, this engine utilizes `agent.stream({ streamMode: "values" })` to pipe LLM reasoning tokens and tool-call states over Server-Sent Events (SSE) directly to the Next.js UI in real time.
+When accessed via the **Playground** surface, this engine utilizes `agent.stream({ streamMode: "values" })` to pipe LLM reasoning tokens and tool-call states over Server-Sent Events (SSE) directly to the Next.js UI in real time.
 
 ---
 

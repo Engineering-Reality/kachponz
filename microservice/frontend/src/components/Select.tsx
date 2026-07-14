@@ -148,9 +148,7 @@ export function Select({
                     onChange(o.value);
                     setOpen(false);
                   }}
-                  className={`w-full flex items-center justify-between gap-2 px-3 py-2 text-sm text-left transition-colors ${
-                    isSel ? "bg-slate-50 text-slate-900 font-medium" : "text-slate-600 hover:bg-slate-50"
-                  }`}
+                  className={`w-full flex items-center justify-between gap-2 px-3 py-2 text-sm text-left transition-colors ${ isSel ? "bg-slate-50 text-slate-900 font-medium" : "text-slate-600 hover:bg-slate-50" }`}
                 >
                   <span className="min-w-0 flex flex-col">
                     <span className="truncate">{o.label}</span>
@@ -256,14 +254,10 @@ export function MultiSelect({
                   key={o.value}
                   type="button"
                   onClick={() => toggle(o.value)}
-                  className={`w-full flex items-center gap-2.5 px-3 py-2 text-sm text-left transition-colors ${
-                    isSel ? "bg-slate-50 text-slate-900" : "text-slate-600 hover:bg-slate-50"
-                  }`}
+                  className={`w-full flex items-center gap-2.5 px-3 py-2 text-sm text-left transition-colors ${ isSel ? "bg-slate-50 text-slate-900" : "text-slate-600 hover:bg-slate-50" }`}
                 >
                   <span
-                    className={`w-4 h-4 rounded flex items-center justify-center flex-shrink-0 border ${
-                      isSel ? "vibrant-rainbow-bg border-transparent" : "border-slate-300 bg-white"
-                    }`}
+                    className={`w-4 h-4 rounded flex items-center justify-center flex-shrink-0 border ${ isSel ? "vibrant-rainbow-bg border-transparent" : "border-slate-300 bg-white" }`}
                   >
                     {isSel && <Check className="w-3 h-3 text-white" />}
                   </span>

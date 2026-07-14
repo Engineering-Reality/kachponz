@@ -22,7 +22,7 @@ export default function DocsIndex() {
         <div className="space-y-10">
           {DOCS_NAV.map((group) => (
             <div key={group.title}>
-              <h2 className="text-xs font-bold uppercase tracking-widest text-slate-400 mb-3">
+              <h2 className="text-xs font-bold text-slate-400 mb-3">
                 {group.title}
               </h2>
               <div className="grid grid-cols-1 md:grid-cols-2 gap-3">

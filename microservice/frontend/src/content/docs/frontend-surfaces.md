@@ -10,7 +10,7 @@ The Amadeus platform provides a unified Next.js App Router console (`microservic
 | `/` | Landing page featuring the Live Settlement Graph and architecture highlights. | — |
 | `/dashboard` | Advanced Transaction Ledger. Provides split views for transaction lists, immutable event logs, A2A interaction history, and flow graphs. | `transaction_tracker` REST (`/transactions`) |
 | `/dashboard/amadeus` | Executive overview dashboard with KPI cards and a clickable state-machine pipeline view. | `transaction_tracker` REST (Polled every 5s) |
-| `/agent-invoke` | The primary interactive console. Streams real-time LangGraph agent reasoning over a selected transaction via SSE. Features a system log for raw tool execution output. | `transaction_tracker` (`/orchestrator/run-agentic`) |
+| `/playground` | The primary interactive console. Streams real-time LangGraph agent reasoning over a selected transaction via SSE. Features a system log for raw tool execution output. | `transaction_tracker` (`/orchestrator/run-agentic`) |
 | `/agent-creator` | Interactive UX for designing new agents via natural language descriptions, featuring an "LC Settlement Orchestrator" preset. | — |
 | `/agents` | Agent Matrix registry. Used to define personas (`agent_style`) and assign specific MCP tools to the LangGraph agents. | `transaction_tracker` REST (`/agents`) |
 | `/tools` | MCP Tool Registry. Used to configure dynamic MCP connections (SSE or STDIO) and manage their active states. | `transaction_tracker` REST (`/tools`) |

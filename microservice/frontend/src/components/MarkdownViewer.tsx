@@ -60,19 +60,12 @@ function parseAlert(text: string) {
 
 export default function MarkdownViewer({ content }: { content: string }) {
   return (
-    <div className="prose prose-slate prose-lg max-w-none
-      prose-headings:font-extrabold prose-headings:tracking-tight prose-headings:text-slate-900
-      prose-a:text-indigo-600 hover:prose-a:text-indigo-800
-      prose-blockquote:border-l-4 prose-blockquote:border-indigo-500 prose-blockquote:bg-indigo-50 prose-blockquote:py-1 prose-blockquote:px-6 prose-blockquote:rounded-r-lg prose-blockquote:not-italic prose-blockquote:text-slate-700
-      prose-th:bg-slate-100 prose-th:px-4 prose-th:py-3 prose-th:border prose-th:border-slate-200
-      prose-td:px-4 prose-td:py-3 prose-td:border prose-td:border-slate-200
-      prose-table:border-collapse prose-table:w-full
-    ">
+    <div className="prose prose-slate prose-lg max-w-none prose-headings:font-extrabold prose-headings:tracking-tight prose-headings:text-slate-900 prose-a:text-indigo-600 hover:prose-a:text-indigo-800 prose-blockquote:border-l-4 prose-blockquote:border-indigo-500 prose-blockquote:bg-indigo-50 prose-blockquote:py-1 prose-blockquote:px-6 prose-blockquote:rounded-r-lg prose-blockquote:not-italic prose-blockquote:text-slate-700 prose-th:bg-slate-100 prose-th:px-4 prose-th:py-3 prose-th:border prose-th:border-slate-200 prose-td:px-4 prose-td:py-3 prose-td:border prose-td:border-slate-200 prose-table:border-collapse prose-table:w-full">
       <ReactMarkdown
         remarkPlugins={[remarkGfm]}
         components={{
           code(props) {
-            const {children, className, node, ...rest} = props
+            const {children, className, node, ref, ...rest} = props
             const match = /language-(\w+)/.exec(className || '')
             const isMermaid = match && match[1] === 'mermaid';
             
@@ -84,7 +77,7 @@ export default function MarkdownViewer({ content }: { content: string }) {
               return (
                 <div className="rounded-xl overflow-hidden shadow-2xl my-6 border border-[#2d2d2d] bg-[#1e1e1e]">
                   <div className="bg-[#252526] px-4 py-2.5 text-xs font-sans text-[#cccccc] border-b border-[#3c3c3c] flex items-center justify-between">
-                    <span className="font-semibold tracking-wide uppercase">{match[1]}</span>
+                    <span className="font-semibold tracking-wide">{match[1]}</span>
                     <div className="flex gap-2">
                       <div className="w-2.5 h-2.5 rounded-full bg-[#ff5f56]"></div>
                       <div className="w-2.5 h-2.5 rounded-full bg-[#ffbd2e]"></div>

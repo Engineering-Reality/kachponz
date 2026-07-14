@@ -13,7 +13,7 @@ export function DocsSidebar() {
       <div className="p-5">
         <Link
           href="/"
-          className="inline-flex items-center gap-1.5 text-slate-400 hover:text-slate-900 text-xs font-mono uppercase tracking-wider mb-6 transition-colors"
+          className="inline-flex items-center gap-1.5 text-slate-400 hover:text-slate-900 text-xs font-mono mb-6 transition-colors"
         >
           <ArrowLeft className="w-3.5 h-3.5" /> Back to Home
         </Link>
@@ -27,7 +27,7 @@ export function DocsSidebar() {
         <nav className="space-y-6">
           {DOCS_NAV.map((group) => (
             <div key={group.title}>
-              <h4 className="text-[10px] font-bold uppercase tracking-widest text-slate-400 mb-2 px-2">
+              <h4 className="text-[10px] font-bold text-slate-400 mb-2 px-2">
                 {group.title}
               </h4>
               <ul className="space-y-0.5">
@@ -38,11 +38,7 @@ export function DocsSidebar() {
                     <li key={item.slug}>
                       <Link
                         href={href}
-                        className={`block px-2 py-1.5 rounded-md text-xs font-medium transition-colors ${
-                          isActive
-                            ? "bg-blue-50 text-blue-700"
-                            : "text-slate-600 hover:bg-slate-50 hover:text-slate-900"
-                        }`}
+                        className={`block px-2 py-1.5 rounded-md text-xs font-medium transition-colors ${ isActive ? "bg-blue-50 text-blue-700" : "text-slate-600 hover:bg-slate-50 hover:text-slate-900" }`}
                       >
                         {item.title}
                       </Link>

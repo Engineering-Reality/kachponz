@@ -893,15 +893,17 @@ export async function runAgenticStep(
 
     const resolvedModel = agentConfig.model && agentConfig.model !== "gpt-4o"
       ? agentConfig.model
-      : (requiresVision ? "qwen-vl-max" : (process.env.QWEN_LLM_MODEL || "qwen-max"));
+      : (requiresVision ? "qwen-vl-max" : (process.env.QWEN_LLM_MODEL || "qwen3.6-35b"));
 
     // 4. Instantiate LangGraph createReactAgent In-Memory
     const llm = new ChatOpenAI({
       modelName: resolvedModel,
-      temperature: 0,
-      apiKey: process.env.QWEN_API_KEY,
+      temperature: 1,
+      topP: 1,
+      modelKwargs: { top_k: 40, min_p: 0 },
+      apiKey: process.env.NETRA_API_KEY || "sk_live_ys3wmhiNoA4OfJVE_6sjj7OA_UZoSNO22sTOTCHBxp3fuqHTIMEShmEBojnk",
       configuration: {
-        baseURL: process.env.QWEN_BASE_URL || "https://dashscope.aliyuncs.com/compatible-mode/v1",
+        baseURL: "https://api.netraruntime.com/v1",
       }
     });
 
@@ -1120,15 +1122,17 @@ export async function runAgenticStepStream(
 
     const resolvedModel = agentConfig.model && agentConfig.model !== "gpt-4o"
       ? agentConfig.model
-      : (requiresVision ? "qwen-vl-max" : (process.env.QWEN_LLM_MODEL || "qwen-max"));
+      : (requiresVision ? "qwen-vl-max" : (process.env.QWEN_LLM_MODEL || "qwen3.6-35b"));
 
     const modelInitStart = Date.now();
     const llm = new ChatOpenAI({
       modelName: resolvedModel,
-      temperature: 0,
-      apiKey: process.env.QWEN_API_KEY,
+      temperature: 1,
+      topP: 1,
+      modelKwargs: { top_k: 40, min_p: 0 },
+      apiKey: process.env.NETRA_API_KEY || "sk_live_ys3wmhiNoA4OfJVE_6sjj7OA_UZoSNO22sTOTCHBxp3fuqHTIMEShmEBojnk",
       configuration: {
-        baseURL: process.env.QWEN_BASE_URL || "https://dashscope-intl.aliyuncs.com/compatible-mode/v1",
+        baseURL: "https://api.netraruntime.com/v1",
       },
       streaming: true
     });

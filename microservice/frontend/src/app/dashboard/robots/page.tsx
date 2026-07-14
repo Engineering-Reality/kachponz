@@ -53,7 +53,7 @@ function StateBadge({ state }: { state: string }) {
 function KpiCard({ label, value, color }: { label: string; value: number; color: string }) {
   return (
     <GlassCard className="flex flex-col gap-1">
-      <div className={`text-xs font-mono uppercase tracking-wider ${color} font-bold`}>{label}</div>
+      <div className={`text-xs font-mono ${color} font-bold`}>{label}</div>
       <div className="text-3xl font-black text-slate-900 tracking-tight">{value}</div>
     </GlassCard>
   );
@@ -166,9 +166,7 @@ export default function RobotsDashboard() {
           <button
             key={s}
             onClick={() => setStateFilter(s)}
-            className={`text-xs px-3 py-1.5 rounded-lg border transition-colors ${
-              stateFilter === s ? "bg-slate-900 text-white border-slate-900" : "bg-white text-slate-500 border-slate-200 hover:bg-slate-50"
-            }`}
+            className={`text-xs px-3 py-1.5 rounded-lg border transition-colors ${ stateFilter === s ? "bg-slate-900 text-white border-slate-900" : "bg-white text-slate-500 border-slate-200 hover:bg-slate-50" }`}
           >
             {s === "all" ? "All" : s}
           </button>

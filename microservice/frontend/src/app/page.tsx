@@ -21,6 +21,7 @@ import {
   Cpu,
   Layers,
   Send,
+  ChevronDown,
 } from "lucide-react";
 
 const EMPTY_EVENTS: any[] = [];
@@ -72,9 +73,9 @@ const NAV_APPS = [
     bg: "bg-emerald-50",
   },
   {
-    href: "/agent-invoke",
+    href: "/playground",
     step: "Step 05",
-    label: "Agent Invoke",
+    label: "Playground",
     desc: "Stream real-time agent reasoning over a selected transaction.",
     icon: Zap,
     accent: "text-cyan-600",
@@ -82,41 +83,28 @@ const NAV_APPS = [
   },
 ];
 
-const BENCHMARKS = {
-  handoff: {
-    title: "Handoff Latency",
-    desc: "Time taken to parse document, transition state machine, and trigger RPA dispatch.",
-    unit: "seconds",
-    data: [
-      { label: "Manual Processing", value: 920, color: "bg-slate-300" },
-      { label: "Standard Python Agent", value: 320, color: "bg-slate-400" },
-      { label: "Legacy RPA Flows", value: 180, color: "bg-indigo-400" },
-      { label: "Amadeus Orchestrator", value: 15, color: "vibrant-rainbow-bg", active: true },
-    ],
+const FAQ_DATA = [
+  {
+    question: "What does Amadeus do?",
+    answer: "Amadeus is an enterprise orchestration platform that seamlessly combines Humans, AI Agents, and Robotic Process Automation (RPA). It acts as the brain that directs work across your existing legacy systems and modern APIs, allowing you to orchestrate end-to-end banking operations autonomously."
   },
-  cost: {
-    title: "Processing Cost per LC",
-    desc: "Transactional overhead including API calls, tokens, and compute resources.",
-    unit: "USD",
-    data: [
-      { label: "Manual Processing", value: 45.0, color: "bg-slate-300" },
-      { label: "Standard Python Agent", value: 12.5, color: "bg-slate-400" },
-      { label: "Legacy RPA Flows", value: 8.2, color: "bg-indigo-400" },
-      { label: "Amadeus Orchestrator", value: 0.9, color: "vibrant-rainbow-bg", active: true },
-    ],
+  {
+    question: "Who is Amadeus for?",
+    answer: "Amadeus is built for operations teams, financial analysts, and enterprises running production workflows. If your company relies on RPA tools like Power Automate, UiPath, Automation Anywhere, or PAD, Amadeus allows you to supercharge those bots with intelligent, agentic decision-making."
   },
-  compliance: {
-    title: "Audit trail integrity",
-    desc: "Cryptographic validation coverage of state mutations across systems.",
-    unit: "% coverage",
-    data: [
-      { label: "Manual Processing", value: 15, color: "bg-slate-300" },
-      { label: "Standard Python Agent", value: 40, color: "bg-slate-400" },
-      { label: "Legacy RPA Flows", value: 75, color: "bg-indigo-400" },
-      { label: "Amadeus Orchestrator", value: 100, color: "vibrant-rainbow-bg", active: true },
-    ],
+  {
+    question: "Why integrate AI Agents with RPA?",
+    answer: "Many legacy banking applications do not expose modern APIs and cannot be accessed via simple API keys. By integrating AI agents with RPA, Amadeus can read screens, click buttons, and operate legacy software autonomously, bridging the gap between intelligent reasoning and legacy financial systems."
   },
-};
+  {
+    question: "How does Amadeus handle regulatory compliance?",
+    answer: "We prioritize precise state execution over conversational fluff. Every step transition in our orchestrator is append-only, cryptographically logged, and HMAC-signed, ensuring full OJK and BI compliance for strict financial processes like Trade Finance settlement."
+  },
+  {
+    question: "Can Amadeus reduce processing costs and latency?",
+    answer: "Yes. By offloading repetitive manual tasks (like document extraction and legacy data entry) to a coordinated team of AI and RPA agents, you significantly lower transaction latency and operational costs, while allowing human analysts to focus entirely on complex exception handling."
+  }
+];
 
 // Import LC state machine — drives the live ticker
 const LC_STEPS = [
@@ -131,38 +119,9 @@ const LC_STEPS = [
   "advised",
 ];
 
-// Small count-up that animates once `start` is true and re-runs when value changes
-function CountUp({ value, start, decimals = 0 }: { value: number; start: boolean; decimals?: number }) {
-  const [display, setDisplay] = useState(0);
-  const rafRef = useRef<number | null>(null);
-
-  useEffect(() => {
-    if (!start) return;
-    const duration = 750;
-    const t0 = performance.now();
-    const tick = (now: number) => {
-      const p = Math.min((now - t0) / duration, 1);
-      const eased = 1 - Math.pow(1 - p, 3);
-      setDisplay(value * eased);
-      if (p < 1) rafRef.current = requestAnimationFrame(tick);
-    };
-    rafRef.current = requestAnimationFrame(tick);
-    return () => {
-      if (rafRef.current) cancelAnimationFrame(rafRef.current);
-    };
-  }, [value, start]);
-
-  return <>{display.toFixed(decimals)}</>;
-}
-
 export default function Home() {
-  const [activeTab, setActiveTab] = useState<keyof typeof BENCHMARKS>("handoff");
+  const [openFaq, setOpenFaq] = useState<number | null>(0);
   const [tickerActive, setTickerActive] = useState(0);
-  const [benchVisible, setBenchVisible] = useState(false);
-  const benchRef = useRef<HTMLDivElement | null>(null);
-
-  const currentBenchmark = BENCHMARKS[activeTab];
-  const maxVal = Math.max(...currentBenchmark.data.map((d) => d.value));
 
   // Ticker: advance active step every 1.5s
   useEffect(() => {
@@ -187,26 +146,12 @@ export default function Home() {
     const elements = document.querySelectorAll(".scroll-reveal");
     elements.forEach((el) => observer.observe(el));
 
-    let benchObserver: IntersectionObserver | null = null;
-    if (benchRef.current) {
-      benchObserver = new IntersectionObserver(
-        (entries) => {
-          entries.forEach((entry) => {
-            if (entry.isIntersecting) setBenchVisible(true);
-          });
-        },
-        { threshold: 0.3 }
-      );
-      benchObserver.observe(benchRef.current);
-    }
-
     return () => {
       observer.disconnect();
-      benchObserver?.disconnect();
     };
   }, []);
 
-  const gridApps = NAV_APPS.filter((a) => a.href !== "/agent-invoke");
+  const gridApps = NAV_APPS.filter((a) => a.href !== "/playground");
 
   return (
     <div className="min-h-screen bg-white text-slate-900 overflow-x-hidden">
@@ -214,7 +159,7 @@ export default function Home() {
       <header className="h-16 border-b border-white/10 surface-dark sticky top-0 z-50">
         <div className="max-w-6xl mx-auto px-6 h-full flex items-center justify-between">
           <div className="flex items-center gap-3">
-            <img src="/amadeus.svg" alt="Amadeus Logo" className="w-10 h-10 object-contain animate-spin-tesseract" />
+            <img src="/amadeus.svg" alt="Amadeus Logo" className="w-10 h-10 object-contain drop-shadow-sm" />
             <span className="font-extrabold text-xl tracking-tight text-white">Amadeus</span>
           </div>
           <nav className="hidden md:flex items-center gap-8">
@@ -249,7 +194,7 @@ export default function Home() {
             </p>
 
             <div className="flex items-center gap-3">
-              <Link href="/agent-invoke" className="inline-flex items-center gap-2 bg-white text-black px-6 py-3 text-sm font-semibold rounded-lg hover:bg-white/90 transition-colors">
+              <Link href="/playground" className="inline-flex items-center gap-2 bg-white text-black px-6 py-3 text-sm font-semibold rounded-lg hover:bg-white/90 transition-colors">
                 Talk to an Agent <ArrowRight className="w-4 h-4" />
               </Link>
               <Link href="/docs" className="inline-flex items-center gap-2 border border-white/20 text-white/70 px-6 py-3 text-sm font-medium rounded-lg hover:text-white hover:border-white/40 transition-colors">
@@ -260,8 +205,8 @@ export default function Home() {
 
           {/* Right Column: Conversation with Banking Agents */}
           <div className="lg:col-span-6 flex justify-center relative min-h-[440px] items-center">
-            {/* Ambient rainbow glow */}
-            <div className="absolute w-80 h-80 rounded-full vibrant-rainbow-border opacity-[0.16] blur-[90px] pointer-events-none" />
+            {/* Ambient corporate glow */}
+            <div className="absolute w-80 h-80 rounded-full bg-blue-500 opacity-[0.12] blur-[90px] pointer-events-none" />
 
             <div className="float-soft relative w-[380px] max-w-full">
               {/* Floating orchestration badge */}
@@ -302,8 +247,8 @@ export default function Home() {
                 <div className="p-5 space-y-4 bg-[#0d0d0d]">
                   {/* User */}
                   <div className="flex justify-end chat-msg" style={{ animationDelay: "0.15s" }}>
-                    <div className="relative rounded-2xl rounded-tr-sm p-[1.5px] overflow-hidden max-w-[82%]">
-                      <div className="absolute inset-0 vibrant-rainbow-border animate-border-spin opacity-80" />
+                    <div className="relative rounded-2xl rounded-tr-sm p-[1px] overflow-hidden max-w-[82%]">
+                      <div className="absolute inset-0 bg-gradient-to-r from-blue-500 to-indigo-500 opacity-60" />
                       <div className="relative z-10 bg-[#0f0f0f] rounded-[13px] px-3.5 py-2.5">
                         <p className="text-[13px] text-white leading-relaxed">
                           Hi! Can you settle import LC #8F3A for me?
@@ -364,8 +309,7 @@ export default function Home() {
                   <div className="flex-1 bg-[#1a1a1a] border border-white/8 rounded-full px-4 py-2 text-[13px] text-slate-500">
                     Message your agents…
                   </div>
-                  <button className="relative w-9 h-9 rounded-full overflow-hidden flex items-center justify-center flex-shrink-0">
-                    <div className="absolute inset-0 vibrant-rainbow-bg" />
+                  <button className="relative w-9 h-9 rounded-full overflow-hidden flex items-center justify-center flex-shrink-0 bg-blue-600 hover:bg-blue-500 transition-colors">
                     <Send className="relative z-10 w-4 h-4 text-white" />
                   </button>
                 </div>
@@ -386,7 +330,7 @@ export default function Home() {
             </div>
 
             <div className="bg-white border border-slate-200 shadow-[0_4px_20px_rgba(0,0,0,0.03)] rounded-2xl px-5 py-3 flex flex-col sm:flex-row items-center gap-4">
-              <span className="text-[10px] font-bold uppercase tracking-widest text-slate-400 text-center sm:text-left">We Support<br />A2A Communication</span>
+              <span className="text-[10px] font-bold text-slate-400 text-center sm:text-left">We Support<br />A2A Communication</span>
               <div className="hidden sm:block w-px h-8 bg-slate-100" />
               <div className="flex items-center gap-5">
                 {/* Power Automate Logo */}
@@ -451,7 +395,7 @@ export default function Home() {
                     <div className={`w-12 h-12 rounded-xl ${bg} flex items-center justify-center shadow-inner`}>
                       <Icon className={`w-6 h-6 ${accent}`} />
                     </div>
-                    <span className="text-[10px] font-bold uppercase tracking-widest text-slate-400 bg-slate-50 px-2.5 py-1 rounded-full border border-slate-100 group-hover:bg-indigo-50 group-hover:text-indigo-600 group-hover:border-indigo-100 transition-colors">
+                    <span className="text-[10px] font-bold text-slate-400 bg-slate-50 px-2.5 py-1 rounded-full border border-slate-100 group-hover:bg-indigo-50 group-hover:text-indigo-600 group-hover:border-indigo-100 transition-colors">
                       {step}
                     </span>
                   </div>
@@ -459,7 +403,7 @@ export default function Home() {
                   <h3 className="section-head text-[19px] text-slate-900 mb-2">{label}</h3>
                   <p className="text-[14px] text-slate-500 leading-relaxed flex-1">{desc}</p>
 
-                  <div className={`mt-6 flex items-center gap-2 text-xs font-bold uppercase tracking-widest ${accent} opacity-70 group-hover:opacity-100 transition-opacity`}>
+                  <div className={`mt-6 flex items-center gap-2 text-xs font-bold ${accent} opacity-70 group-hover:opacity-100 transition-opacity`}>
                     Explore <ArrowRight className="w-3.5 h-3.5 transform group-hover:translate-x-1.5 transition-transform" />
                   </div>
                 </div>
@@ -468,18 +412,18 @@ export default function Home() {
             ))}
           </div>
 
-          {/* Agent Invoke — featured full-width dark */}
+          {/* Playground — featured full-width dark */}
           <div className="surface-dark rounded-2xl overflow-hidden border border-white/10">
             <div className="flex flex-col lg:flex-row items-stretch">
               <div className="flex-1 p-8 md:p-12 space-y-5">
                 <p className="ui-label text-white/40">Featured Surface</p>
-                <h3 className="section-head text-3xl text-white">Agent Invoke</h3>
+                <h3 className="section-head text-3xl text-white">Playground</h3>
                 <p className="text-[15px] text-slate-300 leading-relaxed max-w-md">
                   Stream real-time agent reasoning over a selected transaction. Watch
                   MCP tool calls, state transitions, and telemetry flow through a
                   control panel built for ops — not a chat toy.
                 </p>
-                <Link href="/agent-invoke" className="inline-flex items-center gap-2 bg-white text-black px-5 py-2.5 text-sm font-semibold rounded-lg hover:bg-white/90 transition-colors">
+                <Link href="/playground" className="inline-flex items-center gap-2 bg-white text-black px-5 py-2.5 text-sm font-semibold rounded-lg hover:bg-white/90 transition-colors">
                   Launch Agent Console <ArrowRight className="w-4 h-4" />
                 </Link>
               </div>
@@ -491,7 +435,7 @@ export default function Home() {
                     <span className="terminal-dot bg-red-500" />
                     <span className="terminal-dot bg-yellow-500" />
                     <span className="terminal-dot bg-green-500" />
-                    <span className="ui-label text-white/30 ml-2">Agent Invoke Console</span>
+                    <span className="ui-label text-white/30 ml-2">Playground Console</span>
                   </div>
                   <div className="p-0 flex flex-col h-[320px] bg-[#0a0a0a]">
                     <div className="flex-1 overflow-y-auto p-5 space-y-6 flex flex-col justify-end">
@@ -510,7 +454,7 @@ export default function Home() {
                         <div className="space-y-3 w-full max-w-[85%]">
                           <div className="flex items-center gap-2 mb-1">
                             <span className="ui-label text-white/40">Amadeus Orchestrator</span>
-                            <span className="text-[9px] font-mono uppercase tracking-widest text-emerald-400 border border-emerald-500/30 bg-emerald-500/10 px-1.5 py-0.5 rounded-sm">system</span>
+                            <span className="text-[9px] font-mono text-emerald-400 border border-emerald-500/30 bg-emerald-500/10 px-1.5 py-0.5 rounded-sm">system</span>
                           </div>
                           <div className="text-[13px] text-slate-300 leading-relaxed font-sans">
                             I will now trigger the UiPath robot via MCP to execute the MT202 conversion.
@@ -547,70 +491,39 @@ export default function Home() {
         </div>
       </section>
 
-      {/* Section 4: Benchmarks — dark */}
-      <section ref={benchRef} className="surface-dark py-24 border-y border-white/10">
-        <div className="max-w-6xl mx-auto px-6 grid grid-cols-1 lg:grid-cols-12 gap-12">
-          <div className="lg:col-span-4 space-y-6">
-            <div className="space-y-2">
-              <p className="ui-label text-white/40">Benchmarks</p>
-              <h3 className="section-head text-2xl text-white">Unrivaled efficiency &amp; compliance</h3>
-              <p className="text-slate-400 text-[15px] leading-relaxed">
-                We benchmarked Amadeus against legacy and pythonic orchestration
-                solutions. Select a metric to visualize the delta.
-              </p>
-            </div>
-
-            <div className="flex flex-col gap-1">
-              {(Object.keys(BENCHMARKS) as Array<keyof typeof BENCHMARKS>).map((key) => (
-                <button
-                  key={key}
-                  onClick={() => setActiveTab(key)}
-                  className={`w-full text-left px-4 py-3 rounded-lg ui-label transition-all duration-150 ${activeTab === key
-                    ? "text-white"
-                    : "text-white/40 hover:text-white/70"
-                    }`}
-                >
-                  {activeTab === key && <span className="nav-active-indicator" />}
-                  {BENCHMARKS[key].title}
-                </button>
-              ))}
-            </div>
+      {/* Section 4: FAQ — dark */}
+      <section className="surface-dark py-24 border-y border-white/10">
+        <div className="max-w-4xl mx-auto px-6">
+          <div className="text-center space-y-4 mb-16">
+            <p className="ui-label text-blue-400">You got questions? We got answers</p>
+            <h3 className="section-head text-3xl md:text-4xl text-white">Frequently Asked Questions</h3>
           </div>
 
-          <div className="lg:col-span-8 surface-dark-elevated p-8 space-y-6">
-            <div>
-              <h4 className="section-head text-white text-base">{currentBenchmark.title}</h4>
-              <p className="text-slate-400 text-[13px] mt-1">{currentBenchmark.desc}</p>
-            </div>
-
-            <div className="space-y-5">
-              {currentBenchmark.data.map((d) => (
-                <div key={d.label} className="space-y-1.5">
-                  <div className="flex items-center justify-between text-[13px]">
-                    <span className={d.active ? "text-white font-semibold" : "text-slate-400"}>{d.label}</span>
-                    <span className="metric-value text-white">
-                      <CountUp
-                        value={d.value}
-                        start={benchVisible}
-                        decimals={currentBenchmark.unit === "USD" ? 1 : 0}
-                      />{" "}
-                      <span className="text-white/40 text-[11px]">{currentBenchmark.unit}</span>
-                    </span>
-                  </div>
-                  <div className="w-full h-7 rounded-lg overflow-hidden bg-[#0a0a0a] border border-white/10 p-0.5">
-                    <div
-                      className={`h-full rounded-md transition-all duration-700 flex items-center justify-end px-2 ${d.active ? "vibrant-rainbow-bg" : "bg-[#2a2a2a] border border-white/10"
-                        }`}
-                      style={{ width: `${(d.value / maxVal) * 100}%` }}
-                    >
-                      {d.active && (
-                        <span className="ui-label text-[8px] text-black/70">Active Stack</span>
-                      )}
-                    </div>
+          <div className="space-y-4">
+            {FAQ_DATA.map((faq, index) => {
+              const isOpen = openFaq === index;
+              return (
+                <div 
+                  key={index} 
+                  className={`border border-white/10 rounded-2xl overflow-hidden transition-colors duration-300 ${isOpen ? 'bg-white/5' : 'bg-transparent hover:bg-white/[0.02]'}`}
+                >
+                  <button
+                    onClick={() => setOpenFaq(isOpen ? null : index)}
+                    className="w-full flex items-center justify-between p-6 text-left focus:outline-none"
+                  >
+                    <span className="text-lg font-medium text-white pr-8">{faq.question}</span>
+                    <ChevronDown className={`w-5 h-5 text-slate-400 transition-transform duration-300 flex-shrink-0 ${isOpen ? 'rotate-180' : ''}`} />
+                  </button>
+                  <div 
+                    className={`px-6 overflow-hidden transition-all duration-300 ease-in-out ${isOpen ? 'max-h-96 pb-6 opacity-100' : 'max-h-0 opacity-0'}`}
+                  >
+                    <p className="text-[15px] text-slate-400 leading-relaxed">
+                      {faq.answer}
+                    </p>
                   </div>
                 </div>
-              ))}
-            </div>
+              );
+            })}
           </div>
         </div>
       </section>

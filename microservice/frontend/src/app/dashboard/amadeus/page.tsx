@@ -34,7 +34,7 @@ interface Transaction {
 function KpiCard({ label, value, sub, color }: { label: string; value: number | string; sub?: string; color: string }) {
   return (
     <GlassCard className="flex flex-col gap-1">
-      <div className={`text-xs font-mono uppercase tracking-wider ${color} font-bold`}>{label}</div>
+      <div className={`text-xs font-mono ${color} font-bold`}>{label}</div>
       <div className="text-3xl font-black text-slate-900 tracking-tight">{value}</div>
       {sub && <div className="text-xs text-slate-400 font-mono">{sub}</div>}
     </GlassCard>
@@ -62,13 +62,7 @@ function StepBar({ currentStep, status }: { currentStep: string; status: string 
         <div
           key={s.key}
           title={`${s.label} (${s.actor})`}
-          className={`h-1 rounded-sm flex-1 transition-all ${
-            status === "completed" || i < currentIdx
-              ? "bg-emerald-400"
-              : i === currentIdx && status !== "completed"
-              ? "bg-blue-500 animate-pulse"
-              : "bg-slate-200"
-          }`}
+          className={`h-1 rounded-sm flex-1 transition-all ${ status === "completed" || i < currentIdx ? "bg-emerald-400" : i === currentIdx && status !== "completed" ? "bg-blue-500 animate-pulse" : "bg-slate-200" }`}
         />
       ))}
     </div>
@@ -133,7 +127,7 @@ export default function AmadeusDashboard() {
           <div>
             <Link
               href="/dashboard"
-              className="inline-flex items-center gap-1.5 text-slate-400 hover:text-slate-700 text-xs font-mono uppercase tracking-wider mb-3 transition-colors"
+              className="inline-flex items-center gap-1.5 text-slate-400 hover:text-slate-700 text-xs font-mono mb-3 transition-colors"
             >
               <ArrowLeft className="w-3.5 h-3.5" /> Orchestrator Dashboard
             </Link>
@@ -160,7 +154,7 @@ export default function AmadeusDashboard() {
               <RefreshCw className="w-3.5 h-3.5" /> Refresh
             </button>
             <Link
-              href="/agent-invoke"
+              href="/playground"
               className="flex items-center gap-1.5 px-3 py-1.5 text-xs font-bold bg-slate-900 text-white rounded-lg hover:bg-slate-800 transition-colors"
             >
               <Zap className="w-3.5 h-3.5" /> Invoke Agent
@@ -213,7 +207,7 @@ export default function AmadeusDashboard() {
           </div>
           <div className="flex gap-2 flex-shrink-0">
             <Link
-              href="/agent-invoke?agent=orchestrator"
+              href="/playground?agent=orchestrator"
               className="flex items-center gap-1.5 px-3 py-1.5 text-xs font-bold bg-slate-900 text-white rounded-lg hover:bg-slate-800 transition-colors whitespace-nowrap"
             >
               <Zap className="w-3.5 h-3.5" /> Run via Agent
@@ -230,7 +224,7 @@ export default function AmadeusDashboard() {
         {/* State Machine Pipeline */}
         <div className="bg-white border border-slate-200 rounded-xl overflow-hidden">
           <div className="px-5 py-3 border-b border-slate-100 bg-slate-50/50 flex items-center justify-between">
-            <h2 className="text-xs font-bold uppercase tracking-wider text-slate-600 flex items-center gap-1.5">
+            <h2 className="text-xs font-bold text-slate-600 flex items-center gap-1.5">
               <ArrowRightLeft className="w-3.5 h-3.5" /> State Machine · Import LC / SKBDN / SBLC
             </h2>
             {selectedStep && (
@@ -248,15 +242,9 @@ export default function AmadeusDashboard() {
                   <div key={step.key} className="flex items-center">
                     <button
                       onClick={() => setSelectedStep(isSelected ? null : step.key)}
-                      className={`flex flex-col items-center px-3 py-2.5 rounded-lg border transition-all text-center min-w-[88px] ${
-                        isSelected
-                          ? "border-blue-400 bg-blue-50"
-                          : count > 0
-                          ? "border-slate-300 bg-slate-50 hover:border-slate-400"
-                          : "border-slate-100 hover:border-slate-200"
-                      }`}
+                      className={`flex flex-col items-center px-3 py-2.5 rounded-lg border transition-all text-center min-w-[88px] ${ isSelected ? "border-blue-400 bg-blue-50" : count > 0 ? "border-slate-300 bg-slate-50 hover:border-slate-400" : "border-slate-100 hover:border-slate-200" }`}
                     >
-                      <div className={`text-[9px] font-mono uppercase tracking-wider mb-1 ${step.financial ? "text-amber-600" : "text-slate-400"}`}>
+                      <div className={`text-[9px] font-mono mb-1 ${step.financial ? "text-amber-600" : "text-slate-400"}`}>
                         {step.financial ? "💰" : `${idx + 1}`}
                       </div>
                       <div className={`text-[10px] font-bold leading-tight mb-1.5 ${count > 0 ? "text-slate-800" : "text-slate-400"}`}>
@@ -280,7 +268,7 @@ export default function AmadeusDashboard() {
         {/* Transaction Table */}
         <div className="bg-white border border-slate-200 rounded-xl overflow-hidden">
           <div className="px-5 py-3 border-b border-slate-100 bg-slate-50/50 flex items-center justify-between">
-            <h2 className="text-xs font-bold uppercase tracking-wider text-slate-600 flex items-center gap-1.5">
+            <h2 className="text-xs font-bold text-slate-600 flex items-center gap-1.5">
               <Layers className="w-3.5 h-3.5" />
               Transaction Ledger
               {selectedStep && <span className="font-normal text-blue-500">· filtered: {selectedStep}</span>}
@@ -306,7 +294,7 @@ export default function AmadeusDashboard() {
             <div className="overflow-x-auto">
               <table className="w-full text-left">
                 <thead>
-                  <tr className="text-[10px] text-slate-400 uppercase tracking-wider border-b border-slate-100">
+                  <tr className="text-[10px] text-slate-400 border-b border-slate-100">
                     <th className="py-2.5 px-5 font-medium">ID</th>
                     <th className="py-2.5 px-4 font-medium">Type</th>
                     <th className="py-2.5 px-4 font-medium">Current Step</th>
@@ -332,7 +320,7 @@ export default function AmadeusDashboard() {
                           <Hash className="w-3 h-3 text-slate-300" />
                           {tx.id.substring(0, 12)}...
                         </td>
-                        <td className="py-3 px-4 text-slate-600 uppercase text-[10px] tracking-wider font-bold">
+                        <td className="py-3 px-4 text-slate-600 text-[10px] font-bold">
                           {tx.type?.replace(/_/g, " ")}
                         </td>
                         <td className="py-3 px-4">
