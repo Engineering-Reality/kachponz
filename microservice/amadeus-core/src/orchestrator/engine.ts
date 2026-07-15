@@ -68,7 +68,7 @@ const NON_SECRET_CONTEXT_KEYS = [
  * access to via its tools' env config — so it stops asking the user for
  * things like folderId that are already resolved server-side.
  */
-function buildToolContextBlock(toolConfigs: any[]): string {
+function buildToolContextBlock(toolConfigs: any[], needsNamespacing: boolean = false): string {
   const blocks: string[] = [];
 
   for (const row of toolConfigs) {
@@ -89,13 +89,27 @@ function buildToolContextBlock(toolConfigs: any[]): string {
     }
   }
 
-  if (blocks.length === 0) return '';
-
-  return `\n\n--- Pre-configured context for this agent's tools ---\n` +
+  let result = blocks.length === 0 ? '' : (
+    `\n\n--- Pre-configured context for this agent's tools ---\n` +
     blocks.join('\n') +
     `\nUse these values automatically when calling tools. Only ask the user if a tool call ` +
     `explicitly fails due to one of these values being wrong (e.g. a folder-access error) — ` +
-    `never ask preemptively for something listed above.\n`;
+    `never ask preemptively for something listed above.\n`
+  );
+
+  // Only injected when loadMcpTools() actually namespaced tool names (more
+  // than one tool config attached) — a single-server agent's prompt stays
+  // untouched.
+  if (needsNamespacing) {
+    result += `\n\n--- Multi-server tool naming ---\n` +
+      `Catatan: agent ini terhubung ke lebih dari satu MCP server dengan tool yang mirip ` +
+      `namanya. Prefix sebelum "__" menunjukkan sumbernya — misalnya ` +
+      `"uipath_folder_a__trigger_uipath_job" adalah tool trigger_uipath_job dari server ` +
+      `"UiPath Folder A", BUKAN dari server lain. Selalu perhatikan prefix ini untuk ` +
+      `memastikan kamu memanggil server yang benar.\n`;
+  }
+
+  return result;
 }
 
 function buildSystemPrompt(agentStyle: string | null | undefined, toolContext: string): string {
@@ -315,6 +329,18 @@ export function extractJobTraceMeta(
 }
 
 /**
+ * Sanitizes a tool registration's human label into a namespace prefix safe
+ * for use in a LangChain tool name (models are picky about tool name charsets).
+ */
+function sanitizeToolPrefix(name: string): string {
+  return name
+    .toLowerCase()
+    .replace(/[^a-z0-9]+/g, '_')
+    .replace(/^_+|_+$/g, '')
+    .slice(0, 40); // keep it bounded — very long tool names are unwieldy for the model
+}
+
+/**
  * MCP Integration: Loads tools dynamically for the LangGraph Agent.
  * This also implements the STATE TRACKING constraint by wrapping tool execution.
  */
@@ -323,14 +349,24 @@ async function loadMcpTools(
   log: ReturnType<typeof txLogger>,
   agentId?: string,
   sessionLabel?: string,
-): Promise<{ tools: any[]; clients: Client[]; report: McpServerHealth[] }> {
+): Promise<{ tools: any[]; clients: Client[]; report: McpServerHealth[]; needsNamespacing: boolean }> {
   const langchainTools: any[] = [];
   const clients: Client[] = [];
   const report: McpServerHealth[] = [];
 
+  // Two attached tool registrations can expose identically-named MCP tools
+  // (e.g. two mcp-uipath instances pointed at different orgs/tenants both
+  // register `trigger_uipath_job`). Merged into one flat langchainTools
+  // array, those collide and the model can't address one specifically.
+  // Only prefix when there's more than one tool config attached — a
+  // single-tool agent (the common case) keeps unprefixed names exactly as
+  // before, so this is non-breaking for every existing agent.
+  const needsNamespacing = toolConfigs.length > 1;
+
   for (const config of toolConfigs) {
     const toolName: string = config.name || 'unknown';
     const toolId: string = config.tool_id || '';
+    const namePrefix = needsNamespacing ? `${sanitizeToolPrefix(toolName)}__` : '';
 
     if (config.on_status === "Offline" || config.on_status === false) {
       report.push({ toolName, toolId, status: 'no_versions', error: 'Tool is Offline', loadedTools: [] });
@@ -456,14 +492,20 @@ async function loadMcpTools(
           { tool: mcpTool.name, schema: (realSchema as any).shape ? Object.keys((realSchema as any).shape) : 'passthrough' },
           'MCP tool schema bound',
         );
+        // Prefixed name is what the LLM sees and calls; the underlying MCP
+        // callTool() below must keep using mcpTool.name (unprefixed) — that's
+        // the only name the actual MCP server understands.
+        const langchainToolName = `${namePrefix}${mcpTool.name}`;
         langchainTools.push(
           new DynamicStructuredTool({
-            name: mcpTool.name,
-            description: mcpTool.description || "MCP Tool",
+            name: langchainToolName,
+            description: needsNamespacing
+              ? `[${toolName}] ${mcpTool.description || "MCP Tool"}`
+              : (mcpTool.description || "MCP Tool"),
             schema: realSchema,
             func: async (args: any) => {
               // 1. Transaction Tracker Integration: Update state BEFORE tool yields
-              log.info({ tool: mcpTool.name, action: "DRAFT_TO_PROCESSING" }, "🔌 Yielding to external MCP tool");
+              log.info({ tool: mcpTool.name, prefixedName: langchainToolName, action: "DRAFT_TO_PROCESSING" }, "🔌 Yielding to external MCP tool");
 
               // 2. Execute MCP Server logic
               const res = await mcpClient.callTool({
@@ -524,7 +566,7 @@ async function loadMcpTools(
     );
   }
 
-  return { tools: langchainTools, clients, report };
+  return { tools: langchainTools, clients, report, needsNamespacing };
 }
 
 export type UipathContextSummary = {
@@ -865,7 +907,7 @@ export async function runAgenticStep(
   }
 
   // 3. Construct MCP Tools (Dynamic Adapters) + connection health report
-  const { tools, clients, report } = await loadMcpTools(toolConfigs, log, agentConfig.agent_id, sessionLabel);
+  const { tools, clients, report, needsNamespacing } = await loadMcpTools(toolConfigs, log, agentConfig.agent_id, sessionLabel);
 
   // Fail loud: the agent had tools registered, but none of them connected.
   if (toolConfigs.length > 0 && tools.length === 0) {
@@ -918,7 +960,7 @@ export async function runAgenticStep(
       }
     });
 
-    const toolContext = buildToolContextBlock(toolConfigs);
+    const toolContext = buildToolContextBlock(toolConfigs, needsNamespacing);
 
     const agent = createReactAgent({
       llm,
@@ -1094,7 +1136,7 @@ export async function runAgenticStepStream(
     toolConfigs = toolsRes.rows;
   }
 
-  const { tools, clients, report } = await loadMcpTools(toolConfigs, log, agentConfig.agent_id, sessionLabel);
+  const { tools, clients, report, needsNamespacing } = await loadMcpTools(toolConfigs, log, agentConfig.agent_id, sessionLabel);
 
   // Fail loud: the agent had tools registered, but none of them connected.
   if (toolConfigs.length > 0 && tools.length === 0) {
@@ -1160,7 +1202,7 @@ export async function runAgenticStepStream(
     });
     const modelInitTime = (Date.now() - modelInitStart) / 1000;
 
-    const toolContext = buildToolContextBlock(toolConfigs);
+    const toolContext = buildToolContextBlock(toolConfigs, needsNamespacing);
 
     const agentInitStart = Date.now();
     const agent = createReactAgent({

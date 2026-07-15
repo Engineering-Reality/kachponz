@@ -267,31 +267,19 @@ export default function Home() {
 
           <div className="flex flex-col md:flex-row md:items-end justify-between mb-8 gap-4">
             <div>
-              <p className="ui-label text-slate-400 mb-2">Import LC State Machine</p>
-              <h2 className="text-3xl font-extrabold text-slate-900 tracking-tight">Your Enterprise-Grade Agent Laboratory.</h2>
+              <h2 className="text-3xl font-extrabold text-slate-900 tracking-tight mb-2">Your Enterprise-Grade Agent Laboratory.</h2>
+              <p className="text-slate-500 text-sm max-w-xl leading-relaxed">
+                Real-world business workflows require more than just a single tool. Seamlessly orchestrate AI agents, legacy RPA bots, document parsers, and human oversight into one unified pipeline.
+              </p>
             </div>
 
             <div className="bg-white border border-slate-200 shadow-[0_4px_20px_rgba(0,0,0,0.03)] rounded-2xl px-5 py-3 flex flex-col sm:flex-row items-center gap-4">
               <span className="text-[10px] font-bold text-slate-400 text-center sm:text-left">We Support<br />A2A Communication</span>
               <div className="hidden sm:block w-px h-8 bg-slate-100" />
-              <div className="flex items-center gap-5">
-                {/* Power Automate Logo */}
-                <div className="flex items-center gap-2 grayscale hover:grayscale-0 transition-all duration-300 opacity-80 hover:opacity-100 cursor-pointer" title="Microsoft Power Automate">
-                  <svg className="w-5 h-5" viewBox="0 0 32 32" fill="none" xmlns="http://www.w3.org/2000/svg">
-                    <path d="M11 2L2 11L11 20L20 11L11 2Z" fill="#0078D4" />
-                    <path d="M21 12L12 21L21 30L30 21L21 12Z" fill="#005A9E" />
-                  </svg>
-                  <span className="font-bold text-[14px] text-slate-800 tracking-tight">Power Automate</span>
-                </div>
-                {/* UiPath Logo */}
-                <div className="flex items-center gap-2 grayscale hover:grayscale-0 transition-all duration-300 opacity-80 hover:opacity-100 cursor-pointer" title="UiPath">
-                  <svg className="w-5 h-5" viewBox="0 0 32 32" fill="none" xmlns="http://www.w3.org/2000/svg">
-                    <path d="M5 13V24C5 26.2091 6.79086 28 9 28H19V19H12C10.3431 19 9 17.6569 9 16V13H5Z" fill="#141414" />
-                    <rect x="19" y="4" width="8" height="8" rx="2" fill="#FA4616" />
-                    <path d="M19 14H27V28H19V14Z" fill="#141414" />
-                  </svg>
-                  <span className="font-bold text-[14px] text-slate-800 tracking-tight">UiPath</span>
-                </div>
+              <div className="flex items-center gap-6">
+                <img src="/1uipath.png" alt="UiPath" className="h-7 w-auto object-contain grayscale hover:grayscale-0 transition-all duration-300 opacity-80 hover:opacity-100 cursor-pointer" title="UiPath" />
+                <img src="/2powerautomate.png" alt="Power Automate" className="h-7 w-auto object-contain grayscale hover:grayscale-0 transition-all duration-300 opacity-80 hover:opacity-100 cursor-pointer" title="Microsoft Power Automate" />
+                <img src="/3automationanyywhere.png" alt="Automation Anywhere" className="h-7 w-auto object-contain grayscale hover:grayscale-0 transition-all duration-300 opacity-80 hover:opacity-100 cursor-pointer" title="Automation Anywhere" />
               </div>
             </div>
           </div>
