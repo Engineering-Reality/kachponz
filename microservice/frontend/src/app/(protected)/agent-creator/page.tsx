@@ -4,8 +4,9 @@ import { useState, useRef, useEffect, useCallback } from "react";
 import {
   Bot, Send, Cpu, CheckCircle, Wand2, Headset, LineChart,
   Code2, Landmark, Loader2, Wrench, AlertTriangle, RotateCcw,
-  Globe, Search, ExternalLink, Plus, Sparkles,
+  Globe, Search, ExternalLink, Plus, Sparkles, Share2,
 } from "lucide-react";
+import { ShareModal } from "@/components/ShareModal";
 
 interface Message {
   role: "bot" | "user";
@@ -53,6 +54,8 @@ export default function AgentCreator() {
   const [error, setError] = useState<string | null>(null);
   const [isSaving, setIsSaving] = useState(false);
   const [saved, setSaved] = useState(false);
+  const [savedAgentId, setSavedAgentId] = useState<string | null>(null);
+  const [showShareModal, setShowShareModal] = useState(false);
   const [selectedTools, setSelectedTools] = useState<Set<string>>(new Set());
   const [installingExternal, setInstallingExternal] = useState<string | null>(null);
   const [autofilling, setAutofilling] = useState<"description" | "agent_style" | null>(null);
@@ -165,7 +168,9 @@ export default function AgentCreator() {
         const data = await res.json().catch(() => ({}));
         throw new Error(data.error?.message || `Error ${res.status}`);
       }
+      const data = await res.json();
       setSaved(true);
+      setSavedAgentId(data.agent_id ?? null);
       setMessages(prev => [...prev, { role: "bot", content: `✅ Agent **${config.agent_name}** has been saved! You can find it in the Agents page.` }]);
     } catch (err: any) {
       setError(`Save failed: ${err.message}`);
@@ -528,6 +533,11 @@ export default function AgentCreator() {
                 <button onClick={handleCompile} disabled={!config || isSaving || saved} className="w-full btn-primary text-sm justify-center rounded-xl disabled:opacity-40 disabled:cursor-not-allowed">
                   {isSaving ? <><Loader2 className="w-4 h-4 animate-spin" /> Saving…</> : saved ? <><CheckCircle className="w-4 h-4" /> Agent Saved!</> : <><CheckCircle className="w-4 h-4" /> Compile Agent</>}
                 </button>
+                {saved && savedAgentId && (
+                  <button onClick={() => setShowShareModal(true)} className="w-full btn-secondary text-sm justify-center rounded-xl mt-2 flex items-center gap-2">
+                    <Share2 className="w-3.5 h-3.5" /> Share this agent
+                  </button>
+                )}
                 <p className="text-center ui-label text-slate-400 mt-2">{config ? "Review config above then save" : "Complete the chat to enable compilation"}</p>
               </div>
             </div>
@@ -639,6 +649,14 @@ export default function AgentCreator() {
           </div>
         )}
       </div>
+
+      {showShareModal && savedAgentId && config && (
+        <ShareModal
+          agentId={savedAgentId}
+          resourceName={config.agent_name}
+          onClose={() => setShowShareModal(false)}
+        />
+      )}
     </div>
   );
 }

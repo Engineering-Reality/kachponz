@@ -78,6 +78,23 @@ const EnvSchema = z.object({
   QWEN_LLM_MODEL: z.string().default('qwen-plus'),
   QWEN_TIMEOUT_MS: z.coerce.number().int().positive().default(60_000),
 
+  // ─── Embeddings (RAG) ───────────────────────────────────────────────
+  // Reuses QWEN_MODE/QWEN_BASE_URL/QWEN_API_KEY — DashScope serves both
+  // /chat/completions and /embeddings under the same compatible-mode base
+  // URL and key, so this isn't a separate cloud account, just a different
+  // model + path. Same compliance caveat as QWEN_MODE=cloud applies (see
+  // embeddingClient.ts): dev/prototyping only until an on-prem embedding
+  // model is deployed. EMBEDDING_DIM must match the `vector(N)` column in
+  // migrations/1795000000000_add_rag.ts if this model is ever changed.
+  EMBEDDING_MODEL: z.string().default('text-embedding-v3'),
+  EMBEDDING_DIM: z.coerce.number().int().positive().default(1024),
+
+  // Local-disk file storage for RAG uploads. No object-storage abstraction
+  // (S3/Supabase Storage) exists anywhere in amadeus-core today — this repo
+  // is on-prem Postgres only — so RAG source files live on local disk,
+  // addressed by file_id rather than a bucket path.
+  RAG_STORAGE_DIR: z.string().default('./data/rag-files'),
+
   // Hard wall-clock ceiling on a single runAgenticStep call (invoke or
   // stream). Paired with recursionLimit so a stuck multi-step UiPath chain
   // can't burn tokens/hold a connection indefinitely. 15 min default is

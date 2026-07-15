@@ -76,6 +76,15 @@ export async function assignUserToCompany(
   );
 }
 
+/** Dipakai canShareResource() (lib/sharing.ts) untuk cek keanggotaan email di share_editor_with/share_visitor_with — daftar itu berisi email, bukan user_id. */
+export async function findUserEmailById(userId: string): Promise<string | null> {
+  const res = await query<{ email: string }>(
+    `SELECT email FROM users WHERE user_id = $1 AND is_active = true`,
+    [userId],
+  );
+  return res.rows[0]?.email ?? null;
+}
+
 export async function findRoleIdByName(roleName: string): Promise<number | null> {
   const res = await query<{ role_id: number }>(
     `SELECT role_id FROM roles WHERE role_name = $1 LIMIT 1`,

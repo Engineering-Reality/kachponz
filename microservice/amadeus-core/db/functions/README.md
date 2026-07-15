@@ -4,3 +4,4 @@
 - `fn_reserve_mcp_port(p_tool_id, p_method, p_port, p_pid, p_status, p_last_error, p_entry_mtime, p_set_started_at)` → full `mcp_runtime_state` row. Called from `scripts/mcpAutoManager.ts` `upsertRuntimeState()`.
 - `fn_release_mcp_runtime(p_tool_ids)` → all updated `mcp_runtime_state` rows. Called from `scripts/mcpAutoManager.ts` `markStopped()`.
 - `fn_upsert_uipath_job_trace(p_agent_id, p_tool_id, p_session_label, p_job_id, p_job_key, p_release_key, p_process_name, p_folder_id, p_queue_name, p_state, p_info)` → full `uipath_job_trace` row (upsert on `job_id`). Called from `src/orchestrator/engine.ts` `loadMcpTools()` tool-call hook and `scripts/mcpAutoManager.ts` `pollActiveJobTraces()`.
+- `rerank_documents(query_embedding, top_k)` → `(file_id, content, similarity)` rows ordered by cosine distance (pgvector `<=>`). Called from `src/orchestrator/executors/ragClient.ts` `retrievalWithRerank()`.

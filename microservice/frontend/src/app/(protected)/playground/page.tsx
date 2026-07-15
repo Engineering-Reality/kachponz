@@ -14,7 +14,8 @@ import {
   Paperclip,
   FileText,
   Image as ImageIcon,
-  Menu
+  Menu,
+  Share2
 } from 'lucide-react';
 import { Select } from '@/components/Select';
 import { EditableJsonTable } from '@/components/EditableJsonTable';
@@ -23,6 +24,7 @@ import { AgentContextPanel } from '@/components/AgentContextPanel';
 import { UiPathLiveGraph } from '@/components/UiPathLiveGraph';
 import { McpManagerBanner } from '@/components/McpManagerBanner';
 import { MessageSquarePlus, MessageSquare } from 'lucide-react';
+import { ShareModal } from '@/components/ShareModal';
 
 export interface ChatSession {
   id: string;
@@ -129,6 +131,7 @@ function PlaygroundInner() {
   const [toolsList, setToolsList] = useState<any[]>([]);
   const [selectedAgent, setSelectedAgent] = useState<string>('');
   const [isInspectOpen, setIsInspectOpen] = useState(false);
+  const [isShareOpen, setIsShareOpen] = useState(false);
   const [modelInit, setModelInit] = useState<string | null>(null);
   const [agentInit, setAgentInit] = useState<string | null>(null);
   const [responseTime, setResponseTime] = useState<string | null>(null);
@@ -894,6 +897,16 @@ function PlaygroundInner() {
                 >
                   <Search className="w-4 h-4" />
                 </button>
+                <button
+                  onClick={() => {
+                    if (selectedAgent) setIsShareOpen(true);
+                    else alert("Select an agent first!");
+                  }}
+                  className="p-1.5 text-slate-400 hover:text-violet-600 transition-colors rounded-md hover:bg-violet-50"
+                  title="Share Agent"
+                >
+                  <Share2 className="w-4 h-4" />
+                </button>
               </div>
 
               <div className="w-px h-5 bg-slate-200 shrink-0" />
@@ -1441,7 +1454,15 @@ function PlaygroundInner() {
             </div>
           )}
 
-        
+          {isShareOpen && selectedAgentObj && (
+            <ShareModal
+              agentId={selectedAgentObj.agent_id}
+              resourceName={selectedAgentObj.agent_name}
+              onClose={() => setIsShareOpen(false)}
+            />
+          )}
+
+
         </main>
         
         {/* Right Sidebar — UiPathLiveGraph */}

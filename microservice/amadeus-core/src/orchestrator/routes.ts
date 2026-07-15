@@ -23,6 +23,8 @@ import { DomainError } from '../types/domain.js';
 import { suggestFieldValue } from './executors/autofillClient.js';
 import { suggestFollowUps } from './executors/recommendationClient.js';
 import { suggestChatTitle } from './executors/chatTitleClient.js';
+import { retrievalWithRerank, generateRagResponse, ingestFile, deleteFileChunks } from './executors/ragClient.js';
+import { saveFile, replaceFile, deleteFiles as deleteStoredFiles } from '../lib/ragStorage.js';
 
 // Daftarkan agent bawaan sekali saat modul dimuat.
 try {
@@ -155,6 +157,14 @@ const ChatRecommendationsSchema = z.object({
 
 const ChatTitleSchema = z.object({
   messages: z.array(ConversationMessageSchema).min(1).max(20),
+}).strict();
+
+const RagQuerySchema = z.object({
+  query: z.string().min(1).max(4000),
+}).strict();
+
+const RagRemoveFileSchema = z.object({
+  file_ids: z.array(z.string().min(1)).min(1).max(100),
 }).strict();
 
 export async function registerOrchestratorRoutes(app: FastifyInstance): Promise<void> {
@@ -658,6 +668,71 @@ export async function registerOrchestratorRoutes(app: FastifyInstance): Promise<
       const body = req.body as { transactionId: string; idempotencyKey: string };
       const result = await dispatchCurrentStep(req.auth!, body.transactionId, body.idempotencyKey);
       return reply.send(result);
+    });
+
+    // ─── RAG (pgvector) — port of legacy microservice/rag/routes/rag.py ──
+    // File bytes are treated as UTF-8 text (no PDF/DOCX extraction) and
+    // chunked with simple fixed-size+overlap (ragClient.ts chunkText) —
+    // matches feature.md's explicit non-goal of a sophisticated chunker.
+    // Files themselves live on local disk (lib/ragStorage.ts), since no
+    // object-storage client exists elsewhere in this on-prem-only repo.
+
+    // POST /orchestrator/rag/upload_file
+    secured.post('/orchestrator/rag/upload_file', async (req, reply) => {
+      const data = await req.file();
+      if (!data) {
+        throw new DomainError('VALIDATION_ERROR', 'file wajib disertakan (multipart field "file")', 400);
+      }
+      const buffer = await data.toBuffer();
+      const userIdField = data.fields.user_id as { value?: string } | undefined;
+
+      const fileId = await saveFile(buffer);
+      const chunks = await ingestFile(fileId, userIdField?.value ?? null, buffer.toString('utf8'));
+      return reply.code(201).send({ file_id: fileId, filename: data.filename, chunks });
+    });
+
+    // PUT /orchestrator/rag/update_file — full swap: replace stored bytes,
+    // drop old chunks for file_id, re-chunk/re-embed. file_id is addressed
+    // via local disk (see ragStorage.ts), not a Supabase storage_path like
+    // the legacy endpoint — there's no bucket-path concept on local disk.
+    secured.put('/orchestrator/rag/update_file', async (req, reply) => {
+      const data = await req.file();
+      if (!data) {
+        throw new DomainError('VALIDATION_ERROR', 'file wajib disertakan (multipart field "file")', 400);
+      }
+      const fileIdField = data.fields.file_id as { value?: string } | undefined;
+      const fileId = fileIdField?.value;
+      if (!fileId) {
+        throw new DomainError('VALIDATION_ERROR', 'file_id wajib disertakan sebagai form field', 400);
+      }
+      const buffer = await data.toBuffer();
+      const userIdField = data.fields.user_id as { value?: string } | undefined;
+
+      await replaceFile(fileId, buffer);
+      await deleteFileChunks([fileId]);
+      const chunks = await ingestFile(fileId, userIdField?.value ?? null, buffer.toString('utf8'));
+      return reply.send({ file_id: fileId, chunks });
+    });
+
+    // DELETE /orchestrator/rag/remove_file
+    typedSecured.delete('/orchestrator/rag/remove_file', {
+      schema: { body: RagRemoveFileSchema },
+    }, async (req, reply) => {
+      const { file_ids } = req.body as z.infer<typeof RagRemoveFileSchema>;
+      await deleteStoredFiles(file_ids);
+      await deleteFileChunks(file_ids);
+      return reply.code(204).send();
+    });
+
+    // POST /orchestrator/rag/query — retrieval + generation, matching
+    // legacy /rag/query's { query } in, { query, response } out shape.
+    typedSecured.post('/orchestrator/rag/query', {
+      schema: { body: RagQuerySchema },
+    }, async (req, reply) => {
+      const { query: userQuery } = req.body as z.infer<typeof RagQuerySchema>;
+      const retrieved = await retrievalWithRerank(userQuery);
+      const response = await generateRagResponse(userQuery, retrieved);
+      return reply.send({ query: userQuery, response });
     });
   });
 }

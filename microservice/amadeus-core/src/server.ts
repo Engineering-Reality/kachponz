@@ -10,10 +10,12 @@ import { registerOrchestratorRoutes } from './orchestrator/routes.js';
 import { registerToolsRoutes } from './routes/tools.js';
 import { registerAgentsRoutes } from './routes/agents.js';
 import { registerAuthRoutes } from './routes/auth.js';
+import { registerFeatureSharingRoutes } from './routes/featureSharing.js';
 import { DomainError } from './types/domain.js';
 import { closePool } from './db/pool.js';
 import fastifySwagger from '@fastify/swagger';
 import fastifySwaggerUi from '@fastify/swagger-ui';
+import fastifyMultipart from '@fastify/multipart';
 import { jsonSchemaTransform, serializerCompiler, validatorCompiler } from 'fastify-type-provider-zod';
 
 export async function buildServer() {
@@ -41,6 +43,12 @@ export async function buildServer() {
     credentials: true,
     methods: ['GET', 'POST', 'PUT', 'DELETE', 'PATCH', 'OPTIONS'],
     allowedHeaders: ['Content-Type', 'Authorization', 'X-Robot-Key', 'X-Signature', 'X-Robot-Timestamp', 'X-Robot-Signing-Secret'],
+  });
+
+  // RAG file uploads (/orchestrator/rag/upload_file, update_file) — same 10MB
+  // ceiling as bodyLimit above.
+  await app.register(fastifyMultipart, {
+    limits: { fileSize: 10 * 1_048_576 },
   });
 
   await app.register(fastifySwagger, {
@@ -149,6 +157,7 @@ export async function buildServer() {
   await registerOrchestratorRoutes(app as any);
   await registerToolsRoutes(app as any, {});
   await registerAgentsRoutes(app as any, {});
+  await registerFeatureSharingRoutes(app as any, {});
   // Login manusia (admin dashboard) — hanya aktif bila OAUTH2_JWT_SECRET
   // di-set, karena itulah yang menandatangani token; sama gaya feature-flag
   // dengan ENABLE_TRANSACTION_ROUTES di atas.

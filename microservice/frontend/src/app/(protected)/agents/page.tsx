@@ -4,6 +4,7 @@ import { useEffect, useState } from "react";
 import Link from "next/link";
 import { RainbowRibbonLoader } from "@/components/RainbowRibbonLoader";
 import { Select, MultiSelect } from "@/components/Select";
+import { ShareModal } from "@/components/ShareModal";
 import {
   RefreshCw,
   Plus,
@@ -11,6 +12,7 @@ import {
   Power,
   Edit2,
   Trash2,
+  Share2,
   X,
   Wrench,
   ChevronRight,
@@ -204,6 +206,7 @@ export default function AgentsPage() {
   const [isModalOpen, setIsModalOpen] = useState(false);
   const [modalMode, setModalMode] = useState<"create" | "edit">("create");
   const [currentAgent, setCurrentAgent] = useState<any>(null);
+  const [sharingAgent, setSharingAgent] = useState<{ id: string; name: string } | null>(null);
   const [formData, setFormData] = useState({
     agent_name: "",
     description: "",
@@ -484,6 +487,9 @@ export default function AgentsPage() {
 
                 {/* Actions (visible on hover) */}
                 <div className="absolute top-4 right-4 flex gap-1 opacity-0 group-hover:opacity-100 transition-opacity z-20">
+                  <button onClick={() => setSharingAgent({ id: agent.agent_id, name: agent.agent_name })} className="p-1.5 bg-white border border-slate-200 text-slate-400 hover:text-violet-600 hover:border-violet-200 hover:bg-violet-50 rounded-lg shadow-sm transition-all">
+                    <Share2 className="w-3.5 h-3.5" />
+                  </button>
                   <button onClick={() => openEditModal(agent)} className="p-1.5 bg-white border border-slate-200 text-slate-400 hover:text-slate-700 hover:border-slate-300 rounded-lg shadow-sm transition-all">
                     <Edit2 className="w-3.5 h-3.5" />
                   </button>
@@ -822,6 +828,14 @@ export default function AgentsPage() {
             </div>
           </div>
         </div>
+      )}
+
+      {sharingAgent && (
+        <ShareModal
+          agentId={sharingAgent.id}
+          resourceName={sharingAgent.name}
+          onClose={() => setSharingAgent(null)}
+        />
       )}
     </div>
   );
