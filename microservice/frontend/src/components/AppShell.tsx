@@ -1,7 +1,7 @@
 "use client";
 
 import Link from "next/link";
-import { usePathname } from "next/navigation";
+import { usePathname, useRouter } from "next/navigation";
 import {
   LayoutDashboard,
   Bot,
@@ -10,7 +10,10 @@ import {
   Zap,
   BookOpen,
   ArrowUpRight,
+  LogOut,
 } from "lucide-react";
+import { GithubIcon, LinkedinIcon } from "@/components/Icons";
+import { MARKETING_CHROMELESS_ROUTES } from "@/lib/marketingNav";
 
 const NAV_SECTIONS = [
   {
@@ -33,9 +36,20 @@ const ALL_ITEMS = NAV_SECTIONS.flatMap((s) => s.items);
 
 export function AppShell({ children }: { children: React.ReactNode }) {
   const pathname = usePathname();
-  const isHome = pathname === "/";
+  const router = useRouter();
 
-  if (isHome) return <>{children}</>;
+  const handleLogout = async () => {
+    await fetch("/api/auth/logout", { method: "POST" });
+    router.push("/login");
+    router.refresh();
+  };
+
+  const isChromeless =
+    pathname === "/" ||
+    pathname === "/login" ||
+    MARKETING_CHROMELESS_ROUTES.some((route) => pathname === route || pathname.startsWith(route + "/"));
+
+  if (isChromeless) return <>{children}</>;
 
   const current = ALL_ITEMS.find((n) => pathname === n.href || pathname.startsWith(n.href + "/"));
 
@@ -107,6 +121,14 @@ export function AppShell({ children }: { children: React.ReactNode }) {
             </div>
           </div>
           <div className="flex items-center gap-4">
+            <div className="hidden md:flex items-center gap-3 mr-2">
+              <a href="https://github.com" target="_blank" rel="noopener noreferrer" className="p-1.5 text-slate-400 hover:text-slate-800 transition-colors bg-white hover:bg-slate-50 border border-slate-200 rounded-full shadow-sm">
+                <GithubIcon className="w-4 h-4" />
+              </a>
+              <a href="https://linkedin.com" target="_blank" rel="noopener noreferrer" className="p-1.5 text-slate-400 hover:text-[#0A66C2] transition-colors bg-white hover:bg-slate-50 border border-slate-200 rounded-full shadow-sm">
+                <LinkedinIcon className="w-4 h-4" />
+              </a>
+            </div>
             <span className="hidden md:inline-flex items-center gap-2 text-xs font-medium text-slate-500 bg-slate-100 px-2.5 py-1 rounded-full">
               <span className="w-2 h-2 rounded-full bg-emerald-500 shadow-[0_0_8px_rgba(16,185,129,0.4)]" />
               Operational
@@ -119,6 +141,13 @@ export function AppShell({ children }: { children: React.ReactNode }) {
             >
               API Docs <ArrowUpRight className="w-3 h-3" />
             </a>
+            <button
+              onClick={handleLogout}
+              className="flex items-center gap-1.5 bg-slate-900 border border-slate-900 text-white text-xs font-medium py-1.5 px-3 rounded-full hover:bg-slate-800 transition-colors shadow-sm ml-1"
+              title="Sign Out"
+            >
+              <LogOut className="w-3 h-3" /> <span className="hidden md:inline">Sign Out</span>
+            </button>
           </div>
         </header>
 

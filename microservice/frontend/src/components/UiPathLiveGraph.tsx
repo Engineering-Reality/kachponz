@@ -105,16 +105,12 @@ const nodeTypes = {
 
 type UiPathJob = { id: string; key: string; processName: string; state: string; createdAt: string; info?: string; logs?: string; };
 
-export function UiPathLiveGraph({ 
+export function UiPathLiveGraph({
   sessionLabel,
   agentId,
-  apiUrl, 
-  robotKey 
-}: { 
-  sessionLabel: string | null; 
+}: {
+  sessionLabel: string | null;
   agentId: string | null;
-  apiUrl: string; 
-  robotKey: string; 
 }) {
   const [contextData, setContextData] = useState<any>(null);
   const [loading, setLoading] = useState(true);
@@ -141,13 +137,11 @@ export function UiPathLiveGraph({
     // scheduled.
     const failuresRef = { current: 0 };
 
-    const endpoint = `${apiUrl}/orchestrator/agents/${agentId}/uipath-context`;
+    const endpoint = `/api/orchestrator/agents/${agentId}/uipath-context`;
 
     const fetchContext = async (retryCount = 0) => {
       try {
-        const res = await fetch(endpoint, {
-          headers: { 'X-Robot-Key': robotKey }
-        });
+        const res = await fetch(endpoint);
         if (!res.ok) {
           if ((res.status === 401 || res.status === 502) && retryCount < 3) {
             if (isMounted) {
@@ -199,7 +193,7 @@ export function UiPathLiveGraph({
       isMounted = false;
       clearTimeout(timeoutId);
     };
-  }, [agentId, apiUrl, robotKey]);
+  }, [agentId]);
 
   useEffect(() => {
     if (!contextData || !contextData.tools) return;

@@ -14,13 +14,9 @@ export function McpManagerBanner() {
   const [lastError, setLastError] = useState<string | null>(null);
 
   useEffect(() => {
-    const apiUrl = process.env.NEXT_PUBLIC_API_URL || "http://127.0.0.1:8080";
-    const robotKey = process.env.NEXT_PUBLIC_ROBOT_KEY || "";
-    const headers = { "x-robot-key": robotKey };
-
     const check = async () => {
       try {
-        const res = await fetch(`${apiUrl}/orchestrator/mcp/manager-status`, { headers });
+        const res = await fetch("/api/orchestrator/mcp/manager-status");
         if (!res.ok) return;
         const data: { running: boolean; crashedEarly: boolean; lastError: string | null } = await res.json();
         setCrashedEarly(data.crashedEarly);

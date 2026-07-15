@@ -28,8 +28,6 @@ const AUTH_FAILURE_BADGE: Record<AuthFailureCause, { label: string; className: s
 
 interface AgentContextPanelProps {
   agentId: string;
-  apiUrl: string;
-  robotKey: string;
 }
 
 /**
@@ -37,7 +35,7 @@ interface AgentContextPanelProps {
  * response to a chat message, so it never consumes a conversational turn.
  * Renders nothing if the agent has no UiPath-type tools attached.
  */
-export function AgentContextPanel({ agentId, apiUrl, robotKey }: AgentContextPanelProps) {
+export function AgentContextPanel({ agentId }: AgentContextPanelProps) {
   const [tools, setTools] = useState<ToolContext[] | null>(null);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
@@ -47,9 +45,7 @@ export function AgentContextPanel({ agentId, apiUrl, robotKey }: AgentContextPan
     setLoading(true);
     setError(null);
     try {
-      const res = await fetch(`${apiUrl}/orchestrator/agents/${agentId}/uipath-context`, {
-        headers: { "x-robot-key": robotKey },
-      });
+      const res = await fetch(`/api/orchestrator/agents/${agentId}/uipath-context`);
       if (!res.ok) throw new Error(`${res.status} ${res.statusText}`);
       const data = await res.json();
       setTools(data.tools ?? []);
@@ -59,7 +55,7 @@ export function AgentContextPanel({ agentId, apiUrl, robotKey }: AgentContextPan
     } finally {
       setLoading(false);
     }
-  }, [agentId, apiUrl, robotKey]);
+  }, [agentId]);
 
   useEffect(() => {
     fetchContext();
