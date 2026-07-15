@@ -296,7 +296,7 @@ async function statusOf(env: A2AEnvelope): Promise<A2AResult> {
  * have no job to key a NOT-NULL/UNIQUE job_id column on, so they're not wired
  * into this table.
  */
-function extractJobTraceMeta(
+export function extractJobTraceMeta(
   toolName: string,
   meta: Record<string, unknown> | undefined,
 ): { jobId: string; jobKey: string | null; releaseKey: string | null; folderId: string | null; state: string; info: string | null } | null {
@@ -805,6 +805,7 @@ export async function runAgenticStep(
   agentId?: string,
   mode: InvocationMode = 'playground',
   sessionLabel?: string,
+  runtime: 'cloud' | 'on_prem' = 'cloud',
 ): Promise<A2AResult & { mcpHealth?: McpServerHealth[] }> {
   let txId: string;
   let step: string;
@@ -893,7 +894,17 @@ export async function runAgenticStep(
 
     const resolvedModel = agentConfig.model && agentConfig.model !== "gpt-4o"
       ? agentConfig.model
-      : (requiresVision ? "qwen-vl-max" : (process.env.QWEN_LLM_MODEL || "qwen3.6-35b"));
+      : (requiresVision 
+          ? (runtime === 'on_prem' ? 'Qwen VLM' : "qwen-vl-max") 
+          : (runtime === 'on_prem' ? 'qwen3.6-35b' : (process.env.QWEN_LLM_MODEL || "qwen3.6-35b")));
+
+    const apiKey = runtime === 'on_prem' 
+      ? (process.env.NETRA_API_KEY || "sk_live_ys3wmhiNoA4OfJVE_6sjj7OA_UZoSNO22sTOTCHBxp3fuqHTIMEShmEBojnk")
+      : process.env.QWEN_API_KEY;
+      
+    const baseURL = runtime === 'on_prem' 
+      ? "https://api.netraruntime.com/v1"
+      : process.env.QWEN_BASE_URL;
 
     // 4. Instantiate LangGraph createReactAgent In-Memory
     const llm = new ChatOpenAI({
@@ -901,9 +912,9 @@ export async function runAgenticStep(
       temperature: 1,
       topP: 1,
       modelKwargs: { top_k: 40, min_p: 0 },
-      apiKey: process.env.NETRA_API_KEY || "sk_live_ys3wmhiNoA4OfJVE_6sjj7OA_UZoSNO22sTOTCHBxp3fuqHTIMEShmEBojnk",
+      apiKey,
       configuration: {
-        baseURL: "https://api.netraruntime.com/v1",
+        baseURL,
       }
     });
 
@@ -1014,6 +1025,7 @@ export async function runAgenticStepStream(
   mode: InvocationMode,
   reply: FastifyReply,
   sessionLabel?: string,
+  runtime: 'cloud' | 'on_prem' = 'cloud',
 ): Promise<void> {
   // reply.hijack() (called by the route handler before this function runs)
   // takes the raw response out of Fastify's control, so @fastify/cors's
@@ -1122,7 +1134,17 @@ export async function runAgenticStepStream(
 
     const resolvedModel = agentConfig.model && agentConfig.model !== "gpt-4o"
       ? agentConfig.model
-      : (requiresVision ? "qwen-vl-max" : (process.env.QWEN_LLM_MODEL || "qwen3.6-35b"));
+      : (requiresVision 
+          ? (runtime === 'on_prem' ? 'Qwen VLM' : "qwen-vl-max") 
+          : (runtime === 'on_prem' ? 'qwen3.6-35b' : (process.env.QWEN_LLM_MODEL || "qwen3.6-35b")));
+
+    const apiKey = runtime === 'on_prem' 
+      ? (process.env.NETRA_API_KEY || "sk_live_ys3wmhiNoA4OfJVE_6sjj7OA_UZoSNO22sTOTCHBxp3fuqHTIMEShmEBojnk")
+      : process.env.QWEN_API_KEY;
+      
+    const baseURL = runtime === 'on_prem' 
+      ? "https://api.netraruntime.com/v1"
+      : process.env.QWEN_BASE_URL;
 
     const modelInitStart = Date.now();
     const llm = new ChatOpenAI({
@@ -1130,9 +1152,9 @@ export async function runAgenticStepStream(
       temperature: 1,
       topP: 1,
       modelKwargs: { top_k: 40, min_p: 0 },
-      apiKey: process.env.NETRA_API_KEY || "sk_live_ys3wmhiNoA4OfJVE_6sjj7OA_UZoSNO22sTOTCHBxp3fuqHTIMEShmEBojnk",
+      apiKey,
       configuration: {
-        baseURL: "https://api.netraruntime.com/v1",
+        baseURL,
       },
       streaming: true
     });

@@ -18,6 +18,7 @@
     "user:register": "tsx scripts/registerUser.ts",
     "user:reset-password": "tsx scripts/resetUserPassword.ts",
     "agent:sandbox": "tsx scripts/agentSandbox.ts",
+    "recipe:seed-danantara": "tsx scripts/seedDanantaraRecipe.ts",
     "test": "NODE_ENV=test vitest run",
     "test:watch": "NODE_ENV=test vitest",
     "typecheck": "tsc --noEmit -p tsconfig.json"

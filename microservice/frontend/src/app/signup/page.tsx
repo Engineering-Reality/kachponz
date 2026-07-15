@@ -4,6 +4,7 @@ import { useState } from "react";
 import { useRouter } from "next/navigation";
 import Link from "next/link";
 import InteractiveAuthGradient from "@/components/InteractiveAuthGradient";
+import { Lock, Mail, User, ShieldCheck, ArrowRight, Loader2 } from "lucide-react";
 
 export default function SignupPage() {
   const router = useRouter();
@@ -11,92 +12,163 @@ export default function SignupPage() {
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
   const [loading, setLoading] = useState(false);
+  const [error, setError] = useState<string | null>(null);
 
   async function handleSubmit(e: React.FormEvent) {
     e.preventDefault();
     setLoading(true);
-    // Mock signup flow - in a real app, hit an API endpoint here
-    setTimeout(() => {
+    setError(null);
+
+    try {
+      const res = await fetch("/api/auth/register", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ name, email, password }),
+      });
+      const data = await res.json();
+
+      if (!res.ok || data.error) {
+        setError(data?.error?.message ?? "Failed to create account. Email may already be in use.");
+        setLoading(false);
+        return;
+      }
+
+      if (data.redirect) {
+        router.push(data.redirect);
+        router.refresh();
+      } else {
+        router.push("/dashboard");
+      }
+    } catch (err: any) {
+      setError("Network error. Please try again later.");
       setLoading(false);
-      router.push("/dashboard");
-    }, 1000);
+    }
   }
 
   return (
-    <div className="min-h-[100dvh] flex items-center justify-center bg-slate-50 p-4 md:p-8">
-      <div className="w-full max-w-6xl bg-white border border-slate-200 rounded-[2.5rem] shadow-2xl shadow-slate-200/60 overflow-hidden flex min-h-[700px]">
+    <div className="min-h-[100dvh] flex items-center justify-center bg-slate-100 p-4 md:p-8 font-sans">
+      <div className="w-full max-w-6xl bg-white/80 backdrop-blur-xl border border-slate-200/60 rounded-[2.5rem] shadow-2xl shadow-slate-300/50 overflow-hidden flex min-h-[750px]">
         
         {/* Left Side: Interactive Gradient */}
-        <div className="hidden lg:block lg:w-1/2 p-4">
+        <div className="hidden lg:block lg:w-[45%] p-4">
           <InteractiveAuthGradient 
-            title="The 1st Agentic Platform for RPA."
-            description="Coordinate human analysts, intelligent AI agents, and legacy RPA bots to fully automate your complex operations."
+            title="Next-Gen Orchestration."
+            description="Create your administrator account to manage human-in-the-loop agents and legacy RPA systems."
           />
         </div>
 
         {/* Right Side: Form */}
-        <div className="w-full lg:w-1/2 p-10 md:p-16 flex flex-col justify-center">
+        <div className="w-full lg:w-[55%] p-10 md:p-16 flex flex-col justify-center bg-white">
           <div className="max-w-md w-full mx-auto">
-            <Link href="/" className="inline-flex items-center gap-3 mb-10 group">
-              {/* eslint-disable-next-line @next/next/no-img-element */}
-              <img src="/amadeus.svg" alt="Amadeus" className="w-10 h-10 object-contain drop-shadow-sm filter-none transition-transform group-hover:scale-110" />
-              <span className="font-extrabold text-xl tracking-tight text-slate-900">Amadeus</span>
-            </Link>
-
-            <h1 className="text-3xl font-extrabold text-slate-900 mb-2 tracking-tight">Request Access</h1>
-            <p className="text-[15px] text-slate-500 mb-10">Join the orchestration platform built for scale.</p>
-
-            <form onSubmit={handleSubmit} className="space-y-5">
-              <div>
-                <label className="block text-[13px] font-bold text-slate-700 mb-2">Full Name</label>
-                <input
-                  type="text"
-                  required
-                  value={name}
-                  onChange={(e) => setName(e.target.value)}
-                  placeholder="e.g. John Doe"
-                  className="w-full rounded-xl border border-slate-200 bg-slate-50 px-4 py-3.5 text-[14px] text-slate-800 focus:outline-none focus:ring-2 focus:ring-pink-500 focus:bg-white transition-all shadow-sm"
-                  autoComplete="name"
-                />
+            <div className="flex items-center justify-between mb-8">
+              <Link href="/" className="inline-flex items-center gap-3 group">
+                {/* eslint-disable-next-line @next/next/no-img-element */}
+                <img src="/amadeus.svg" alt="Amadeus" className="w-9 h-9 object-contain drop-shadow-sm transition-transform group-hover:scale-110" />
+                <span className="font-extrabold text-xl tracking-tight text-slate-900">Amadeus</span>
+              </Link>
+              <div className="flex items-center gap-1.5 px-3 py-1 bg-indigo-50 border border-indigo-100 rounded-full text-indigo-700 text-[10px] font-bold uppercase tracking-wider">
+                <ShieldCheck className="w-3.5 h-3.5" />
+                Admin Portal
               </div>
-              <div>
-                <label className="block text-[13px] font-bold text-slate-700 mb-2">Work Email</label>
-                <input
-                  type="email"
-                  required
-                  value={email}
-                  onChange={(e) => setEmail(e.target.value)}
-                  placeholder="admin@bankmandiri.co.id"
-                  className="w-full rounded-xl border border-slate-200 bg-slate-50 px-4 py-3.5 text-[14px] text-slate-800 focus:outline-none focus:ring-2 focus:ring-pink-500 focus:bg-white transition-all shadow-sm"
-                  autoComplete="email"
-                />
+            </div>
+
+            <h1 className="text-3xl font-extrabold text-slate-900 mb-2 tracking-tight">Create Account</h1>
+            <p className="text-[14px] text-slate-500 mb-8">Register to access the enterprise administration dashboard.</p>
+
+            {/* SSO Placeholder */}
+            <button
+              type="button"
+              onClick={() => alert("SSO integration is not configured in this environment.")}
+              className="w-full flex items-center justify-center gap-3 rounded-xl border-2 border-slate-200 bg-white px-4 py-3.5 text-[14px] font-bold text-slate-700 hover:border-slate-300 hover:bg-slate-50 transition-all focus:outline-none focus:ring-4 focus:ring-slate-100"
+            >
+              <svg className="w-5 h-5 text-[#24292F]" fill="currentColor" viewBox="0 0 24 24" aria-hidden="true">
+                <path fillRule="evenodd" d="M12 2C6.477 2 2 6.484 2 12.017c0 4.425 2.865 8.18 6.839 9.504.5.092.682-.217.682-.483 0-.237-.008-.868-.013-1.703-2.782.605-3.369-1.343-3.369-1.343-.454-1.158-1.11-1.466-1.11-1.466-.908-.62.069-.608.069-.608 1.003.07 1.531 1.032 1.531 1.032.892 1.53 2.341 1.088 2.91.832.092-.647.35-1.088.636-1.338-2.22-.253-4.555-1.113-4.555-4.951 0-1.093.39-1.988 1.029-2.688-.103-.253-.446-1.272.098-2.65 0 0 .84-.27 2.75 1.026A9.564 9.564 0 0112 6.844c.85.004 1.705.115 2.504.337 1.909-1.296 2.747-1.027 2.747-1.027.546 1.379.202 2.398.1 2.651.64.7 1.028 1.595 1.028 2.688 0 3.848-2.339 4.695-4.566 4.943.359.309.678.92.678 1.855 0 1.338-.012 2.419-.012 2.747 0 .268.18.58.688.482A10.019 10.019 0 0022 12.017C22 6.484 17.522 2 12 2z" clipRule="evenodd" />
+              </svg>
+              Sign up with SAML SSO
+            </button>
+
+            <div className="flex items-center gap-4 my-6">
+              <div className="h-px flex-1 bg-slate-200"></div>
+              <span className="text-[11px] font-semibold text-slate-400 uppercase tracking-widest">or continue with email</span>
+              <div className="h-px flex-1 bg-slate-200"></div>
+            </div>
+
+            {error && (
+              <div className="bg-red-50 border border-red-100 rounded-xl px-4 py-3 mb-6 animate-in fade-in slide-in-from-top-2">
+                <p className="text-[13px] text-red-600 font-medium">{error}</p>
               </div>
+            )}
+
+            <form onSubmit={handleSubmit} className="space-y-4">
               <div>
-                <label className="block text-[13px] font-bold text-slate-700 mb-2">Password</label>
-                <input
-                  type="password"
-                  required
-                  value={password}
-                  onChange={(e) => setPassword(e.target.value)}
-                  placeholder="••••••••"
-                  className="w-full rounded-xl border border-slate-200 bg-slate-50 px-4 py-3.5 text-[14px] text-slate-800 focus:outline-none focus:ring-2 focus:ring-pink-500 focus:bg-white transition-all shadow-sm"
-                  autoComplete="new-password"
-                />
+                <label className="block text-[12px] font-bold text-slate-700 mb-1.5 ml-1">Full Name</label>
+                <div className="relative group">
+                  <User className="absolute left-4 top-1/2 -translate-y-1/2 w-4 h-4 text-slate-400 group-focus-within:text-indigo-500 transition-colors" />
+                  <input
+                    type="text"
+                    required
+                    value={name}
+                    onChange={(e) => setName(e.target.value)}
+                    placeholder="e.g. John Doe"
+                    className="w-full rounded-xl border border-slate-200 bg-slate-50/50 pl-11 pr-4 py-3.5 text-[14px] text-slate-800 placeholder-slate-400 focus:outline-none focus:ring-2 focus:ring-indigo-500/20 focus:border-indigo-500 focus:bg-white transition-all shadow-inner"
+                    autoComplete="name"
+                  />
+                </div>
+              </div>
+
+              <div>
+                <label className="block text-[12px] font-bold text-slate-700 mb-1.5 ml-1">Work Email</label>
+                <div className="relative group">
+                  <Mail className="absolute left-4 top-1/2 -translate-y-1/2 w-4 h-4 text-slate-400 group-focus-within:text-indigo-500 transition-colors" />
+                  <input
+                    type="email"
+                    required
+                    value={email}
+                    onChange={(e) => setEmail(e.target.value)}
+                    placeholder="admin@company.com"
+                    className="w-full rounded-xl border border-slate-200 bg-slate-50/50 pl-11 pr-4 py-3.5 text-[14px] text-slate-800 placeholder-slate-400 focus:outline-none focus:ring-2 focus:ring-indigo-500/20 focus:border-indigo-500 focus:bg-white transition-all shadow-inner"
+                    autoComplete="email"
+                  />
+                </div>
+              </div>
+              
+              <div>
+                <label className="block text-[12px] font-bold text-slate-700 mb-1.5 ml-1">Password</label>
+                <div className="relative group">
+                  <Lock className="absolute left-4 top-1/2 -translate-y-1/2 w-4 h-4 text-slate-400 group-focus-within:text-indigo-500 transition-colors" />
+                  <input
+                    type="password"
+                    required
+                    minLength={8}
+                    value={password}
+                    onChange={(e) => setPassword(e.target.value)}
+                    placeholder="Min. 8 characters"
+                    className="w-full rounded-xl border border-slate-200 bg-slate-50/50 pl-11 pr-4 py-3.5 text-[14px] text-slate-800 placeholder-slate-400 focus:outline-none focus:ring-2 focus:ring-indigo-500/20 focus:border-indigo-500 focus:bg-white transition-all shadow-inner"
+                    autoComplete="new-password"
+                  />
+                </div>
               </div>
 
               <button
                 type="submit"
                 disabled={loading}
-                className="w-full rounded-xl bg-slate-900 text-white text-[15px] font-bold py-3.5 mt-4 hover:bg-slate-800 disabled:opacity-50 transition-all shadow-lg shadow-slate-900/10 hover:shadow-slate-900/20 active:scale-[0.98]"
+                className="w-full relative overflow-hidden rounded-xl bg-gradient-to-r from-slate-900 to-slate-800 text-white text-[15px] font-bold py-4 mt-6 hover:from-slate-800 hover:to-slate-700 disabled:opacity-70 transition-all shadow-lg shadow-slate-900/20 hover:shadow-slate-900/30 active:scale-[0.98] group"
               >
-                {loading ? "Creating account…" : "Request Access"}
+                <div className="absolute inset-0 bg-white/20 translate-y-full group-hover:translate-y-0 transition-transform duration-300 ease-out"></div>
+                <div className="relative flex items-center justify-center gap-2">
+                  {loading ? (
+                    <><Loader2 className="w-5 h-5 animate-spin" /> Creating Account...</>
+                  ) : (
+                    <>Create Administrator Account <ArrowRight className="w-4 h-4 group-hover:translate-x-1 transition-transform" /></>
+                  )}
+                </div>
               </button>
             </form>
 
-            <div className="mt-8 text-center text-[14px] text-slate-500">
-              Already have an account?{" "}
-              <Link href="/login" className="font-bold text-slate-900 hover:text-pink-600 transition-colors">
-                Sign in
+            <div className="mt-8 text-center text-[13px] text-slate-500">
+              Already an administrator?{" "}
+              <Link href="/login" className="font-bold text-indigo-600 hover:text-indigo-700 transition-colors">
+                Sign in to portal
               </Link>
             </div>
           </div>

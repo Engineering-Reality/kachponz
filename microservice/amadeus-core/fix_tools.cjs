@@ -18,9 +18,9 @@ async function fix() {
     if (release) {
       release.command = 'node';
       if (row.name === 'amadeus-mcp') {
-        release.args = ['/home/firania/Downloads/ponzgen/microservice/amadeus-mcp/build/index.js'];
+        release.args = ['/home/firania/Downloads/ponzgen/microservice/mcp/amadeus-mcp/build/index.js'];
       } else {
-        release.args = ['/home/firania/Downloads/ponzgen/microservice/mcp-uipath/build/index.js'];
+        release.args = ['/home/firania/Downloads/ponzgen/microservice/mcp/mcp-uipath/build/index.js'];
       }
       
       await client.query('UPDATE tools SET versions = $1 WHERE tool_id = $2', [JSON.stringify(versions), row.tool_id]);

@@ -62,11 +62,8 @@ export function MarketingHeader() {
             </div>
             <div className="w-px h-5 bg-slate-300 hidden xl:block" />
             <div className="flex items-center gap-3">
-              <Link href="/#demo" className="text-[13px] font-bold text-slate-700 hover:text-pink-600 transition-colors hidden md:block">
-                Book a Demo
-              </Link>
-              <Link href="/signup" className="inline-flex items-center gap-1.5 bg-slate-900 text-white text-[13px] font-bold py-2 px-5 rounded-full hover:bg-slate-800 transition-colors shadow-lg shadow-slate-900/10 active:scale-[0.98]">
-                Try for free <ArrowRight className="w-3.5 h-3.5" />
+              <Link href="/login" className="inline-flex items-center gap-1.5 bg-slate-900 text-white text-[13px] font-bold py-2 px-5 rounded-full hover:bg-slate-800 transition-colors shadow-lg shadow-slate-900/10 active:scale-[0.98]">
+                Sign in <ArrowRight className="w-3.5 h-3.5" />
               </Link>
             </div>
           </div>

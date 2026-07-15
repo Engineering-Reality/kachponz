@@ -1,17 +1,10 @@
 "use client";
 
-import { useState } from "react";
+import { useState, useRef, useEffect, useCallback } from "react";
 import {
-  Bot,
-  Send,
-  Cpu,
-  CheckCircle,
-  Wand2,
-  Headset,
-  LineChart,
-  Code2,
-  Landmark,
-  X,
+  Bot, Send, Cpu, CheckCircle, Wand2, Headset, LineChart,
+  Code2, Landmark, Loader2, Wrench, AlertTriangle, RotateCcw,
+  Globe, Search, ExternalLink, Plus,
 } from "lucide-react";
 
 interface Message {
@@ -19,173 +12,564 @@ interface Message {
   content: string;
 }
 
+interface AgentConfig {
+  agent_name: string;
+  description: string;
+  agent_style: string;
+  keywords: string[];
+  tool_ids: string[];
+  reasoning: string;
+  available_tools: { tool_id: string; name: string; description: string | null }[];
+}
+
+interface McpServer {
+  name: string;
+  description: string;
+  repository: string;
+  version: string;
+  remotes: { type: string; url: string }[];
+  official: boolean;
+}
+
 const EXAMPLES = [
   { icon: Headset, label: "Customer Support", text: "Create a customer support agent that answers questions about LC settlement status and escalates unresolved issues to a human checker." },
   { icon: LineChart, label: "Data Analyst", text: "Create a data analyst agent that queries transaction history and generates settlement summaries in JSON format." },
   { icon: Code2, label: "Code Reviewer", text: "Create a code reviewer agent that validates UiPath bot scripts against Amadeus A2A protocol v1 specifications." },
-  { icon: Landmark, label: "LC Settlement Orchestrator", text: "Create an orchestrator agent that coordinates Import LC settlement across 9 steps using amadeus-mcp and mcp-uipath tools. It should use cost-aware routing (LLM for doc examination, PAD for simple CRUD, UiPath for financial steps) and provide real-time status updates." },
+  { icon: Landmark, label: "LC Settlement", text: "Create an orchestrator agent that coordinates Import LC settlement across 9 steps using amadeus-mcp and mcp-uipath tools." },
 ];
 
 export default function AgentCreator() {
+  const [activeTab, setActiveTab] = useState<"architect" | "discover">("architect");
+
+  // --- Architect state ---
   const [input, setInput] = useState("");
   const [messages, setMessages] = useState<Message[]>([
-    {
-      role: "bot",
-      content:
-        "Hello! I'm the Architect — describe the agent you'd like to build and I'll help configure its persona, system prompt, and MCP tool assignments.",
-    },
+    { role: "bot", content: "Hello! I'm the Architect — describe the agent you'd like to build and I'll configure its persona, system prompt, and MCP tool assignments using AI." },
   ]);
+  const [config, setConfig] = useState<AgentConfig | null>(null);
+  const [recommendedExternal, setRecommendedExternal] = useState<McpServer[]>([]);
+  const [isSearchingExternal, setIsSearchingExternal] = useState(false);
+  const [isLoading, setIsLoading] = useState(false);
+  const [error, setError] = useState<string | null>(null);
+  const [isSaving, setIsSaving] = useState(false);
+  const [saved, setSaved] = useState(false);
+  const [selectedTools, setSelectedTools] = useState<Set<string>>(new Set());
+  const [installingExternal, setInstallingExternal] = useState<string | null>(null);
+  const messagesEndRef = useRef<HTMLDivElement>(null);
 
-  const handleSend = () => {
-    if (!input.trim()) return;
-    setMessages(prev => [...prev, { role: "user", content: input }]);
+  // --- Discover state ---
+  const [discoverQuery, setDiscoverQuery] = useState("");
+  const [discoverResults, setDiscoverResults] = useState<McpServer[]>([]);
+  const [discoverLoading, setDiscoverLoading] = useState(false);
+  const [discoverError, setDiscoverError] = useState<string | null>(null);
+  const [discoverSearched, setDiscoverSearched] = useState(false);
+
+  useEffect(() => {
+    messagesEndRef.current?.scrollIntoView({ behavior: "smooth" });
+  }, [messages]);
+
+  // Auto-load popular MCPs when user first opens the discover tab
+  useEffect(() => {
+    if (activeTab === "discover" && !discoverSearched) {
+      handleDiscover("");
+    }
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [activeTab]);
+
+  const handleSend = async () => {
+    if (!input.trim() || isLoading) return;
+    const userMsg = input.trim();
     setInput("");
-    setTimeout(() => {
+    setError(null);
+    setSaved(false);
+
+    setMessages(prev => [...prev, { role: "user", content: userMsg }]);
+    setMessages(prev => [...prev, { role: "bot", content: "Analyzing your description… generating agent configuration." }]);
+    setIsLoading(true);
+    setConfig(null);
+    setRecommendedExternal([]);
+
+    try {
+      const res = await fetch("/api/agents/create-from-description", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ description: userMsg }),
+      });
+
+      if (!res.ok) {
+        const data = await res.json().catch(() => ({}));
+        throw new Error(data.error?.message || data.message || `Error ${res.status}`);
+      }
+
+      const data: AgentConfig = await res.json();
+      setConfig(data);
+      setSelectedTools(new Set(data.tool_ids));
+      
+      // Auto-fetch recommended external tools based on LLM keywords
+      if (data.keywords && data.keywords.length > 0) {
+        setIsSearchingExternal(true);
+        try {
+          const kwSearch = data.keywords.slice(0, 2).join(" ");
+          let extRes = await fetch(`/api/mcp-registry/search?q=${encodeURIComponent(kwSearch)}&limit=3`);
+          let extData = extRes.ok ? await extRes.json() : { servers: [] };
+          
+          // Fallback to single keyword if combined search yields 0 results
+          if ((!extData.servers || extData.servers.length === 0) && data.keywords.length > 1) {
+            const fallbackRes = await fetch(`/api/mcp-registry/search?q=${encodeURIComponent(data.keywords[0])}&limit=3`);
+            if (fallbackRes.ok) {
+              extData = await fallbackRes.json();
+            }
+          }
+          
+          setRecommendedExternal(extData.servers ?? []);
+        } catch (e) {
+          console.error("Failed to fetch external recommendations", e);
+        } finally {
+          setIsSearchingExternal(false);
+        }
+      }
+
       setMessages(prev => [
-        ...prev,
-        {
-          role: "bot",
-          content:
-            "Analyzing your request… I'll extract the best persona, capabilities, and tool assignments based on your description.",
-        },
+        ...prev.slice(0, -1),
+        { role: "bot", content: `Done! I've configured **${data.agent_name}** with ${data.tool_ids.length} tool(s) assigned. Review the panel on the right and click "Compile Agent" to save it.` },
       ]);
-    }, 900);
+    } catch (err: any) {
+      setError(err.message);
+      setMessages(prev => [
+        ...prev.slice(0, -1),
+        { role: "bot", content: `Sorry, something went wrong: ${err.message}` },
+      ]);
+    } finally {
+      setIsLoading(false);
+    }
+  };
+
+  const handleCompile = async () => {
+    if (!config || isSaving) return;
+    setIsSaving(true);
+    try {
+      const res = await fetch("/api/agents", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          agent_name: config.agent_name,
+          description: config.description,
+          agent_style: config.agent_style,
+          tools: Array.from(selectedTools),
+          on_status: true,
+          share_editor_with: [],
+        }),
+      });
+      if (!res.ok) {
+        const data = await res.json().catch(() => ({}));
+        throw new Error(data.error?.message || `Error ${res.status}`);
+      }
+      setSaved(true);
+      setMessages(prev => [...prev, { role: "bot", content: `✅ Agent **${config.agent_name}** has been saved! You can find it in the Agents page.` }]);
+    } catch (err: any) {
+      setError(`Save failed: ${err.message}`);
+    } finally {
+      setIsSaving(false);
+    }
+  };
+
+  const handleDiscover = async (overrideQuery?: string) => {
+    const q = (overrideQuery !== undefined ? overrideQuery : discoverQuery).trim() || "automation";
+    setDiscoverLoading(true);
+    setDiscoverError(null);
+    setDiscoverSearched(true);
+    try {
+      const res = await fetch(`/api/mcp-registry/search?q=${encodeURIComponent(q)}&limit=15`);
+      if (!res.ok) throw new Error(`Error ${res.status}`);
+      const data = await res.json();
+      if (data.error) throw new Error(data.error);
+      setDiscoverResults(data.servers ?? []);
+    } catch (err: any) {
+      setDiscoverError(err.message);
+    } finally {
+      setDiscoverLoading(false);
+    }
+  };
+
+  const toggleTool = (toolId: string) => {
+    setSelectedTools(prev => {
+      const next = new Set(prev);
+      if (next.has(toolId)) next.delete(toolId);
+      else next.add(toolId);
+      return next;
+    });
+  };
+
+  const handleInstallExternal = async (ext: McpServer) => {
+    if (installingExternal) return;
+    setInstallingExternal(ext.name);
+    try {
+      const res = await fetch("/api/tools", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          name: ext.name,
+          description: ext.description,
+          versions: [{
+            version: ext.version || "1.0.0",
+            released: {
+              method: "stdio",
+              command: "npx",
+              args: ["-y", ext.name]
+            }
+          }],
+          on_status: "Offline",
+        }),
+      });
+      
+      if (!res.ok) {
+        const errorData = await res.json().catch(() => ({}));
+        throw new Error(errorData.error?.message || errorData.message || `Error ${res.status}`);
+      }
+      
+      const newTool = await res.json();
+      
+      // Add the new tool to config.available_tools and check it
+      if (config) {
+        setConfig({
+          ...config,
+          available_tools: [...config.available_tools, { tool_id: newTool.tool_id, name: newTool.name, description: newTool.description }]
+        });
+        setSelectedTools(prev => {
+          const next = new Set(prev);
+          next.add(newTool.tool_id);
+          return next;
+        });
+      }
+      
+      // Remove from recommended list
+      setRecommendedExternal(prev => prev.filter(item => item.name !== ext.name));
+      
+    } catch (err: any) {
+      setError(`Failed to install ${ext.name}: ${err.message}`);
+    } finally {
+      setInstallingExternal(null);
+    }
   };
 
   return (
-    <div className="flex h-full bg-white overflow-hidden">
-      {/* Chat */}
-      <div className="flex-1 flex flex-col border-r border-slate-200/70 min-w-0">
-        {/* Architect Header */}
-        <div className="px-6 py-4 border-b border-slate-200/70 bg-white flex items-center justify-between flex-shrink-0">
-          <div className="flex items-center gap-3">
-            <div className="w-9 h-9 rounded-xl flex items-center justify-center overflow-hidden relative flex-shrink-0">
-              <div className="absolute inset-0 vibrant-rainbow-border animate-border-spin opacity-90" />
-              <div className="absolute inset-[2px] bg-white rounded-[9px] flex items-center justify-center">
-                <Wand2 className="w-4 h-4 text-slate-800" />
-              </div>
-            </div>
-            <div>
-              <h1 className="text-sm font-semibold text-slate-900 leading-tight">Agent Architect</h1>
-              <p className="ui-label text-slate-400">Natural-language agent builder</p>
-            </div>
-          </div>
-          <span className="badge badge-slate">Draft session</span>
-        </div>
-
-        {/* Messages */}
-        <div className="flex-1 overflow-y-auto p-6">
-          <div className="max-w-2xl mx-auto space-y-5">
-            {messages.map((msg, idx) => (
-              <div
-                key={idx}
-                className={`flex gap-3 ${msg.role === "user" ? "justify-end" : "justify-start"}`}
-              >
-                {msg.role === "bot" && (
-                  <div className="w-8 h-8 rounded-full flex items-center justify-center flex-shrink-0 mt-0.5 relative overflow-hidden p-[1.5px]">
-                    <div className="absolute inset-0 vibrant-rainbow-border animate-border-spin opacity-90" />
-                    <div className="relative z-10 w-full h-full rounded-full bg-white flex items-center justify-center">
-                      <Bot className="w-4 h-4 text-slate-700" />
-                    </div>
-                  </div>
-                )}
-                <div
-                  className={`px-4 py-3 rounded-2xl max-w-[80%] text-sm leading-relaxed shadow-sm ${ msg.role === "user" ? "bg-slate-900 text-white rounded-tr-sm" : "bg-white border border-slate-200 text-slate-800 rounded-tl-sm" }`}
-                >
-                  {msg.content}
-                </div>
-              </div>
-            ))}
-          </div>
-        </div>
-
-        {/* Example Prompts */}
-        <div className="px-6 pb-3">
-          <div className="max-w-2xl mx-auto">
-            <p className="ui-label text-slate-400 mb-2">Start from a template</p>
-            <div className="flex gap-2 overflow-x-auto pb-1">
-              {EXAMPLES.map(({ icon: Icon, label, text }) => (
-                <button
-                  key={label}
-                  onClick={() => setInput(text)}
-                  className="flex-shrink-0 flex items-center gap-2 px-3 py-2 bg-white border border-slate-200 rounded-xl text-xs font-medium text-slate-600 hover:border-pink-200 hover:text-pink-600 hover:bg-pink-50 transition-all shadow-sm"
-                >
-                  <Icon className="w-3.5 h-3.5" />
-                  {label}
-                </button>
-              ))}
-            </div>
-          </div>
-        </div>
-
-        {/* Input */}
-        <div className="px-6 pb-6 pt-2">
-          <div className="max-w-2xl mx-auto relative">
-            <input
-              type="text"
-              value={input}
-              onChange={e => setInput(e.target.value)}
-              onKeyDown={e => e.key === "Enter" && handleSend()}
-              placeholder="Describe your agent in plain language…"
-              className="form-input pr-12 py-3 rounded-2xl"
-            />
-            <button
-              onClick={handleSend}
-              disabled={!input.trim()}
-              className="absolute right-2 top-1/2 -translate-y-1/2 p-2 bg-slate-900 text-white rounded-xl hover:bg-slate-800 transition-colors disabled:opacity-40 disabled:cursor-not-allowed"
-            >
-              <Send className="w-4 h-4" />
-            </button>
-          </div>
-        </div>
+    <div className="flex h-full bg-white overflow-hidden flex-col">
+      {/* Top Tab Bar */}
+      <div className="flex items-center gap-1 px-6 py-3 border-b border-slate-200/70 bg-white flex-shrink-0">
+        <button
+          onClick={() => setActiveTab("architect")}
+          className={`flex items-center gap-2 px-4 py-1.5 rounded-lg text-xs font-medium transition-all ${activeTab === "architect" ? "bg-slate-900 text-white" : "text-slate-500 hover:bg-slate-100"}`}
+        >
+          <Wand2 className="w-3.5 h-3.5" /> Agent Architect
+        </button>
+        <button
+          onClick={() => setActiveTab("discover")}
+          className={`flex items-center gap-2 px-4 py-1.5 rounded-lg text-xs font-medium transition-all ${activeTab === "discover" ? "bg-slate-900 text-white" : "text-slate-500 hover:bg-slate-100"}`}
+        >
+          <Globe className="w-3.5 h-3.5" /> Discover Global MCP
+        </button>
       </div>
 
-      {/* Inspector / Config Panel */}
-      <div className="w-80 flex-shrink-0 flex flex-col bg-[#fafafa]">
-        <div className="px-5 py-4 border-b border-slate-200/70 bg-white flex items-center justify-between">
-          <h2 className="ui-label text-slate-500 flex items-center gap-2">
-            <Cpu className="w-3.5 h-3.5" /> Preview Config
-          </h2>
-          <span className="badge badge-slate">Awaiting</span>
-        </div>
+      {/* Content */}
+      <div className="flex flex-1 min-h-0">
+        {activeTab === "architect" ? (
+          <>
+            {/* Chat */}
+            <div className="flex-1 flex flex-col border-r border-slate-200/70 min-w-0">
+              <div className="px-6 py-3 border-b border-slate-200/70 bg-white flex items-center justify-between flex-shrink-0">
+                <div className="flex items-center gap-3">
+                  <div className="w-8 h-8 rounded-xl flex items-center justify-center overflow-hidden relative flex-shrink-0">
+                    <div className="absolute inset-0 vibrant-rainbow-border animate-border-spin opacity-90" />
+                    <div className="absolute inset-[2px] bg-white rounded-[7px] flex items-center justify-center">
+                      <Bot className="w-4 h-4 text-slate-800" />
+                    </div>
+                  </div>
+                  <div>
+                    <h1 className="text-sm font-semibold text-slate-900 leading-tight">Agent Architect</h1>
+                    <p className="ui-label text-slate-400">LLM-powered agent builder</p>
+                  </div>
+                </div>
+                <span className={`badge ${saved ? "badge-success" : "badge-slate"}`}>
+                  {saved ? "Compiled ✓" : isLoading ? "Generating…" : "Draft"}
+                </span>
+              </div>
 
-        {/* Skeleton preview — enterprise placeholder */}
-        <div className="flex-1 overflow-y-auto p-5 space-y-4">
-          {[
-            { label: "Agent Name", lines: 1 },
-            { label: "System Persona", lines: 3 },
-            { label: "MCP Tool Assignments", lines: 2 },
-          ].map((f) => (
-            <div key={f.label} className="bg-white border border-slate-200 rounded-xl p-4 space-y-2.5">
-              <p className="ui-label text-slate-400">{f.label}</p>
-              {Array.from({ length: f.lines }).map((_, i) => (
-                <div
-                  key={i}
-                  className="h-2.5 rounded-full bg-slate-100"
-                  style={{ width: `${90 - i * 18}%` }}
-                />
-              ))}
+              <div className="flex-1 overflow-y-auto p-6">
+                <div className="max-w-2xl mx-auto space-y-5">
+                  {messages.map((msg, idx) => (
+                    <div key={idx} className={`flex gap-3 ${msg.role === "user" ? "justify-end" : "justify-start"}`}>
+                      {msg.role === "bot" && (
+                        <div className="w-8 h-8 rounded-full flex items-center justify-center flex-shrink-0 mt-0.5 relative overflow-hidden p-[1.5px]">
+                          <div className="absolute inset-0 vibrant-rainbow-border animate-border-spin opacity-90" />
+                          <div className="relative z-10 w-full h-full rounded-full bg-white flex items-center justify-center">
+                            <Bot className="w-4 h-4 text-slate-700" />
+                          </div>
+                        </div>
+                      )}
+                      <div className={`px-4 py-3 rounded-2xl max-w-[80%] text-sm leading-relaxed shadow-sm ${msg.role === "user" ? "bg-slate-900 text-white rounded-tr-sm" : "bg-white border border-slate-200 text-slate-800 rounded-tl-sm"}`}>
+                        {msg.content}
+                      </div>
+                    </div>
+                  ))}
+                  {isLoading && (
+                    <div className="flex gap-3">
+                      <div className="w-8 h-8 rounded-full bg-slate-100 flex items-center justify-center">
+                        <Loader2 className="w-4 h-4 text-slate-400 animate-spin" />
+                      </div>
+                      <div className="px-4 py-3 rounded-2xl bg-white border border-slate-200 text-slate-400 text-sm animate-pulse">LLM is thinking…</div>
+                    </div>
+                  )}
+                  <div ref={messagesEndRef} />
+                </div>
+              </div>
+
+              <div className="px-6 pb-3">
+                <div className="max-w-2xl mx-auto">
+                  <p className="ui-label text-slate-400 mb-2">Templates</p>
+                  <div className="flex gap-2 overflow-x-auto pb-1">
+                    {EXAMPLES.map(({ icon: Icon, label, text }) => (
+                      <button key={label} onClick={() => setInput(text)} className="flex-shrink-0 flex items-center gap-2 px-3 py-2 bg-white border border-slate-200 rounded-xl text-xs font-medium text-slate-600 hover:border-pink-200 hover:text-pink-600 hover:bg-pink-50 transition-all shadow-sm">
+                        <Icon className="w-3.5 h-3.5" />{label}
+                      </button>
+                    ))}
+                  </div>
+                </div>
+              </div>
+
+              <div className="px-6 pb-6 pt-2">
+                <div className="max-w-2xl mx-auto relative">
+                  <textarea rows={2} value={input} onChange={e => setInput(e.target.value)} onKeyDown={e => { if (e.key === "Enter" && !e.shiftKey) { e.preventDefault(); handleSend(); } }} placeholder="Describe your agent in plain language… (Enter to send)" className="form-input pr-12 py-3 rounded-2xl resize-none w-full" disabled={isLoading} />
+                  <button onClick={handleSend} disabled={!input.trim() || isLoading} className="absolute right-2 bottom-2 p-2 bg-slate-900 text-white rounded-xl hover:bg-slate-800 transition-colors disabled:opacity-40 disabled:cursor-not-allowed">
+                    {isLoading ? <Loader2 className="w-4 h-4 animate-spin" /> : <Send className="w-4 h-4" />}
+                  </button>
+                </div>
+              </div>
             </div>
-          ))}
-          <div className="flex items-center gap-2 justify-center pt-2 text-slate-400">
-            <Wand2 className="w-3.5 h-3.5" />
-            <p className="text-xs leading-relaxed text-center">
-              Describe your agent — the Architect fills this in.
-            </p>
-          </div>
-        </div>
 
-        <div className="p-5 border-t border-slate-200/70 bg-white">
-          <button
-            disabled
-            className="w-full btn-primary text-sm justify-center opacity-40 cursor-not-allowed rounded-xl"
-          >
-            <CheckCircle className="w-4 h-4" /> Compile Agent
-          </button>
-          <p className="text-center ui-label text-slate-400 mt-2">
-            Complete the chat to enable compilation
-          </p>
-        </div>
+            {/* Inspector Panel */}
+            <div className="w-80 flex-shrink-0 flex flex-col bg-[#fafafa]">
+              <div className="px-5 py-4 border-b border-slate-200/70 bg-white flex items-center justify-between">
+                <h2 className="ui-label text-slate-500 flex items-center gap-2"><Cpu className="w-3.5 h-3.5" /> Preview Config</h2>
+                {config && <button onClick={() => { setConfig(null); setSaved(false); setError(null); }} className="text-slate-400 hover:text-slate-600"><RotateCcw className="w-3.5 h-3.5" /></button>}
+              </div>
+              <div className="flex-1 overflow-y-auto p-5 space-y-3">
+                {error && <div className="bg-red-50 border border-red-200 rounded-xl p-3 flex gap-2 text-xs text-red-700"><AlertTriangle className="w-3.5 h-3.5 shrink-0 mt-0.5" />{error}</div>}
+                {!config ? (
+                  <>
+                    {[{ label: "Agent Name", lines: 1 }, { label: "System Persona", lines: 3 }, { label: "MCP Tool Assignments", lines: 2 }].map(f => (
+                      <div key={f.label} className="bg-white border border-slate-200 rounded-xl p-4 space-y-2.5">
+                        <p className="ui-label text-slate-400">{f.label}</p>
+                        {Array.from({ length: f.lines }).map((_, i) => (<div key={i} className="h-2.5 rounded-full bg-slate-100" style={{ width: `${90 - i * 18}%` }} />))}
+                      </div>
+                    ))}
+                    <div className="flex items-center gap-2 justify-center pt-2 text-slate-400">
+                      <Wand2 className="w-3.5 h-3.5" />
+                      <p className="text-xs leading-relaxed text-center">Describe your agent — the Architect fills this in.</p>
+                    </div>
+                  </>
+                ) : (
+                  <>
+                    <div className="bg-white border border-slate-200 rounded-xl p-4 space-y-1">
+                      <p className="ui-label text-slate-400">Agent Name</p>
+                      <p className="text-sm font-semibold text-slate-800">{config.agent_name}</p>
+                    </div>
+                    <div className="bg-white border border-slate-200 rounded-xl p-4 space-y-1">
+                      <p className="ui-label text-slate-400">Description</p>
+                      <p className="text-xs text-slate-600 leading-relaxed">{config.description}</p>
+                    </div>
+                    <div className="bg-white border border-slate-200 rounded-xl p-4 space-y-1">
+                      <p className="ui-label text-slate-400">System Persona</p>
+                      <p className="text-xs text-slate-600 leading-relaxed whitespace-pre-wrap">{config.agent_style}</p>
+                    </div>
+                    <div className="bg-white border border-slate-200 rounded-xl p-4 space-y-2">
+                      <p className="ui-label text-slate-400 flex items-center gap-1.5"><Wrench className="w-3 h-3" /> Assigned MCP Tools ({selectedTools.size})</p>
+                      {config.available_tools.length === 0 ? (<p className="text-xs text-slate-400 italic">No tools available in Library.</p>) : (
+                        <div className="max-h-48 overflow-y-auto space-y-1.5 pr-1 custom-scrollbar">
+                          {config.available_tools.map(tool => (
+                            <label key={tool.tool_id} className="flex items-start gap-2.5 p-2 hover:bg-slate-50 rounded-lg cursor-pointer border border-transparent hover:border-slate-100 transition-colors">
+                              <input 
+                                type="checkbox" 
+                                className="mt-0.5 rounded border-slate-300 text-indigo-600 focus:ring-indigo-500 cursor-pointer"
+                                checked={selectedTools.has(tool.tool_id)}
+                                onChange={() => toggleTool(tool.tool_id)}
+                              />
+                              <div className="flex-1 min-w-0">
+                                <p className={`text-xs font-medium truncate ${selectedTools.has(tool.tool_id) ? "text-indigo-700" : "text-slate-700"}`}>{tool.name}</p>
+                                {tool.description && <p className="text-[10px] text-slate-500 line-clamp-1">{tool.description}</p>}
+                              </div>
+                            </label>
+                          ))}
+                        </div>
+                      )}
+                      {config.reasoning && <p className="text-[10px] text-slate-400 italic mt-2 p-2 bg-slate-50 rounded-lg border border-slate-100"><span className="font-semibold text-slate-500">LLM Reasoning:</span> {config.reasoning}</p>}
+                    </div>
+
+                    {(isSearchingExternal || recommendedExternal.length > 0 || config.keywords?.length > 0) && (
+                      <div className="bg-white border border-pink-200 shadow-sm rounded-xl p-4 space-y-2 mt-2">
+                        <p className="ui-label text-pink-600 flex items-center gap-1.5">
+                          <Globe className="w-3 h-3" /> External Recommendations
+                        </p>
+                        <p className="text-[10px] text-slate-400 mb-2">Searching registry for: <span className="font-medium text-slate-500">{config.keywords?.join(", ")}</span></p>
+                        
+                        {isSearchingExternal ? (
+                          <div className="flex items-center justify-center p-4">
+                            <Loader2 className="w-4 h-4 text-pink-400 animate-spin" />
+                            <span className="text-[10px] text-slate-400 ml-2">Scraping global registry...</span>
+                          </div>
+                        ) : recommendedExternal.length === 0 ? (
+                          <div className="p-3 text-center border border-dashed border-slate-200 rounded-lg">
+                            <p className="text-[10px] text-slate-400">No matching external MCPs found in the global registry.</p>
+                          </div>
+                        ) : (
+                          <div className="space-y-2">
+                            {recommendedExternal.map((ext, idx) => (
+                              <div key={idx} className="border border-slate-200 rounded-lg p-2 hover:border-indigo-300 transition-colors">
+                                <div className="flex items-center gap-1.5 mb-1">
+                                  <span className="text-xs font-semibold text-slate-800 truncate">{ext.name.split("/").pop()}</span>
+                                  {ext.official && <span className="text-[9px] bg-emerald-50 text-emerald-700 border border-emerald-200 rounded-full px-1.5 py-0.5 font-semibold">official</span>}
+                                </div>
+                                <p className="text-[10px] text-slate-500 line-clamp-2 mb-2">{ext.description}</p>
+                                <div className="flex items-center justify-between mt-auto pt-2 border-t border-slate-100">
+                                  {ext.repository ? (
+                                    <a href={ext.repository} target="_blank" rel="noopener noreferrer" className="text-[10px] text-indigo-500 hover:text-indigo-700 flex items-center gap-1 font-medium">
+                                      <ExternalLink className="w-2.5 h-2.5" /> Source
+                                    </a>
+                                  ) : <div />}
+                                  <button 
+                                    onClick={() => handleInstallExternal(ext)}
+                                    disabled={installingExternal === ext.name}
+                                    className="text-[10px] bg-pink-50 hover:bg-pink-100 text-pink-700 font-semibold py-1 px-2.5 rounded border border-pink-200 transition-colors flex items-center gap-1 disabled:opacity-50 disabled:cursor-not-allowed"
+                                  >
+                                    {installingExternal === ext.name ? (
+                                      <><Loader2 className="w-3 h-3 animate-spin" /> Installing...</>
+                                    ) : (
+                                      <><Plus className="w-3 h-3" /> Install</>
+                                    )}
+                                  </button>
+                                </div>
+                              </div>
+                            ))}
+                          </div>
+                        )}
+                      </div>
+                    )}
+                  </>
+                )}
+              </div>
+              <div className="p-5 border-t border-slate-200/70 bg-white">
+                <button onClick={handleCompile} disabled={!config || isSaving || saved} className="w-full btn-primary text-sm justify-center rounded-xl disabled:opacity-40 disabled:cursor-not-allowed">
+                  {isSaving ? <><Loader2 className="w-4 h-4 animate-spin" /> Saving…</> : saved ? <><CheckCircle className="w-4 h-4" /> Agent Saved!</> : <><CheckCircle className="w-4 h-4" /> Compile Agent</>}
+                </button>
+                <p className="text-center ui-label text-slate-400 mt-2">{config ? "Review config above then save" : "Complete the chat to enable compilation"}</p>
+              </div>
+            </div>
+          </>
+        ) : (
+          /* Discover Global MCP Tab */
+          <div className="flex-1 flex flex-col min-h-0">
+            <div className="px-6 py-4 border-b border-slate-200/70 bg-white flex-shrink-0">
+              <p className="text-sm font-semibold text-slate-800 mb-1">Official MCP Registry</p>
+              <p className="text-xs text-slate-400 mb-3">Search {">"}10,000 MCP servers from <span className="font-medium text-slate-600">registry.modelcontextprotocol.io</span></p>
+              <div className="flex gap-2">
+                <div className="relative flex-1">
+                  <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-slate-400" />
+                  <input
+                    type="text"
+                    value={discoverQuery}
+                    onChange={e => setDiscoverQuery(e.target.value)}
+                    onKeyDown={e => e.key === "Enter" && handleDiscover()}
+                    placeholder="Search: github, uipath, slack, notion…"
+                    className="form-input pl-9 py-2 rounded-xl w-full text-sm"
+                  />
+                </div>
+                <button
+                  onClick={() => handleDiscover()}
+                  disabled={discoverLoading}
+                  className="px-4 py-2 bg-slate-900 text-white rounded-xl text-xs font-medium hover:bg-slate-800 transition-colors disabled:opacity-50 flex items-center gap-2"
+                >
+                  {discoverLoading ? <Loader2 className="w-4 h-4 animate-spin" /> : <Search className="w-4 h-4" />}
+                  Search
+                </button>
+              </div>
+            </div>
+
+            <div className="flex-1 overflow-y-auto p-6">
+              {discoverError && (
+                <div className="bg-red-50 border border-red-200 rounded-xl p-4 flex gap-2 text-sm text-red-700 mb-4">
+                  <AlertTriangle className="w-4 h-4 shrink-0 mt-0.5" />{discoverError}
+                </div>
+              )}
+
+              {!discoverSearched && !discoverLoading && (
+                <div className="flex flex-col items-center justify-center h-full text-center text-slate-400">
+                  <Globe className="w-10 h-10 mb-3 text-slate-300" />
+                  <p className="text-sm font-medium text-slate-500 mb-1">Search the Global MCP Registry</p>
+                  <p className="text-xs">Find any MCP server from the official Anthropic registry by keyword</p>
+                  <div className="flex flex-wrap gap-2 mt-4 justify-center">
+                    {["github", "notion", "slack", "database", "email", "calendar", "uipath", "automation"].map(kw => (
+                      <button key={kw} onClick={() => { setDiscoverQuery(kw); handleDiscover(kw); }} className="px-3 py-1.5 text-xs bg-white border border-slate-200 rounded-full hover:border-indigo-300 hover:text-indigo-600 transition-all">{kw}</button>
+                    ))}
+                  </div>
+                </div>
+              )}
+
+              {discoverLoading && (
+                <div className="flex items-center justify-center h-32">
+                  <Loader2 className="w-6 h-6 animate-spin text-slate-400" />
+                  <span className="ml-2 text-sm text-slate-400">Searching registry…</span>
+                </div>
+              )}
+
+              {!discoverLoading && discoverResults.length === 0 && discoverSearched && (
+                <div className="text-center text-slate-400 text-sm pt-10">No results found for "{discoverQuery}"</div>
+              )}
+
+              <div className="grid grid-cols-1 lg:grid-cols-2 gap-4 max-w-5xl mx-auto">
+                {discoverResults.map((server, idx) => (
+                  <div key={idx} className="bg-white border border-slate-200 rounded-2xl p-4 hover:border-slate-300 hover:shadow-md transition-all flex flex-col gap-3">
+                    <div className="flex items-start justify-between gap-2">
+                      <div className="flex-1 min-w-0">
+                        <div className="flex items-center gap-2 mb-1">
+                          <span className="text-xs font-semibold text-slate-800 truncate">{server.name.split("/").pop()}</span>
+                          {server.official && <span className="text-[9px] bg-emerald-50 text-emerald-700 border border-emerald-200 rounded-full px-1.5 py-0.5 font-semibold flex-shrink-0">official</span>}
+                          {server.version && <span className="text-[9px] text-slate-400 font-mono flex-shrink-0">v{server.version}</span>}
+                        </div>
+                        <p className="text-xs text-slate-500 line-clamp-2 leading-relaxed">{server.description || "No description available."}</p>
+                      </div>
+                    </div>
+
+                    {server.remotes.length > 0 && (
+                      <div className="space-y-1">
+                        {server.remotes.slice(0, 2).map((r, ri) => (
+                          <div key={ri} className="text-[10px] font-mono text-slate-400 bg-slate-50 rounded-lg px-2 py-1 truncate">
+                            <span className="text-indigo-500 font-semibold">{r.type}</span> · {r.url}
+                          </div>
+                        ))}
+                      </div>
+                    )}
+
+                    <div className="flex gap-2 mt-auto">
+                      {server.repository && (
+                        <a href={server.repository} target="_blank" rel="noopener noreferrer" className="flex items-center gap-1.5 text-xs text-slate-500 hover:text-slate-800 transition-colors">
+                          <ExternalLink className="w-3 h-3" /> GitHub
+                        </a>
+                      )}
+                      <button
+                        onClick={() => {
+                          setActiveTab("architect");
+                          setInput(`Create an agent that uses the "${server.name.split("/").pop()}" MCP server. ${server.description}`);
+                        }}
+                        className="ml-auto flex items-center gap-1.5 text-xs text-indigo-600 hover:text-indigo-800 font-medium transition-colors"
+                      >
+                        <Plus className="w-3 h-3" /> Use this server
+                      </button>
+                    </div>
+                  </div>
+                ))}
+              </div>
+            </div>
+          </div>
+        )}
       </div>
     </div>
   );

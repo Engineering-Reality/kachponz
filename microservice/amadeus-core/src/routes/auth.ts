@@ -3,14 +3,23 @@ import rateLimit from '@fastify/rate-limit';
 import { z } from 'zod';
 import { SignJWT } from 'jose';
 import { env } from '../config/env.js';
-import { verifySecret } from '../lib/crypto.js';
-import { findActiveUserByEmail, findUserCompanyAndRole } from '../services/users.js';
+import { verifySecret, hashSecret } from '../lib/crypto.js';
+import { findActiveUserByEmail, findUserCompanyAndRole, activeUserEmailExists, insertUser, assignUserToCompany } from '../services/users.js';
 import { DomainError } from '../types/domain.js';
+import { pool } from '../db/pool.js';
 
 const LoginBody = z
   .object({
     email: z.string().email(),
     password: z.string().min(1),
+  })
+  .strict();
+
+const RegisterBody = z
+  .object({
+    name: z.string().min(1),
+    email: z.string().email(),
+    password: z.string().min(8),
   })
   .strict();
 
@@ -78,6 +87,58 @@ export const registerAuthRoutes: FastifyPluginAsync = async (rootApp: FastifyIns
             role: membership.roleName,
           },
         });
+      },
+    );
+
+    app.post(
+      '/auth/register',
+      { schema: { body: RegisterBody } },
+      async (request, reply) => {
+        const { name, email, password } = request.body as z.infer<typeof RegisterBody>;
+
+        const exists = await activeUserEmailExists(email);
+        if (exists) {
+          throw new DomainError('CONFLICT', 'Email sudah terdaftar', 409);
+        }
+
+        const passwordHash = await hashSecret(password);
+        const client = await pool.connect();
+        try {
+          await client.query('BEGIN');
+          
+          const newUserId = await insertUser(client, {
+            email,
+            passwordHash,
+            displayName: name
+          });
+
+          // Default company: 455bbe68-f931-4c1a-ad06-402f92292099
+          // Default role_id: 3 (staff)
+          const defaultCompanyId = '455bbe68-f931-4c1a-ad06-402f92292099';
+          await assignUserToCompany(client, {
+            userId: newUserId,
+            companyId: defaultCompanyId,
+            roleId: 3
+          });
+
+          await client.query('COMMIT');
+
+          return reply.code(201).send({
+            success: true,
+            user: {
+              id: newUserId,
+              email,
+              displayName: name,
+              companyId: defaultCompanyId,
+              role: 'staff',
+            },
+          });
+        } catch (error) {
+          await client.query('ROLLBACK');
+          throw error;
+        } finally {
+          client.release();
+        }
       },
     );
   });

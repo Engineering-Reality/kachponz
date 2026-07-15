@@ -4,6 +4,8 @@ import { query } from '../db/pool.js';
 import { callFn } from '../db/rpc.js';
 import { DomainError } from '../types/domain.js';
 import { authenticateRobot } from '../middleware/auth.js';
+import { ChatOpenAI } from '@langchain/openai';
+import { HumanMessage, SystemMessage } from '@langchain/core/messages';
 
 export const registerAgentsRoutes: FastifyPluginAsync = async (rootApp: FastifyInstance) => {
   await rootApp.register(async (app) => {
@@ -173,5 +175,91 @@ export const registerAgentsRoutes: FastifyPluginAsync = async (rootApp: FastifyI
       return reply.code(204).send();
     }
   );
+
+  // POST /agents/create-from-description
+  // TypeScript port of Python agent_creator autofill.
+  // Sends the user's natural language description to the LLM and returns a
+  // structured agent config (name, description, agent_style, tool_ids).
+  // Does NOT persist — the frontend sends a follow-up POST /agents to compile.
+  app.post(
+    '/agents/create-from-description',
+    {
+      schema: {
+        body: z.object({
+          description: z.string().min(10).max(4000),
+          runtime: z.enum(['cloud', 'on_prem']).optional().default('cloud'),
+        }).strict(),
+      },
+    },
+    async (request, reply) => {
+      const { description, runtime } = request.body as { description: string; runtime: 'cloud' | 'on_prem' };
+
+      // Fetch available tools to pass as context for recommendation
+      const toolsRes = await query<{ tool_id: string; name: string; description: string | null }>(
+        'SELECT tool_id, name, description FROM tools WHERE company_id = $1 ORDER BY name ASC',
+        [request.auth!.companyId],
+      );
+      const availableTools = toolsRes.rows;
+
+      const toolList = availableTools.length > 0
+        ? availableTools.map(t => `- ID: ${t.tool_id} | Name: ${t.name} | Desc: ${t.description ?? ''}`).join('\n')
+        : '(no tools registered yet)';
+
+      const systemPrompt = `You are Agent Architect, an expert AI agent configuration generator for the Amadeus platform.
+Given a natural language description of an agent the user wants to build, you must produce a JSON object with these exact fields:
+- agent_name: string (short, clear, PascalCase slug, e.g. "LcSettlementOrchestrator")
+- description: string (2–4 sentence description of the agent's purpose and capabilities)
+- agent_style: string (a detailed system prompt that defines the agent's persona, tone, and behaviour rules; 3–6 sentences)
+- keywords: string[] (3-5 short keywords for searching external tool registries, e.g. ["github", "database", "calendar", "uipath"])
+- tool_ids: string[] (array of tool IDs from the available tools list that this agent should have access to; pick only the most relevant ones)
+- reasoning: string (1–2 sentence explanation of why you chose those tools)
+
+Available MCP tools registered in this company:
+${toolList}
+
+Respond with ONLY a valid JSON object, no markdown, no explanation.`;
+
+      const apiKey = runtime === 'on_prem'
+        ? (process.env.NETRA_API_KEY || '')
+        : process.env.QWEN_API_KEY;
+      const baseURL = runtime === 'on_prem'
+        ? 'https://api.netraruntime.com/v1'
+        : process.env.QWEN_BASE_URL;
+      const modelName = runtime === 'on_prem' ? 'qwen3.6-35b' : (process.env.QWEN_LLM_MODEL || 'qwen3.6-35b');
+
+      const llm = new ChatOpenAI({
+        modelName,
+        temperature: 0.3,
+        apiKey: apiKey!,
+        configuration: { baseURL },
+      });
+
+      const raw = await llm.invoke([
+        new SystemMessage(systemPrompt),
+        new HumanMessage(description),
+      ]);
+
+      let parsed: any;
+      try {
+        const text = typeof raw.content === 'string' ? raw.content : JSON.stringify(raw.content);
+        // Strip markdown code fences if present
+        const clean = text.replace(/^```(?:json)?\n?|\n?```$/g, '').trim();
+        parsed = JSON.parse(clean);
+      } catch {
+        throw new DomainError('LLM_PARSE_ERROR', 'LLM returned invalid JSON — please try again', 500);
+      }
+
+      return reply.code(200).send({
+        agent_name: parsed.agent_name ?? '',
+        description: parsed.description ?? '',
+        agent_style: parsed.agent_style ?? '',
+        keywords: Array.isArray(parsed.keywords) ? parsed.keywords : [],
+        tool_ids: Array.isArray(parsed.tool_ids) ? parsed.tool_ids : [],
+        reasoning: parsed.reasoning ?? '',
+        available_tools: availableTools,
+      });
+    }
+  );
+
   });
 };

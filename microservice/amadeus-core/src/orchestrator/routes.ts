@@ -16,8 +16,10 @@ import { streamHandler } from './a2a/streamHandler.js';
 import { buildAgentCard } from './a2a/agentCard.js';
 import { getMcpManagerState } from './mcpManagerState.js';
 import { resetUiPathTokenCache } from '../lib/uipathAuth.js';
-import { getRecipeById } from './recipes/registry.js';
+import { getRecipeForAgent, upsertRecipeForAgent, deleteRecipeForAgent } from './recipes/store.js';
 import { runRecipeStream } from './recipes/executor.js';
+import type { RecipeDef } from './recipes/types.js';
+import { DomainError } from '../types/domain.js';
 
 // Daftarkan agent bawaan sekali saat modul dimuat.
 try {
@@ -63,8 +65,72 @@ const RunAgenticSchema = z
     // key), forwarded so uipath_job_trace rows can be correlated back to a chat.
     // Best-effort only — never validated against a server-side session table.
     sessionLabel: z.string().max(200).optional(),
+    runtime: z.enum(['cloud', 'on_prem']).optional(),
   })
   .strict();
+
+// Zod mirror of RecipeDef/RecipeStepDef (recipes/types.ts) — creatoroop.md's
+// generalized, tool-agnostic Recipe schema. `agentId`/`id` in the body are
+// ignored on write (the URL param and existing/generated id win instead).
+const ArgsTemplateSchema = z.record(z.string(), z.unknown());
+
+const RecipeResolverSchema = z.object({
+  id: z.string().min(1).max(64),
+  toolName: z.string().min(1).max(200),
+  argsTemplate: ArgsTemplateSchema,
+  extract: z.union([
+    z.object({
+      kind: z.literal('text_lines'),
+      itemPattern: z.string().min(1),
+      nameGroup: z.number().int().min(0),
+      valueGroup: z.number().int().min(0),
+    }).strict(),
+    z.object({
+      kind: z.literal('meta_array'),
+      metaField: z.string().min(1),
+      nameField: z.string().min(1),
+      valueField: z.string().min(1),
+    }).strict(),
+  ]),
+}).strict();
+
+const RecipeStepSchema = z.object({
+  id: z.string().min(1).max(64),
+  label: z.string().min(1).max(200),
+  toolName: z.string().min(1).max(200),
+  argsTemplate: ArgsTemplateSchema,
+  variantCount: z.number().int().min(1).max(20).optional(),
+  resolve: z.object({
+    resolverId: z.string().min(1).max(64),
+    nameTemplate: z.string().min(1).max(200),
+  }).strict().optional(),
+  pollFor: z.object({
+    toolName: z.string().min(1).max(200),
+    argsTemplate: ArgsTemplateSchema,
+    terminalField: z.string().min(1).max(100),
+    terminalValues: z.array(z.string().min(1)).min(1),
+    successValues: z.array(z.string().min(1)).optional(),
+    timeoutSeconds: z.number().int().min(1).max(3600),
+    pollIntervalSeconds: z.number().int().min(1).max(300),
+  }).strict().optional(),
+  verify: z.object({
+    toolName: z.string().min(1).max(200),
+    argsTemplate: ArgsTemplateSchema,
+    checkField: z.string().min(1).max(100),
+    mustBeNonEmpty: z.boolean(),
+  }).strict().optional(),
+  onFault: z.enum(['rotate_variant', 'abort_iteration', 'abort_recipe']),
+}).strict();
+
+const RecipeDefSchema = z.object({
+  id: z.string().min(1).max(64).optional(),
+  agentId: z.string().uuid().optional(),
+  label: z.string().min(1).max(200),
+  steps: z.array(RecipeStepSchema).min(1),
+  iterations: z.number().int().min(1).max(20),
+  maxConcurrentJobs: z.literal(1).optional(),
+  resolvers: z.array(RecipeResolverSchema).optional(),
+}).strict();
 
 export async function registerOrchestratorRoutes(app: FastifyInstance): Promise<void> {
   // GET /.well-known/amadeus-agent-card.json (Public discovery)
@@ -104,41 +170,170 @@ export async function registerOrchestratorRoutes(app: FastifyInstance): Promise<
     typedSecured.post('/orchestrator/run-agentic', {
       schema: { body: RunAgenticSchema }
     }, async (req, reply) => {
-      const body = req.body as { transactionId?: string; agentId?: string; idempotencyKey: string; prompt?: string; messages?: any[]; stream?: boolean; mode: 'playground' | 'production'; sessionLabel?: string };
+      const body = req.body as { transactionId?: string; agentId?: string; idempotencyKey: string; prompt?: string; messages?: any[]; stream?: boolean; mode: 'playground' | 'production'; sessionLabel?: string; runtime?: 'cloud' | 'on_prem' };
       if (body.stream) {
         reply.hijack();
-        await runAgenticStepStream(req.auth!, body.transactionId, body.idempotencyKey, body.prompt, body.messages, body.agentId, body.mode, reply, body.sessionLabel);
+        await runAgenticStepStream(req.auth!, body.transactionId, body.idempotencyKey, body.prompt, body.messages, body.agentId, body.mode, reply, body.sessionLabel, body.runtime);
         return;
       }
-      const result = await runAgenticStep(req.auth!, body.transactionId, body.idempotencyKey, body.prompt, body.messages, body.agentId, body.mode, body.sessionLabel);
+      const result = await runAgenticStep(req.auth!, body.transactionId, body.idempotencyKey, body.prompt, body.messages, body.agentId, body.mode, body.sessionLabel, body.runtime);
       return reply.send(result);
     });
 
-    // POST /orchestrator/recipes/:recipeId/run — Recipe Executor (Loop Mode).
-    // A separate, additive execution path from /orchestrator/run-agentic: a
-    // deterministic state machine runs the mechanical trigger->wait->verify
-    // chain with no LLM call, calling the model only at bounded fault-
-    // classification decision points. See loop.md for the full rationale.
-    typedSecured.post('/orchestrator/recipes/:recipeId/run', {
+    // GET/PUT/DELETE /orchestrator/agents/:agentId/recipe — creatoroop.md's
+    // generalized Recipe Executor (Loop Mode) config, per agent. Zero-or-one
+    // per agent; not every agent has one, and agents with none are
+    // unaffected (404, not an error).
+    typedSecured.get('/orchestrator/agents/:agentId/recipe', {
+      schema: { params: z.object({ agentId: z.string().uuid() }).strict() },
+    }, async (req, reply) => {
+      const { agentId } = req.params as { agentId: string };
+      const recipe = await getRecipeForAgent(agentId);
+      if (!recipe) {
+        throw new DomainError('RECIPE_NOT_FOUND', `No recipe configured for agent ${agentId}`, 404);
+      }
+      return reply.send(recipe);
+    });
+
+    typedSecured.put('/orchestrator/agents/:agentId/recipe', {
       schema: {
-        params: z.object({ recipeId: SAFE_SLUG }).strict(),
-        body: z.object({
-          agentId: z.string().uuid(),
-          iterations: z.number().int().min(1).max(20),
-          folderId: z.string().optional(),
-        }).strict(),
+        params: z.object({ agentId: z.string().uuid() }).strict(),
+        body: RecipeDefSchema,
       },
     }, async (req, reply) => {
-      const { recipeId } = req.params as { recipeId: string };
-      const body = req.body as { agentId: string; iterations: number; folderId?: string };
+      const { agentId } = req.params as { agentId: string };
+      const body = req.body as z.infer<typeof RecipeDefSchema>;
 
-      const recipe = getRecipeById(recipeId);
+      const agentRes = await query('SELECT 1 FROM agents WHERE agent_id = $1', [agentId]);
+      if (agentRes.rowCount === 0) {
+        throw new DomainError('AGENT_NOT_FOUND', `No agent with id ${agentId}`, 404);
+      }
+
+      // Server owns agentId/id — never trust the client's copy of either.
+      const recipe: RecipeDef = {
+        ...body,
+        id: body.id ?? `agent_${agentId}`,
+        agentId,
+        maxConcurrentJobs: 1,
+      };
+      const saved = await upsertRecipeForAgent(agentId, recipe);
+      return reply.send(saved);
+    });
+
+    typedSecured.delete('/orchestrator/agents/:agentId/recipe', {
+      schema: { params: z.object({ agentId: z.string().uuid() }).strict() },
+    }, async (req, reply) => {
+      const { agentId } = req.params as { agentId: string };
+      await deleteRecipeForAgent(agentId);
+      return reply.code(204).send();
+    });
+
+    // POST /orchestrator/agents/:agentId/recipe/run — Recipe Executor
+    // (Loop Mode). A separate, additive execution path from
+    // /orchestrator/run-agentic: a deterministic state machine runs the
+    // mechanical trigger->wait->verify chain with no LLM call, calling the
+    // model only at bounded fault-classification decision points. See
+    // loop.md/creatoroop.md for the full rationale.
+    typedSecured.post('/orchestrator/agents/:agentId/recipe/run', {
+      schema: {
+        params: z.object({ agentId: z.string().uuid() }).strict(),
+        body: z.object({ iterations: z.number().int().min(1).max(20).optional() }).strict(),
+      },
+    }, async (req, reply) => {
+      const { agentId } = req.params as { agentId: string };
+      const body = req.body as { iterations?: number };
+
+      // Load BEFORE hijacking the reply, so a missing recipe returns a
+      // clean 404 JSON response instead of a broken SSE stream.
+      const recipe = await getRecipeForAgent(agentId);
       if (!recipe) {
-        return reply.code(404).send({ error: { code: 'RECIPE_NOT_FOUND', message: `No recipe registered for id ${recipeId}` } });
+        throw new DomainError('RECIPE_NOT_FOUND', `No recipe configured for agent ${agentId}`, 404);
       }
 
       reply.hijack();
-      await runRecipeStream(recipe, { agentId: body.agentId, iterations: body.iterations, folderId: body.folderId }, reply);
+      await runRecipeStream(recipe, { agentId, iterations: body.iterations ?? recipe.iterations }, reply);
+    });
+
+    // POST /orchestrator/agents/:agentId/loop/run — Prompt-Driven Loop Mode.
+    // Runs the agent N times using a user-supplied prompt. Each iteration is
+    // a fresh agentic call; results are streamed as SSE events so the frontend
+    // can display live per-iteration progress without needing a recipe.
+    typedSecured.post('/orchestrator/agents/:agentId/loop/run', {
+      schema: {
+        params: z.object({ agentId: z.string().uuid() }).strict(),
+        body: z.object({
+          prompt: z.string().min(1).max(4000),
+          iterations: z.number().int().min(1).max(50).optional().default(3),
+          runtime: z.enum(['cloud', 'on_prem']).optional(),
+        }).strict(),
+      },
+    }, async (req, reply) => {
+      const { agentId } = req.params as { agentId: string };
+      const { prompt, iterations, runtime } = req.body as { prompt: string; iterations: number; runtime?: 'cloud' | 'on_prem' };
+
+      // Verify agent exists before hijacking reply
+      const agentCheck = await query('SELECT 1 FROM agents WHERE agent_id = $1', [agentId]);
+      if (agentCheck.rowCount === 0) {
+        throw new DomainError('AGENT_NOT_FOUND', `No agent with id ${agentId}`, 404);
+      }
+
+      const raw = reply.raw;
+      raw.setHeader('Content-Type', 'text/event-stream');
+      raw.setHeader('Cache-Control', 'no-cache, no-transform');
+      raw.setHeader('Connection', 'keep-alive');
+      raw.setHeader('X-Accel-Buffering', 'no');
+      raw.flushHeaders?.();
+      reply.hijack();
+
+      const sendEvent = (event: string, data: object) => {
+        raw.write(`event: ${event}\ndata: ${JSON.stringify(data)}\n\n`);
+      };
+
+      sendEvent('loop_start', { totalIterations: iterations, prompt });
+
+      for (let i = 1; i <= iterations; i++) {
+        sendEvent('iteration_start', { iteration: i, totalIterations: iterations });
+        try {
+          // Collect chunks from the streaming step into a single result string
+          let resultText = '';
+          // Use idempotency key unique per iteration
+          const idemKey = `loop-${agentId}-iter${i}-${Date.now()}`;
+
+          // We need a synchronous result so we call the non-streaming variant
+          const result = await runAgenticStep(
+            req.auth!,
+            undefined,
+            idemKey,
+            `[Iteration ${i}/${iterations}] ${prompt}`,
+            undefined,
+            agentId,
+            'playground',
+            undefined,
+            runtime,
+          );
+
+          resultText = typeof result === 'string'
+            ? result
+            : (result as any)?.answer ?? (result as any)?.response ?? JSON.stringify(result);
+
+          sendEvent('iteration_done', {
+            iteration: i,
+            totalIterations: iterations,
+            status: 'success',
+            detail: resultText.substring(0, 500), // truncate for SSE safety
+          });
+        } catch (err: any) {
+          sendEvent('iteration_done', {
+            iteration: i,
+            totalIterations: iterations,
+            status: 'failed',
+            detail: err.message ?? 'Unknown error',
+          });
+        }
+      }
+
+      sendEvent('loop_complete', { totalIterations: iterations, status: 'completed' });
+      raw.end();
     });
 
     // GET /orchestrator/agents — daftar agent terdaftar & kapabilitasnya.

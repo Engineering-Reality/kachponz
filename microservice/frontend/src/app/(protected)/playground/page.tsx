@@ -55,25 +55,24 @@ interface RecipeRunState {
   recipeId: string;
   runId: string;
   agentId: string;
-  toolId: string;
-  folderId: string;
   currentIteration: number;
   currentStepIndex: number;
   currentVariant: number;
-  resolvedReleaseKeys: Record<string, string>;
-  activeJobId: string | null;
+  resolved: Record<string, Record<string, string>>;
+  activeStepId: string | null;
+  lastStepOutput: Record<string, unknown>;
   iterationResults: { iteration: number; status: 'success' | 'failed' | 'aborted'; detail: string }[];
   status: 'running' | 'completed' | 'failed' | 'awaiting_llm_decision';
   error?: string;
 }
 
-const RECIPE_ID = 'danantara_survey_loop';
-const RECIPE_STEP_LABELS = [
-  { id: 'get_email', label: 'Get disposable email' },
-  { id: 'login', label: 'Login' },
-  { id: 'get_otp', label: 'Get OTP' },
-  { id: 'input_otp_and_survey', label: 'Input OTP & survey' },
-];
+// Mirrors backend RecipeDef (src/orchestrator/recipes/types.ts) — only the
+// fields the progress view needs (label, per-step labels).
+interface AgentRecipe {
+  id: string;
+  label: string;
+  steps: { id: string; label: string }[];
+}
 
 const generateTopicSummary = (text: string) => {
   let summary = text.replace(/^(please|can you|could you|list my|show me|tell me about|what is|how to)\s+/i, '');
@@ -150,15 +149,51 @@ function PlaygroundInner() {
   const [attachments, setAttachments] = useState<Attachment[]>([]);
   const fileInputRef = useRef<HTMLInputElement>(null);
   const [isSidebarOpen, setIsSidebarOpen] = useState(true);
+  const [runtimeMode, setRuntimeMode] = useState<'cloud' | 'on_prem'>('cloud');
 
   // Loop Mode — drives the Recipe Executor's deterministic run instead of the
   // conversational ReAct agent. Kept as separate state from the chat flow
   // above: this is a progress tracker, not a conversation (loop.md Step 5).
   const [loopMode, setLoopMode] = useState(false);
   const [loopIterations, setLoopIterations] = useState(3);
+  const [loopPrompt, setLoopPrompt] = useState('');
+  const [loopRunning, setLoopRunning] = useState(false);
+  const [loopResults, setLoopResults] = useState<{ iteration: number; status: string; detail: string }[]>([]);
+  const [loopStatus, setLoopStatus] = useState<'idle' | 'running' | 'completed' | 'failed'>('idle');
   const [recipeState, setRecipeState] = useState<RecipeRunState | null>(null);
   const [recipeRunning, setRecipeRunning] = useState(false);
   const [recipeError, setRecipeError] = useState<string | null>(null);
+  const [agentRecipe, setAgentRecipe] = useState<AgentRecipe | null>(null);
+
+  // Loop Mode is a property of whichever agent has a recipe configured
+  // (creatoroop.md Step 5), not a Danantara-only special case — fetch it
+  // whenever the selected agent changes, and hide/reset the toggle for an
+  // agent with none.
+  useEffect(() => {
+    if (!selectedAgent) {
+      setAgentRecipe(null);
+      setLoopMode(false);
+      return;
+    }
+    let cancelled = false;
+    fetch(`/api/orchestrator/agents/${selectedAgent}/recipe`)
+      .then(async (res) => {
+        if (cancelled) return;
+        if (res.ok) {
+          setAgentRecipe(await res.json());
+        } else {
+          setAgentRecipe(null);
+          setLoopMode(false);
+        }
+      })
+      .catch(() => {
+        if (!cancelled) {
+          setAgentRecipe(null);
+          setLoopMode(false);
+        }
+      });
+    return () => { cancelled = true; };
+  }, [selectedAgent]);
 
   useEffect(() => {
     const savedSessions = localStorage.getItem('agent-sessions');
@@ -458,6 +493,7 @@ function PlaygroundInner() {
             }),
           stream: true,
           mode: 'playground',
+          runtime: runtimeMode,
           sessionLabel: currentSessionId ?? undefined,
         })
       });
@@ -583,6 +619,55 @@ function PlaygroundInner() {
     setMcpHealth([]);
   };
 
+  const handleRunLoopWithPrompt = async () => {
+    if (!selectedAgent) { alert('Select an agent first!'); return; }
+    if (!loopPrompt.trim()) { alert('Please enter a prompt for the loop.'); return; }
+    setLoopRunning(true);
+    setLoopStatus('running');
+    setLoopResults([]);
+    try {
+      const res = await fetch(`/api/orchestrator/agents/${selectedAgent}/loop/run`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ prompt: loopPrompt.trim(), iterations: loopIterations, runtime: runtimeMode }),
+      });
+      if (!res.ok) {
+        const data = await res.json().catch(() => ({}));
+        throw new Error(data.error?.message || `Server error: ${res.status}`);
+      }
+      const reader = res.body?.getReader();
+      const decoder = new TextDecoder('utf-8');
+      if (!reader) throw new Error('Stream not supported');
+      let buffer = '';
+      let currentEvent = '';
+      while (true) {
+        const { done, value } = await reader.read();
+        if (done) break;
+        buffer += decoder.decode(value, { stream: true });
+        const lines = buffer.split('\n');
+        buffer = lines.pop() ?? '';
+        for (const line of lines) {
+          if (line.startsWith('event: ')) { currentEvent = line.slice(7).trim(); }
+          else if (line.startsWith('data: ')) {
+            try {
+              const data = JSON.parse(line.slice(6));
+              if (currentEvent === 'iteration_done') {
+                setLoopResults(prev => [...prev, { iteration: data.iteration, status: data.status, detail: data.detail }]);
+              } else if (currentEvent === 'loop_complete') {
+                setLoopStatus('completed');
+              }
+            } catch {}
+          }
+        }
+      }
+      setLoopStatus('completed');
+    } catch (err: any) {
+      setLoopStatus('failed');
+    } finally {
+      setLoopRunning(false);
+    }
+  };
+
   const handleRunRecipe = async () => {
     if (!selectedAgent) {
       alert('Select an agent first!');
@@ -593,12 +678,12 @@ function PlaygroundInner() {
     setRecipeState(null);
 
     try {
-      const res = await fetch(`/api/orchestrator/recipes/${RECIPE_ID}/run`, {
+      const res = await fetch(`/api/orchestrator/agents/${selectedAgent}/recipe/run`, {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
         },
-        body: JSON.stringify({ agentId: selectedAgent, iterations: loopIterations }),
+        body: JSON.stringify({ iterations: loopIterations }),
       });
 
       if (!res.ok) {
@@ -771,14 +856,34 @@ function PlaygroundInner() {
 
               <div className="w-px h-5 bg-slate-200 shrink-0" />
 
-              {/* Loop Mode toggle — switches to the Recipe Executor's
-                  deterministic progress view instead of the chat transcript. */}
+              {/* Runtime Mode Select */}
+              <div className="flex items-center gap-3 shrink-0">
+                <label className="ui-label text-slate-500">Model</label>
+                <div className="w-44 relative rounded-md p-[1px] overflow-hidden bg-slate-200">
+                  <Select
+                    value={runtimeMode}
+                    onChange={(val: any) => setRuntimeMode(val)}
+                    options={[
+                      { value: 'cloud', label: 'Qwen DashScope (Cloud)' },
+                      { value: 'on_prem', label: 'Netra Qwen (On-Prem)' }
+                    ]}
+                    className="relative z-10 !py-1 text-xs bg-white"
+                    triggerClassName="rounded-[5px] border-transparent"
+                  />
+                </div>
+              </div>
+
+              <div className="w-px h-5 bg-slate-200 shrink-0" />
+
+              {/* Loop Mode toggle — always visible for all agents so users
+                  can run any agent in a deterministic loop without needing
+                  a recipe configured. */}
               <div className="flex items-center gap-2 shrink-0">
                 <label className="ui-label text-slate-500">Loop Mode</label>
                 <button
                   onClick={() => setLoopMode((v) => !v)}
                   className={`relative w-10 h-5 rounded-full transition-colors ${loopMode ? 'bg-indigo-600' : 'bg-slate-200'}`}
-                  title="Toggle Recipe Executor Loop Mode"
+                  title="Toggle Loop Mode — run this agent multiple times in sequence"
                 >
                   <span className={`absolute top-0.5 left-0.5 w-4 h-4 bg-white rounded-full shadow transition-transform ${loopMode ? 'translate-x-5' : ''}`} />
                 </button>
@@ -815,102 +920,99 @@ function PlaygroundInner() {
 {loopMode ? (
           <div className="flex-1 overflow-y-auto p-6">
             <div className="max-w-3xl mx-auto w-full space-y-4">
+
+              {/* Header card */}
               <div className="bg-white border border-slate-200 rounded-2xl p-5 shadow-sm">
-                <div className="flex items-center justify-between mb-4">
+                <div className="flex items-center justify-between mb-5">
                   <div>
-                    <h3 className="text-sm font-semibold text-slate-800">Danantara Survey Loop</h3>
-                    <p className="text-xs text-slate-500 mt-0.5">Recipe Executor — deterministic run, no chat turns.</p>
+                    <h3 className="text-sm font-semibold text-slate-800">Loop Mode</h3>
+                    <p className="text-xs text-slate-500 mt-0.5">Ketik instruksimu sekali — agent akan menjalankannya N kali berturut-turut.</p>
                   </div>
-                  <span className={`text-[10px] font-semibold px-2 py-1 rounded-full ${ recipeState?.status === 'completed' ? 'bg-emerald-50 text-emerald-700 border border-emerald-200' : recipeState?.status === 'failed' ? 'bg-red-50 text-red-700 border border-red-200' : recipeRunning ? 'bg-amber-50 text-amber-700 border border-amber-200' : 'bg-slate-50 text-slate-500 border border-slate-200' }`}>
-                    {recipeState?.status ?? (recipeRunning ? 'starting' : 'idle')}
+                  <span className={`text-[10px] font-semibold px-2 py-1 rounded-full border ${
+                    loopStatus === 'completed' ? 'bg-emerald-50 text-emerald-700 border-emerald-200' :
+                    loopStatus === 'failed' ? 'bg-red-50 text-red-700 border-red-200' :
+                    loopStatus === 'running' ? 'bg-amber-50 text-amber-700 border-amber-200 animate-pulse' :
+                    'bg-slate-50 text-slate-500 border-slate-200'
+                  }`}>
+                    {loopStatus === 'running' ? `Running... ${loopResults.length}/${loopIterations}` : loopStatus}
                   </span>
                 </div>
 
-                <div className="flex items-center gap-3 mb-4">
-                  <label className="ui-label text-slate-500">Iterations</label>
+                {/* Prompt input */}
+                <div className="mb-4">
+                  <label className="ui-label text-slate-500 mb-1.5 block">Instruksi / Prompt</label>
+                  <textarea
+                    value={loopPrompt}
+                    onChange={(e) => setLoopPrompt(e.target.value)}
+                    disabled={loopRunning}
+                    placeholder="Contoh: Buka aplikasi CX100, buat transaksi baru dengan nomor antrian berikutnya, lalu tutup."
+                    rows={4}
+                    className="w-full px-3 py-2.5 text-sm text-slate-700 bg-slate-50 border border-slate-200 rounded-xl outline-none focus:border-indigo-400 focus:ring-2 focus:ring-indigo-100 transition-all resize-none disabled:opacity-50 placeholder:text-slate-300"
+                  />
+                </div>
+
+                {/* Iterations + Start */}
+                <div className="flex items-center gap-3">
+                  <label className="ui-label text-slate-500 shrink-0">Iterasi</label>
                   <input
                     type="number"
                     min={1}
-                    max={20}
+                    max={50}
                     value={loopIterations}
-                    onChange={(e) => setLoopIterations(Math.max(1, Math.min(20, Number(e.target.value) || 1)))}
-                    disabled={recipeRunning}
+                    onChange={(e) => setLoopIterations(Math.max(1, Math.min(50, Number(e.target.value) || 1)))}
+                    disabled={loopRunning}
                     className="w-20 px-3 py-1.5 text-xs font-mono text-slate-700 bg-slate-50 border border-slate-200 rounded-md outline-none focus:border-indigo-400 transition-colors disabled:opacity-50"
                   />
                   <button
-                    onClick={handleRunRecipe}
-                    disabled={recipeRunning || !selectedAgent}
-                    className="relative px-4 py-1.5 rounded-lg overflow-hidden disabled:opacity-40 text-xs font-semibold text-white"
+                    onClick={handleRunLoopWithPrompt}
+                    disabled={loopRunning || !selectedAgent || !loopPrompt.trim()}
+                    className="relative px-5 py-1.5 rounded-lg overflow-hidden disabled:opacity-40 text-xs font-semibold text-white"
                   >
                     <div className="absolute inset-0 vibrant-rainbow-bg" />
-                    <span className="relative z-10">{recipeRunning ? 'Running…' : 'Start Loop'}</span>
+                    <span className="relative z-10">{loopRunning ? `Running ${loopResults.length}/${loopIterations}…` : '▶ Start Loop'}</span>
                   </button>
+                  {loopStatus !== 'idle' && (
+                    <button
+                      onClick={() => { setLoopResults([]); setLoopStatus('idle'); }}
+                      disabled={loopRunning}
+                      className="text-xs text-slate-400 hover:text-slate-600 transition-colors disabled:opacity-30"
+                    >
+                      Reset
+                    </button>
+                  )}
                 </div>
-
-                {recipeError && (
-                  <div className="bg-red-50 border border-red-200 text-red-700 p-3 rounded-xl text-xs mb-4 flex items-start gap-2">
-                    <AlertTriangle className="w-3.5 h-3.5 flex-shrink-0 mt-0.5" />
-                    {recipeError}
-                  </div>
-                )}
-
-                {!recipeState && !recipeError && (
-                  <p className="text-xs text-slate-400 italic">
-                    Select an agent with a UiPath tool attached, set iterations, and start the loop.
-                  </p>
-                )}
-
-                {recipeState && (
-                  <>
-                    <div className="grid grid-cols-3 gap-3 mb-4">
-                      <div className="bg-slate-50 border border-slate-200 rounded-xl p-3">
-                        <span className="ui-label text-slate-400 block">Iteration</span>
-                        <span className="text-lg font-mono text-slate-800">{recipeState.currentIteration} / {loopIterations}</span>
-                      </div>
-                      <div className="bg-slate-50 border border-slate-200 rounded-xl p-3">
-                        <span className="ui-label text-slate-400 block">Step</span>
-                        <span className="text-sm font-mono text-slate-800">
-                          {RECIPE_STEP_LABELS[recipeState.currentStepIndex]?.label ?? `#${recipeState.currentStepIndex}`}
-                        </span>
-                      </div>
-                      <div className="bg-slate-50 border border-slate-200 rounded-xl p-3">
-                        <span className="ui-label text-slate-400 block">Variant</span>
-                        <span className="text-lg font-mono text-slate-800">_{recipeState.currentVariant}</span>
-                      </div>
-                    </div>
-
-                    {recipeState.activeJobId && (
-                      <div className="text-[11px] font-mono text-slate-500 mb-4">
-                        Active job: <span className="text-slate-800">{recipeState.activeJobId}</span>
-                      </div>
-                    )}
-
-                    <div>
-                      <span className="ui-label text-slate-400 block mb-2">Iteration Results</span>
-                      <div className="space-y-1.5">
-                        {recipeState.iterationResults.length === 0 && (
-                          <p className="text-xs text-slate-400 italic">No iterations completed yet.</p>
-                        )}
-                        {recipeState.iterationResults.map((r) => (
-                          <div
-                            key={r.iteration}
-                            className={`flex items-start gap-2 text-xs p-2.5 rounded-lg border ${ r.status === 'success' ? 'border-emerald-100 bg-emerald-50 text-emerald-700' : r.status === 'failed' ? 'border-red-100 bg-red-50 text-red-700' : 'border-amber-100 bg-amber-50 text-amber-700' }`}
-                          >
-                            <span className="font-mono font-semibold shrink-0">#{r.iteration}</span>
-                            <span className="flex-1">{r.detail}</span>
-                          </div>
-                        ))}
-                      </div>
-                    </div>
-
-                    {recipeState.error && (
-                      <div className="mt-4 bg-red-50 border border-red-200 text-red-700 p-3 rounded-xl text-xs">
-                        {recipeState.error}
-                      </div>
-                    )}
-                  </>
-                )}
               </div>
+
+              {/* Live results */}
+              {loopResults.length > 0 && (
+                <div className="bg-white border border-slate-200 rounded-2xl p-5 shadow-sm space-y-2">
+                  <span className="ui-label text-slate-500 block mb-3">Hasil per Iterasi</span>
+                  {loopResults.map((r) => (
+                    <div
+                      key={r.iteration}
+                      className={`rounded-xl border p-3 text-xs flex gap-3 ${
+                        r.status === 'success' ? 'border-emerald-100 bg-emerald-50' :
+                        r.status === 'failed' ? 'border-red-100 bg-red-50' :
+                        'border-amber-100 bg-amber-50'
+                      }`}
+                    >
+                      <span className={`font-mono font-bold shrink-0 w-8 text-center ${
+                        r.status === 'success' ? 'text-emerald-700' : r.status === 'failed' ? 'text-red-700' : 'text-amber-700'
+                      }`}>#{r.iteration}</span>
+                      <span className="flex-1 text-slate-700 whitespace-pre-wrap break-all">{r.detail}</span>
+                      <span className={`shrink-0 text-[9px] font-semibold uppercase ${
+                        r.status === 'success' ? 'text-emerald-600' : r.status === 'failed' ? 'text-red-600' : 'text-amber-600'
+                      }`}>{r.status}</span>
+                    </div>
+                  ))}
+                  {loopRunning && loopResults.length < loopIterations && (
+                    <div className="rounded-xl border border-slate-100 bg-slate-50 p-3 text-xs flex gap-3 items-center">
+                      <span className="font-mono font-bold text-slate-400 w-8 text-center">#{loopResults.length + 1}</span>
+                      <span className="text-slate-400 animate-pulse">Agent sedang berpikir…</span>
+                    </div>
+                  )}
+                </div>
+              )}
             </div>
           </div>
         ) : (

@@ -20,6 +20,12 @@ import {
   Zap,
   Link as LinkIcon,
   Loader2,
+  Star,
+  Files,
+  GitBranch,
+  Mail,
+  Globe,
+  Cpu,
 } from "lucide-react";
 
 export default function ToolsPage() {
@@ -29,6 +35,8 @@ export default function ToolsPage() {
   const [isModalOpen, setIsModalOpen] = useState(false);
   const [modalMode, setModalMode] = useState<"create" | "edit">("create");
   const [currentTool, setCurrentTool] = useState<any>(null);
+  const [deleteModalOpen, setDeleteModalOpen] = useState(false);
+  const [toolToDelete, setToolToDelete] = useState<any>(null);
   const [formData, setFormData] = useState({
     name: "",
     description: "",
@@ -45,6 +53,48 @@ export default function ToolsPage() {
   // is recorded. Ports are assigned dynamically at process-start, so there is
   // no static value to show until the tool has actually been started.
   const [mcpStatus, setMcpStatus] = useState<Record<string, { port: number | null; status: string }>>({});
+
+  const [starredTools, setStarredTools] = useState<string[]>([]);
+  useEffect(() => {
+    try {
+      const stored = localStorage.getItem("amadeus_starred_tools");
+      if (stored) setStarredTools(JSON.parse(stored));
+    } catch (e) {}
+  }, []);
+  
+  const toggleStar = (toolId: string) => {
+    setStarredTools(prev => {
+      const next = prev.includes(toolId) ? prev.filter(id => id !== toolId) : [...prev, toolId];
+      localStorage.setItem("amadeus_starred_tools", JSON.stringify(next));
+      return next;
+    });
+  };
+
+  const handleDuplicate = (tool: any) => {
+    const { command, args, method, env } = parseVersions(tool);
+    setFormData({
+      name: `${tool.name} (Copy)`,
+      description: tool.description || "",
+      on_status: tool.on_status || "Online",
+      method: method,
+      command: command,
+      argsText: args.join("\n"),
+      envText: Object.entries(env || {}).map(([k, v]) => `${k}=${v}`).join("\n"),
+    });
+    setModalMode("create");
+    setIsModalOpen(true);
+  };
+
+  const getDynamicIcon = (name: string, isActive: boolean) => {
+    const n = name.toLowerCase();
+    const className = `w-6 h-6 ${isActive ? "text-orange-600" : "text-slate-400"}`;
+    if (n.includes("uipath")) return <img src="/uipath.svg" alt="UiPath" className={className} />;
+    if (n.includes("github")) return <GitBranch className={className} />;
+    if (n.includes("pad") || n.includes("power automate")) return <Zap className={className} />;
+    if (n.includes("gmail") || n.includes("mail")) return <Mail className={className} />;
+    if (n.includes("google") || n.includes("drive")) return <Globe className={className} />;
+    return <Server className={className} />;
+  };
 
   const [isAuthModalOpen, setIsAuthModalOpen] = useState(false);
   const [authProvider, setAuthProvider] = useState<"uipath" | "pad" | "amadeus" | "">("");
@@ -152,13 +202,22 @@ export default function ToolsPage() {
     setPasteCommand("");
   };
 
-  const deleteTool = async (toolId: string) => {
-    if (!confirm("Delete this MCP server?")) return;
+  const confirmDelete = (tool: any) => {
+    setToolToDelete(tool);
+    setDeleteModalOpen(true);
+  };
+
+  const executeDelete = async () => {
+    if (!toolToDelete) return;
     try {
-      const res = await fetch(`/api/tools/${toolId}`, { method: "DELETE" });
+      const res = await fetch(`/api/tools/${toolToDelete.tool_id}`, { method: "DELETE" });
       if (!res.ok) throw new Error("Failed");
       fetchTools();
     } catch (err: any) { alert(err.message); }
+    finally {
+      setDeleteModalOpen(false);
+      setToolToDelete(null);
+    }
   };
 
   const [restartingId, setRestartingId] = useState<string | null>(null);
@@ -314,10 +373,10 @@ export default function ToolsPage() {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
-          clientId: authFormData.clientId,
-          clientSecret: authFormData.clientSecret,
-          org: authFormData.org,
-          tenant: authFormData.tenant,
+          clientId: authFormData.clientId.trim(),
+          clientSecret: authFormData.clientSecret.trim(),
+          org: authFormData.org.trim(),
+          tenant: authFormData.tenant.trim(),
           baseUrl: "https://cloud.uipath.com",
         }),
       });
@@ -328,6 +387,29 @@ export default function ToolsPage() {
       setFolderTestError(err.message);
     } finally {
       setIsTestingFolders(false);
+    }
+  };
+
+  const handleUiPathUrlParse = (url: string) => {
+    try {
+      const parsedUrl = new URL(url);
+      if (parsedUrl.hostname.includes("uipath.com")) {
+        const pathSegments = parsedUrl.pathname.split('/').filter(Boolean);
+        if (pathSegments.length >= 2) {
+          const org = pathSegments[0];
+          const tenant = pathSegments[1];
+          const fid = parsedUrl.searchParams.get("fid") || "";
+          
+          setAuthFormData(prev => ({
+            ...prev,
+            org: org || prev.org,
+            tenant: tenant || prev.tenant,
+            folderId: fid || prev.folderId
+          }));
+        }
+      }
+    } catch (e) {
+      // ignore invalid URLs silently while typing
     }
   };
 
@@ -346,8 +428,8 @@ export default function ToolsPage() {
         //        Appears in /orchestrator/mcp/status with a live port.
         const isStdio = authFormData.transportMethod === "stdio";
         const mcpArgs = isStdio
-          ? ["/home/firania/Downloads/ponzgen/microservice/mcp-uipath/build/index.js", "--stdio"]
-          : ["/home/firania/Downloads/ponzgen/microservice/mcp-uipath/build/index.js"]; // no --stdio = SSE/HTTP mode
+          ? ["/home/firania/Downloads/ponzgen/microservice/mcp/mcp-uipath/build/index.js", "--stdio"]
+          : ["/home/firania/Downloads/ponzgen/microservice/mcp/mcp-uipath/build/index.js"]; // no --stdio = SSE/HTTP mode
         payload = {
           name: toolName,
           description: `UiPath MCP [${isStdio ? "STDIO" : "SSE"}] — Org: ${authFormData.org} / Tenant: ${authFormData.tenant} / Folder: ${authFormData.folderId}`,
@@ -360,11 +442,11 @@ export default function ToolsPage() {
               args: mcpArgs,
               env: {
                 UIPATH_BASE_URL: "https://cloud.uipath.com",
-                UIPATH_ORG: authFormData.org,
-                UIPATH_TENANT: authFormData.tenant,
-                UIPATH_CLIENT_ID: authFormData.clientId,
-                UIPATH_CLIENT_SECRET: authFormData.clientSecret,
-                UIPATH_FOLDER_ID: authFormData.folderId,
+                UIPATH_ORG: authFormData.org.trim(),
+                UIPATH_TENANT: authFormData.tenant.trim(),
+                UIPATH_CLIENT_ID: authFormData.clientId.trim(),
+                UIPATH_CLIENT_SECRET: authFormData.clientSecret.trim(),
+                UIPATH_FOLDER_ID: authFormData.folderId.trim(),
                 UIPATH_SCOPES: "OR.Jobs OR.Robots.Read OR.Execution OR.Folders.Read OR.Queues OR.Monitoring",
               }
             }
@@ -427,13 +509,21 @@ export default function ToolsPage() {
     }
   };
 
-  const filteredTools = tools.filter(t => {
-    const { method } = parseVersions(t);
-    const matchesSearch = t.name?.toLowerCase().includes(searchQuery.toLowerCase()) ||
-      t.description?.toLowerCase().includes(searchQuery.toLowerCase());
-    const matchesMethod = methodFilter === "all" || method === methodFilter;
-    return matchesSearch && matchesMethod;
-  });
+  const filteredTools = [...tools]
+    .filter(t => {
+      const { method } = parseVersions(t);
+      const matchesSearch = t.name?.toLowerCase().includes(searchQuery.toLowerCase()) ||
+        t.description?.toLowerCase().includes(searchQuery.toLowerCase());
+      const matchesMethod = methodFilter === "all" || method === methodFilter;
+      return matchesSearch && matchesMethod;
+    })
+    .sort((a, b) => {
+      const aStarred = starredTools.includes(a.tool_id);
+      const bStarred = starredTools.includes(b.tool_id);
+      if (aStarred && !bStarred) return -1;
+      if (!aStarred && bStarred) return 1;
+      return a.name.localeCompare(b.name);
+    });
 
   return (
     <div className="p-8 max-w-6xl mx-auto">
@@ -581,21 +671,27 @@ export default function ToolsPage() {
                 className="bg-white border border-slate-200 rounded-2xl p-6 card-hover group relative flex flex-col hover:border-slate-300 hover:shadow-xl hover:shadow-slate-500/5 transition-all duration-300"
               >
                 {/* Actions */}
-                <div className="absolute top-4 right-4 flex gap-1 opacity-0 group-hover:opacity-100 transition-opacity z-10">
+                <div className="absolute top-4 right-4 flex gap-1 transition-opacity z-10 opacity-100">
+                  <button onClick={() => toggleStar(tool.tool_id)} title="Favorite" className="p-1.5 bg-white border border-slate-200 text-slate-400 hover:text-amber-500 hover:border-amber-200 hover:bg-amber-50 rounded-lg shadow-sm transition-all">
+                    <Star className={`w-3.5 h-3.5 ${starredTools.includes(tool.tool_id) ? "fill-amber-400 text-amber-500" : ""}`} />
+                  </button>
                   {isActive && (
                     <button
                       onClick={() => restartTool(tool.tool_id)}
                       disabled={restartingId === tool.tool_id}
-                      title="Restart — kills the running process and lets the auto-manager respawn it on its next sync tick"
+                      title="Restart"
                       className="p-1.5 bg-white border border-slate-200 text-slate-400 hover:text-blue-600 hover:border-blue-200 hover:bg-blue-50 rounded-lg shadow-sm transition-all disabled:opacity-40"
                     >
                       <RefreshCw className={`w-3.5 h-3.5 ${restartingId === tool.tool_id ? "animate-spin" : ""}`} />
                     </button>
                   )}
-                  <button onClick={() => openEditModal(tool)} className="p-1.5 bg-white border border-slate-200 text-slate-400 hover:text-slate-700 hover:border-slate-300 rounded-lg shadow-sm transition-all">
+                  <button onClick={() => handleDuplicate(tool)} title="Duplicate" className="p-1.5 bg-white border border-slate-200 text-slate-400 hover:text-indigo-600 hover:border-indigo-200 hover:bg-indigo-50 rounded-lg shadow-sm transition-all">
+                    <Files className="w-3.5 h-3.5" />
+                  </button>
+                  <button onClick={() => openEditModal(tool)} title="Edit" className="p-1.5 bg-white border border-slate-200 text-slate-400 hover:text-slate-700 hover:border-slate-300 rounded-lg shadow-sm transition-all">
                     <Edit2 className="w-3.5 h-3.5" />
                   </button>
-                  <button onClick={() => deleteTool(tool.tool_id)} className="p-1.5 bg-white border border-slate-200 text-slate-400 hover:text-red-600 hover:border-red-200 hover:bg-red-50 rounded-lg shadow-sm transition-all">
+                  <button onClick={() => confirmDelete(tool)} title="Delete" className="p-1.5 bg-white border border-slate-200 text-slate-400 hover:text-red-600 hover:border-red-200 hover:bg-red-50 rounded-lg shadow-sm transition-all">
                     <Trash2 className="w-3.5 h-3.5" />
                   </button>
                 </div>
@@ -603,7 +699,7 @@ export default function ToolsPage() {
                 {/* Header */}
                 <div className="flex items-start gap-4 mb-4 pr-16">
                   <div className={`w-12 h-12 rounded-2xl ${isActive ? "bg-orange-50 border border-orange-100 text-orange-600" : "bg-slate-50 border border-slate-100 text-slate-400"} flex items-center justify-center flex-shrink-0 shadow-sm`}>
-                    <Server className="w-6 h-6" />
+                    {getDynamicIcon(tool.name, isActive)}
                   </div>
                   <div>
                     <h3 className="font-extrabold text-slate-900 text-base leading-snug">{tool.name}</h3>
@@ -893,6 +989,16 @@ export default function ToolsPage() {
                     <div className="bg-slate-50 p-3 rounded-xl border border-slate-100 text-xs text-slate-500">
                       Enter your UiPath External Application credentials. Credentials are stored as environment variables — never exposed in process listings.
                     </div>
+                    <div className="bg-indigo-50/50 p-3.5 rounded-xl border border-indigo-100 space-y-2">
+                      <label className="form-label text-indigo-900 mb-0">Auto-Fill from URL <span className="normal-case font-normal text-indigo-600/70">(Optional)</span></label>
+                      <p className="text-[10px] text-indigo-500 mb-2">Paste your Orchestrator folder URL to automatically extract Org, Tenant, and Folder ID.</p>
+                      <input 
+                        type="url"
+                        onChange={(e) => handleUiPathUrlParse(e.target.value)}
+                        className="form-input rounded-xl border-indigo-200 bg-white placeholder-indigo-300 focus:ring-indigo-500 focus:border-indigo-500 w-full" 
+                        placeholder="https://cloud.uipath.com/org/tenant/orchestrator_/?fid=XXXXX" 
+                      />
+                    </div>
                     <div>
                       <label className="form-label">Transport Method</label>
                       <div className="flex gap-2">
@@ -1000,6 +1106,37 @@ export default function ToolsPage() {
                 </button>
               </div>
             </form>
+          </div>
+        </div>
+      )}
+
+      {/* Delete Modal */}
+      {deleteModalOpen && toolToDelete && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/25 backdrop-blur-sm p-4 animate-in fade-in duration-200">
+          <div className="bg-white border border-slate-200 rounded-2xl w-full max-w-sm shadow-2xl flex flex-col">
+            <div className="p-6">
+              <div className="w-12 h-12 rounded-full bg-red-100 flex items-center justify-center mx-auto mb-4 text-red-600">
+                <Trash2 className="w-6 h-6" />
+              </div>
+              <h3 className="text-lg font-bold text-slate-900 text-center mb-2">Delete MCP Server?</h3>
+              <p className="text-sm text-slate-500 text-center mb-6">
+                Are you sure you want to delete <span className="font-bold text-slate-700">{toolToDelete.name}</span>? This action cannot be undone.
+              </p>
+              <div className="flex gap-3">
+                <button 
+                  onClick={() => { setDeleteModalOpen(false); setToolToDelete(null); }} 
+                  className="flex-1 px-4 py-2 bg-slate-100 hover:bg-slate-200 text-slate-700 rounded-xl font-medium transition-colors"
+                >
+                  Cancel
+                </button>
+                <button 
+                  onClick={executeDelete} 
+                  className="flex-1 px-4 py-2 bg-red-600 hover:bg-red-700 text-white rounded-xl font-medium transition-colors shadow-sm shadow-red-600/20"
+                >
+                  Delete
+                </button>
+              </div>
+            </div>
           </div>
         </div>
       )}

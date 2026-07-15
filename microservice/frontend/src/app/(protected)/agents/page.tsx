@@ -14,7 +14,187 @@ import {
   X,
   Wrench,
   ChevronRight,
+  Workflow,
+  ArrowUp,
+  ArrowDown,
+  AlertTriangle,
 } from "lucide-react";
+
+// Client-side mirror of amadeus-core's recipes/types.ts (creatoroop.md) —
+// form-editable shape only, no executor logic. argsTemplate-shaped fields are
+// kept as raw JSON text while editing (Step 3's sanctioned textarea fallback)
+// and parsed only on save.
+interface RecipeStepForm {
+  id: string;
+  label: string;
+  toolName: string;
+  argsTemplateText: string;
+  variantCount: string; // numeric text input, "" = unset
+  resolveEnabled: boolean;
+  resolverId: string;
+  nameTemplate: string;
+  pollForEnabled: boolean;
+  pollForToolName: string;
+  pollForArgsTemplateText: string;
+  terminalField: string;
+  terminalValuesText: string; // comma-separated
+  successValuesText: string; // comma-separated, optional
+  timeoutSeconds: string;
+  pollIntervalSeconds: string;
+  verifyEnabled: boolean;
+  verifyToolName: string;
+  verifyArgsTemplateText: string;
+  checkField: string;
+  mustBeNonEmpty: boolean;
+  onFault: "rotate_variant" | "abort_iteration" | "abort_recipe";
+}
+
+interface RecipeForm {
+  id?: string;
+  label: string;
+  iterations: string;
+  resolversText: string; // raw JSON array of RecipeResolverDef
+  steps: RecipeStepForm[];
+}
+
+function emptyStep(): RecipeStepForm {
+  return {
+    id: `step_${Math.random().toString(36).slice(2, 8)}`,
+    label: "",
+    toolName: "",
+    argsTemplateText: "{}",
+    variantCount: "",
+    resolveEnabled: false,
+    resolverId: "",
+    nameTemplate: "",
+    pollForEnabled: false,
+    pollForToolName: "",
+    pollForArgsTemplateText: "{}",
+    terminalField: "",
+    terminalValuesText: "",
+    successValuesText: "",
+    timeoutSeconds: "120",
+    pollIntervalSeconds: "5",
+    verifyEnabled: false,
+    verifyToolName: "",
+    verifyArgsTemplateText: "{}",
+    checkField: "",
+    mustBeNonEmpty: true,
+    onFault: "abort_iteration",
+  };
+}
+
+function emptyRecipeForm(): RecipeForm {
+  return { label: "", iterations: "1", resolversText: "[]", steps: [] };
+}
+
+function stepFromServer(step: any): RecipeStepForm {
+  return {
+    id: step.id,
+    label: step.label ?? "",
+    toolName: step.toolName ?? "",
+    argsTemplateText: JSON.stringify(step.argsTemplate ?? {}, null, 2),
+    variantCount: step.variantCount != null ? String(step.variantCount) : "",
+    resolveEnabled: !!step.resolve,
+    resolverId: step.resolve?.resolverId ?? "",
+    nameTemplate: step.resolve?.nameTemplate ?? "",
+    pollForEnabled: !!step.pollFor,
+    pollForToolName: step.pollFor?.toolName ?? "",
+    pollForArgsTemplateText: JSON.stringify(step.pollFor?.argsTemplate ?? {}, null, 2),
+    terminalField: step.pollFor?.terminalField ?? "",
+    terminalValuesText: (step.pollFor?.terminalValues ?? []).join(", "),
+    successValuesText: (step.pollFor?.successValues ?? []).join(", "),
+    timeoutSeconds: step.pollFor?.timeoutSeconds != null ? String(step.pollFor.timeoutSeconds) : "120",
+    pollIntervalSeconds: step.pollFor?.pollIntervalSeconds != null ? String(step.pollFor.pollIntervalSeconds) : "5",
+    verifyEnabled: !!step.verify,
+    verifyToolName: step.verify?.toolName ?? "",
+    verifyArgsTemplateText: JSON.stringify(step.verify?.argsTemplate ?? {}, null, 2),
+    checkField: step.verify?.checkField ?? "",
+    mustBeNonEmpty: step.verify?.mustBeNonEmpty ?? true,
+    onFault: step.onFault ?? "abort_iteration",
+  };
+}
+
+function recipeFormFromServer(recipe: any): RecipeForm {
+  return {
+    id: recipe.id,
+    label: recipe.label ?? "",
+    iterations: String(recipe.iterations ?? 1),
+    resolversText: JSON.stringify(recipe.resolvers ?? [], null, 2),
+    steps: (recipe.steps ?? []).map(stepFromServer),
+  };
+}
+
+/** Parses the editable form back into the server RecipeDef shape. Throws
+ * with a human-readable message on the first invalid field found — the
+ * caller shows this instead of attempting a partial save. */
+function buildServerRecipe(form: RecipeForm, agentId: string): any {
+  const parseJson = (text: string, label: string) => {
+    try {
+      return JSON.parse(text);
+    } catch {
+      throw new Error(`${label}: invalid JSON`);
+    }
+  };
+  const splitList = (text: string) => text.split(",").map((s) => s.trim()).filter(Boolean);
+
+  if (form.steps.length === 0) throw new Error("At least one step is required.");
+
+  const steps = form.steps.map((step, idx) => {
+    if (!step.label.trim()) throw new Error(`Step ${idx + 1}: label is required.`);
+    if (!step.toolName.trim()) throw new Error(`Step ${idx + 1}: tool name is required.`);
+    const out: any = {
+      id: step.id,
+      label: step.label.trim(),
+      toolName: step.toolName.trim(),
+      argsTemplate: parseJson(step.argsTemplateText, `Step ${idx + 1} args`),
+      onFault: step.onFault,
+    };
+    if (step.variantCount.trim()) out.variantCount = Number(step.variantCount);
+    if (step.resolveEnabled) {
+      if (!step.resolverId.trim() || !step.nameTemplate.trim()) {
+        throw new Error(`Step ${idx + 1}: resolver id and name template are required when resolution is enabled.`);
+      }
+      out.resolve = { resolverId: step.resolverId.trim(), nameTemplate: step.nameTemplate.trim() };
+    }
+    if (step.pollForEnabled) {
+      if (!step.pollForToolName.trim() || !step.terminalField.trim() || !step.terminalValuesText.trim()) {
+        throw new Error(`Step ${idx + 1}: pollFor tool name, terminal field, and terminal values are required.`);
+      }
+      out.pollFor = {
+        toolName: step.pollForToolName.trim(),
+        argsTemplate: parseJson(step.pollForArgsTemplateText, `Step ${idx + 1} pollFor args`),
+        terminalField: step.terminalField.trim(),
+        terminalValues: splitList(step.terminalValuesText),
+        ...(step.successValuesText.trim() ? { successValues: splitList(step.successValuesText) } : {}),
+        timeoutSeconds: Number(step.timeoutSeconds) || 120,
+        pollIntervalSeconds: Number(step.pollIntervalSeconds) || 5,
+      };
+    }
+    if (step.verifyEnabled) {
+      if (!step.verifyToolName.trim() || !step.checkField.trim()) {
+        throw new Error(`Step ${idx + 1}: verify tool name and check field are required.`);
+      }
+      out.verify = {
+        toolName: step.verifyToolName.trim(),
+        argsTemplate: parseJson(step.verifyArgsTemplateText, `Step ${idx + 1} verify args`),
+        checkField: step.checkField.trim(),
+        mustBeNonEmpty: step.mustBeNonEmpty,
+      };
+    }
+    return out;
+  });
+
+  return {
+    id: form.id,
+    agentId,
+    label: form.label.trim() || "Untitled Recipe",
+    steps,
+    iterations: Number(form.iterations) || 1,
+    maxConcurrentJobs: 1,
+    resolvers: parseJson(form.resolversText, "Resolvers"),
+  };
+}
 
 export default function AgentsPage() {
   const [agents, setAgents] = useState<any[]>([]);
@@ -31,6 +211,13 @@ export default function AgentsPage() {
     on_status: true,
     tools: [] as string[],
   });
+
+  // Loop Mode (creatoroop.md) — a recipe belongs to exactly one agent and is
+  // fetched/edited alongside that agent's own form, not on a separate page.
+  const [recipeEnabled, setRecipeEnabled] = useState(false);
+  const [recipeExistedOnOpen, setRecipeExistedOnOpen] = useState(false);
+  const [recipe, setRecipe] = useState<RecipeForm>(emptyRecipeForm());
+  const [recipeError, setRecipeError] = useState<string | null>(null);
 
   const [searchQuery, setSearchQuery] = useState("");
   const [statusFilter, setStatusFilter] = useState("all");
@@ -60,14 +247,37 @@ export default function AgentsPage() {
     setModalMode("create");
     setCurrentAgent(null);
     setFormData({ agent_name: "", description: "", agent_style: "The agent will reply in a warm and friendly manner, using English.", on_status: true, tools: [] });
+    setRecipeEnabled(false);
+    setRecipeExistedOnOpen(false);
+    setRecipe(emptyRecipeForm());
+    setRecipeError(null);
     setIsModalOpen(true);
   };
 
-  const openEditModal = (agent: any) => {
+  const openEditModal = async (agent: any) => {
     setModalMode("edit");
     setCurrentAgent(agent);
     setFormData({ agent_name: agent.agent_name || "", description: agent.description || "", agent_style: agent.agent_style || "", on_status: agent.on_status ?? true, tools: agent.tools || [] });
+    setRecipeError(null);
     setIsModalOpen(true);
+
+    try {
+      const res = await fetch(`/api/orchestrator/agents/${agent.agent_id}/recipe`);
+      if (res.ok) {
+        const data = await res.json();
+        setRecipe(recipeFormFromServer(data));
+        setRecipeEnabled(true);
+        setRecipeExistedOnOpen(true);
+      } else {
+        setRecipe(emptyRecipeForm());
+        setRecipeEnabled(false);
+        setRecipeExistedOnOpen(false);
+      }
+    } catch {
+      setRecipe(emptyRecipeForm());
+      setRecipeEnabled(false);
+      setRecipeExistedOnOpen(false);
+    }
   };
 
   const deleteAgent = async (agentId: string) => {
@@ -81,6 +291,21 @@ export default function AgentsPage() {
 
   const handleSave = async (e: React.FormEvent) => {
     e.preventDefault();
+    setRecipeError(null);
+
+    // Validate the recipe form BEFORE touching the agent record, so a typo
+    // in a JSON textarea never leaves the agent saved but the recipe silently
+    // dropped.
+    let serverRecipe: any = null;
+    if (recipeEnabled) {
+      try {
+        serverRecipe = buildServerRecipe(recipe, currentAgent?.agent_id ?? "");
+      } catch (err: any) {
+        setRecipeError(err.message);
+        return;
+      }
+    }
+
     try {
       const url = modalMode === "create" ? "/api/agents" : `/api/agents/${currentAgent.agent_id}`;
       const res = await fetch(url, {
@@ -89,9 +314,39 @@ export default function AgentsPage() {
         body: JSON.stringify(formData),
       });
       if (!res.ok) throw new Error("Failed to save");
+      const savedAgent = await res.json();
+      const agentId = savedAgent.agent_id ?? currentAgent?.agent_id;
+
+      if (recipeEnabled && serverRecipe && agentId) {
+        serverRecipe.agentId = agentId;
+        const recipeRes = await fetch(`/api/orchestrator/agents/${agentId}/recipe`, {
+          method: "PUT",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify(serverRecipe),
+        });
+        if (!recipeRes.ok) throw new Error("Agent saved, but Loop Mode recipe failed to save.");
+      } else if (!recipeEnabled && recipeExistedOnOpen && agentId) {
+        await fetch(`/api/orchestrator/agents/${agentId}/recipe`, { method: "DELETE" });
+      }
+
       setIsModalOpen(false);
       fetchAgentsAndTools();
     } catch (err: any) { alert(err.message); }
+  };
+
+  const updateStep = (idx: number, patch: Partial<RecipeStepForm>) => {
+    setRecipe((r) => ({ ...r, steps: r.steps.map((s, i) => (i === idx ? { ...s, ...patch } : s)) }));
+  };
+  const addStep = () => setRecipe((r) => ({ ...r, steps: [...r.steps, emptyStep()] }));
+  const removeStep = (idx: number) => setRecipe((r) => ({ ...r, steps: r.steps.filter((_, i) => i !== idx) }));
+  const moveStep = (idx: number, dir: -1 | 1) => {
+    setRecipe((r) => {
+      const target = idx + dir;
+      if (target < 0 || target >= r.steps.length) return r;
+      const steps = [...r.steps];
+      [steps[idx], steps[target]] = [steps[target], steps[idx]];
+      return { ...r, steps };
+    });
   };
 
   // Helper to generate deterministic mock metrics for visual completeness
@@ -390,6 +645,171 @@ export default function AgentsPage() {
                     <span>⚡ STDIO — spawned on-demand</span>
                     <span>📡 SSE — persistent HTTP server</span>
                   </p>
+                </div>
+
+                {/* Loop Mode (creatoroop.md) — a structured step-chain form,
+                    scoped to whatever tools are already attached above. Not a
+                    node/canvas editor; that's flagged future work, not this. */}
+                <div className="border-t border-slate-100 pt-5">
+                  <div className="flex items-center justify-between mb-1">
+                    <label className="form-label flex items-center gap-1.5">
+                      <Workflow className="w-3.5 h-3.5 text-slate-400" /> Loop Mode
+                    </label>
+                    {modalMode === "edit" && formData.tools.length > 0 && (
+                      <button
+                        type="button"
+                        onClick={() => setRecipeEnabled((v) => !v)}
+                        className={`relative w-10 h-5 rounded-full transition-colors ${recipeEnabled ? "bg-indigo-600" : "bg-slate-200"}`}
+                      >
+                        <span className={`absolute top-0.5 left-0.5 w-4 h-4 bg-white rounded-full shadow transition-transform ${recipeEnabled ? "translate-x-5" : ""}`} />
+                      </button>
+                    )}
+                  </div>
+
+                  {modalMode === "create" ? (
+                    <p className="text-xs text-slate-400 italic">
+                      Loop Mode configuration becomes available after creating this agent and attaching tools.
+                    </p>
+                  ) : formData.tools.length === 0 ? (
+                    <p className="text-xs text-slate-400 italic">
+                      Attach at least one MCP tool above to configure Loop Mode.
+                    </p>
+                  ) : !recipeEnabled ? (
+                    <p className="text-xs text-slate-400 italic">
+                      This agent runs as a normal conversational agent — no recipe configured.
+                    </p>
+                  ) : (
+                    <div className="space-y-4 mt-3">
+                      {recipeError && (
+                        <div className="bg-red-50 border border-red-200 text-red-700 p-3 rounded-xl text-xs flex items-start gap-2">
+                          <AlertTriangle className="w-3.5 h-3.5 flex-shrink-0 mt-0.5" />
+                          {recipeError}
+                        </div>
+                      )}
+                      <div className="grid grid-cols-2 gap-4">
+                        <div>
+                          <label className="form-label">Recipe Label</label>
+                          <input value={recipe.label} onChange={(e) => setRecipe({ ...recipe, label: e.target.value })} className="form-input rounded-xl border-slate-200" placeholder="e.g. Danantara Survey Loop" />
+                        </div>
+                        <div>
+                          <label className="form-label">Iterations</label>
+                          <input type="number" min={1} max={20} value={recipe.iterations} onChange={(e) => setRecipe({ ...recipe, iterations: e.target.value })} className="form-input rounded-xl border-slate-200" />
+                        </div>
+                      </div>
+
+                      <div className="space-y-3">
+                        {recipe.steps.map((step, idx) => (
+                          <div key={step.id} className="bg-slate-50 border border-slate-200 rounded-xl p-4 space-y-3">
+                            <div className="flex items-center justify-between">
+                              <span className="text-xs font-semibold text-slate-600">Step {idx + 1}</span>
+                              <div className="flex items-center gap-1">
+                                <button type="button" onClick={() => moveStep(idx, -1)} disabled={idx === 0} className="p-1 text-slate-400 hover:text-slate-700 disabled:opacity-30 disabled:cursor-not-allowed"><ArrowUp className="w-3.5 h-3.5" /></button>
+                                <button type="button" onClick={() => moveStep(idx, 1)} disabled={idx === recipe.steps.length - 1} className="p-1 text-slate-400 hover:text-slate-700 disabled:opacity-30 disabled:cursor-not-allowed"><ArrowDown className="w-3.5 h-3.5" /></button>
+                                <button type="button" onClick={() => removeStep(idx)} className="p-1 text-slate-400 hover:text-red-600"><Trash2 className="w-3.5 h-3.5" /></button>
+                              </div>
+                            </div>
+
+                            <div className="grid grid-cols-2 gap-2">
+                              <input value={step.label} onChange={(e) => updateStep(idx, { label: e.target.value })} placeholder="Label (e.g. Get disposable email)" className="form-input rounded-lg border-slate-200 text-xs" />
+                              <input value={step.toolName} onChange={(e) => updateStep(idx, { toolName: e.target.value })} placeholder="MCP tool name (e.g. trigger_uipath_job)" className="form-input rounded-lg border-slate-200 text-xs font-mono" />
+                            </div>
+                            <p className="text-[10px] text-slate-400 -mt-1.5">Must match an MCP method exposed by one of this agent's attached tools — validated when the recipe runs.</p>
+
+                            <div>
+                              <label className="text-[10px] font-semibold text-slate-500 uppercase tracking-wide">Args template (JSON)</label>
+                              <textarea value={step.argsTemplateText} onChange={(e) => updateStep(idx, { argsTemplateText: e.target.value })} className="form-input rounded-lg border-slate-200 h-16 resize-none font-mono text-xs" />
+                            </div>
+
+                            <div className="grid grid-cols-2 gap-2">
+                              <div>
+                                <label className="text-[10px] font-semibold text-slate-500 uppercase tracking-wide">Variant count (optional)</label>
+                                <input type="number" min={1} value={step.variantCount} onChange={(e) => updateStep(idx, { variantCount: e.target.value })} className="form-input rounded-lg border-slate-200 text-xs" />
+                              </div>
+                              <div>
+                                <label className="text-[10px] font-semibold text-slate-500 uppercase tracking-wide">On fault</label>
+                                <Select
+                                  value={step.onFault}
+                                  onChange={(v: any) => updateStep(idx, { onFault: v })}
+                                  options={[
+                                    { value: "rotate_variant", label: "Rotate variant" },
+                                    { value: "abort_iteration", label: "Abort iteration" },
+                                    { value: "abort_recipe", label: "Abort recipe" },
+                                  ]}
+                                  triggerClassName="rounded-lg !py-2 text-xs"
+                                />
+                              </div>
+                            </div>
+
+                            <label className="flex items-center gap-2 text-xs text-slate-600">
+                              <input type="checkbox" checked={step.resolveEnabled} onChange={(e) => updateStep(idx, { resolveEnabled: e.target.checked })} />
+                              This step needs name→ID resolution
+                            </label>
+                            {step.resolveEnabled && (
+                              <div className="grid grid-cols-2 gap-2 pl-5">
+                                <input value={step.resolverId} onChange={(e) => updateStep(idx, { resolverId: e.target.value })} placeholder="Resolver id" className="form-input rounded-lg border-slate-200 text-xs font-mono" />
+                                <input value={step.nameTemplate} onChange={(e) => updateStep(idx, { nameTemplate: e.target.value })} placeholder="Name template (e.g. Get_Email_{{variant}})" className="form-input rounded-lg border-slate-200 text-xs font-mono" />
+                              </div>
+                            )}
+
+                            <label className="flex items-center gap-2 text-xs text-slate-600">
+                              <input type="checkbox" checked={step.pollForEnabled} onChange={(e) => updateStep(idx, { pollForEnabled: e.target.checked })} />
+                              Wait for async completion
+                            </label>
+                            {step.pollForEnabled && (
+                              <div className="space-y-2 pl-5">
+                                <input value={step.pollForToolName} onChange={(e) => updateStep(idx, { pollForToolName: e.target.value })} placeholder="Status-check tool name" className="form-input rounded-lg border-slate-200 text-xs font-mono" />
+                                <textarea value={step.pollForArgsTemplateText} onChange={(e) => updateStep(idx, { pollForArgsTemplateText: e.target.value })} className="form-input rounded-lg border-slate-200 h-14 resize-none font-mono text-xs" placeholder="Args template (JSON)" />
+                                <div className="grid grid-cols-2 gap-2">
+                                  <input value={step.terminalField} onChange={(e) => updateStep(idx, { terminalField: e.target.value })} placeholder="Terminal field (e.g. state)" className="form-input rounded-lg border-slate-200 text-xs" />
+                                  <input value={step.terminalValuesText} onChange={(e) => updateStep(idx, { terminalValuesText: e.target.value })} placeholder="Terminal values (comma-separated)" className="form-input rounded-lg border-slate-200 text-xs" />
+                                  <input value={step.successValuesText} onChange={(e) => updateStep(idx, { successValuesText: e.target.value })} placeholder="Success values (optional)" className="form-input rounded-lg border-slate-200 text-xs" />
+                                  <div className="grid grid-cols-2 gap-2">
+                                    <input type="number" value={step.timeoutSeconds} onChange={(e) => updateStep(idx, { timeoutSeconds: e.target.value })} placeholder="Timeout (s)" className="form-input rounded-lg border-slate-200 text-xs" />
+                                    <input type="number" value={step.pollIntervalSeconds} onChange={(e) => updateStep(idx, { pollIntervalSeconds: e.target.value })} placeholder="Interval (s)" className="form-input rounded-lg border-slate-200 text-xs" />
+                                  </div>
+                                </div>
+                              </div>
+                            )}
+
+                            <label className="flex items-center gap-2 text-xs text-slate-600">
+                              <input type="checkbox" checked={step.verifyEnabled} onChange={(e) => updateStep(idx, { verifyEnabled: e.target.checked })} />
+                              Verify after completion
+                            </label>
+                            {step.verifyEnabled && (
+                              <div className="space-y-2 pl-5">
+                                <input value={step.verifyToolName} onChange={(e) => updateStep(idx, { verifyToolName: e.target.value })} placeholder="Verify tool name" className="form-input rounded-lg border-slate-200 text-xs font-mono" />
+                                <textarea value={step.verifyArgsTemplateText} onChange={(e) => updateStep(idx, { verifyArgsTemplateText: e.target.value })} className="form-input rounded-lg border-slate-200 h-14 resize-none font-mono text-xs" placeholder="Args template (JSON)" />
+                                <div className="flex items-center gap-2">
+                                  <input value={step.checkField} onChange={(e) => updateStep(idx, { checkField: e.target.value })} placeholder="Check field" className="form-input rounded-lg border-slate-200 text-xs flex-1" />
+                                  <label className="flex items-center gap-1.5 text-xs text-slate-600 whitespace-nowrap">
+                                    <input type="checkbox" checked={step.mustBeNonEmpty} onChange={(e) => updateStep(idx, { mustBeNonEmpty: e.target.checked })} />
+                                    Must be non-empty
+                                  </label>
+                                </div>
+                              </div>
+                            )}
+                          </div>
+                        ))}
+                      </div>
+
+                      <button type="button" onClick={addStep} className="btn-secondary text-xs py-2 px-3 rounded-lg flex items-center gap-1.5">
+                        <Plus className="w-3.5 h-3.5" /> Add Step
+                      </button>
+
+                      <details className="bg-slate-50 border border-slate-200 rounded-xl p-3">
+                        <summary className="text-xs font-semibold text-slate-600 cursor-pointer">Resolvers (Advanced)</summary>
+                        <p className="text-[10px] text-slate-400 mt-1 mb-2">
+                          One-time name→ID resolution passes (e.g. resolving a release name to a real key via a
+                          "list" tool call), referenced by a step's resolver id above.
+                        </p>
+                        <textarea
+                          value={recipe.resolversText}
+                          onChange={(e) => setRecipe({ ...recipe, resolversText: e.target.value })}
+                          className="form-input rounded-lg border-slate-200 h-28 resize-none font-mono text-xs w-full"
+                        />
+                      </details>
+                    </div>
+                  )}
                 </div>
               </form>
             </div>
