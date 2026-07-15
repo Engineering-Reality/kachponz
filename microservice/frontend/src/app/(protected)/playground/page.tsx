@@ -74,18 +74,6 @@ interface AgentRecipe {
   steps: { id: string; label: string }[];
 }
 
-const generateTopicSummary = (text: string) => {
-  let summary = text.replace(/^(please|can you|could you|list my|show me|tell me about|what is|how to)\s+/i, '');
-  summary = summary.charAt(0).toUpperCase() + summary.slice(1);
-  const words = summary.split(' ');
-  if (words.length > 5) {
-    summary = words.slice(0, 5).join(' ') + '...';
-  } else if (summary.length > 25) {
-    summary = summary.slice(0, 25) + '...';
-  }
-  return summary;
-};
-
 function groupSessionsByDate(sessions: ChatSession[]) {
   const groups: Record<string, ChatSession[]> = {
     'Today': [],
@@ -150,6 +138,14 @@ function PlaygroundInner() {
   const fileInputRef = useRef<HTMLInputElement>(null);
   const [isSidebarOpen, setIsSidebarOpen] = useState(true);
   const [runtimeMode, setRuntimeMode] = useState<'cloud' | 'on_prem'>('cloud');
+
+  // Typing indicator — true from the moment a message is sent until the
+  // first token/chunk of the agent's reply streams in (or the request
+  // errors out). Prompt #14 Part B.
+  const [isAgentTyping, setIsAgentTyping] = useState(false);
+  // Follow-up suggestion chips shown below the latest assistant message —
+  // best-effort, fire-and-forget; empty array renders nothing. Prompt #14 Part C.
+  const [followUpSuggestions, setFollowUpSuggestions] = useState<string[]>([]);
 
   // Loop Mode — drives the Recipe Executor's deterministic run instead of the
   // conversational ReAct agent. Kept as separate state from the chat flow
@@ -394,11 +390,15 @@ function PlaygroundInner() {
     setAttachments(prev => prev.filter((_, i) => i !== index));
   };
 
-  const handleSend = async () => {
-    if (!input.trim() && attachments.length === 0) {
+  const handleSend = async (overrideInput?: string) => {
+    const effectiveInput = overrideInput ?? input;
+    if (!effectiveInput.trim() && attachments.length === 0) {
       return;
     }
-    const currentInputDisplay = input.trim();
+    // Session's very first turn — the chat-title fetch only fires once,
+    // right after this turn's assistant response completes (Part D).
+    const wasFirstTurn = messages.length === 0;
+    const currentInputDisplay = effectiveInput.trim();
     const systemInstruction = attachments.length > 0 
       ? `\n\n[SYSTEM INSTRUCTION: Baca gambar lampiran secara langsung menggunakan kemampuan vision Anda (JANGAN memanggil fungsi/tools eksternal apapun untuk membaca dokumen ini). Jika terdapat data tabel, form, atau kolom pada dokumen, tulis ulang data tersebut HANYA berupa JSON Array of Objects di dalam blok \`\`\`json (tanpa teks lain). SANGAT PENTING: Anda TIDAK BOLEH mengubah format penulisan header/kolom (jangan menghilangkan spasi, jangan mengubah huruf besar/kecil). Jika di dokumen tertulis "First Name", tulis key sebagai "First Name" BUKAN "FirstName". Ekstrak apa adanya sesuai yang tertera secara visual. Jangan memanggil fungsi apapun. Contoh: \`\`\`json\n[{"First Name": "A", "Company Name": "B"}]\n\`\`\`]`
       : ``;
@@ -430,17 +430,13 @@ function PlaygroundInner() {
       // update session
       if (currentSessionId) {
         setSessions(s => {
-          const updated = s.map(session => {
-            if (session.id === currentSessionId) {
-              let newTitle = session.title;
-              if (prev.length === 0 && session.title.startsWith("Chat ")) {
-                const baseText = currentInputDisplay || "Attached File(s)";
-                newTitle = generateTopicSummary(baseText);
-              }
-              return { ...session, messages: newMsgs, title: newTitle };
-            }
-            return session;
-          });
+          // Title stays the "Chat <date>" placeholder for now — Part D
+          // swaps in the real LLM-generated summary once the first
+          // assistant response completes, instead of truncating this
+          // first message client-side.
+          const updated = s.map(session =>
+            session.id === currentSessionId ? { ...session, messages: newMsgs } : session
+          );
           localStorage.setItem('agent-sessions', JSON.stringify(updated));
           return updated;
         });
@@ -454,6 +450,8 @@ function PlaygroundInner() {
     setAgentInit(null);
     setResponseTime(null);
     setMcpHealth([]);
+    setFollowUpSuggestions([]);
+    setIsAgentTyping(true);
 
     try {
       const res = await fetch("/api/orchestrator/run-agentic", {
@@ -560,6 +558,9 @@ function PlaygroundInner() {
                 if (data.message && data.message.content) {
                   if (data.node === 'agent' && data.message.role === 'assistant') {
                     accumulatedResponse = data.message.content;
+                    // First real token has arrived — the typing indicator's
+                    // job is done, regardless of when the stream itself ends.
+                    setIsAgentTyping(false);
                     setMessages(prev => {
                       const next = [...prev];
                       if (next.length > 0) {
@@ -604,12 +605,53 @@ function PlaygroundInner() {
         }
       }
       setStatus('UPLINK: STABLE');
+      // Safety net — if the stream ended with zero content (e.g. an empty
+      // reply), the typing indicator would otherwise never clear.
+      setIsAgentTyping(false);
+
+      // Both calls below are fire-and-forget, best-effort enhancements —
+      // neither is awaited, and neither can delay or fail the chat flow
+      // that already completed above.
+      const conversationTail = [...messages, userMessage, { role: 'bot' as const, content: accumulatedResponse }]
+        .filter(m => m.role === 'user' || m.role === 'bot')
+        .slice(-6)
+        .map(m => ({ role: m.role === 'bot' ? 'assistant' : 'user', content: m.content }));
+
+      fetch('/api/orchestrator/chat/recommendations', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ conversationTail }),
+      })
+        .then(r => (r.ok ? r.json() : { suggestions: [] }))
+        .then(data => setFollowUpSuggestions(Array.isArray(data.suggestions) ? data.suggestions : []))
+        .catch(() => setFollowUpSuggestions([]));
+
+      if (wasFirstTurn && currentSessionId) {
+        fetch('/api/orchestrator/chat/title', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ messages: conversationTail }),
+        })
+          .then(r => (r.ok ? r.json() : null))
+          .then(data => {
+            if (!data?.title) return;
+            setSessions(s => {
+              const updated = s.map(session =>
+                session.id === currentSessionId ? { ...session, title: data.title } : session
+              );
+              localStorage.setItem('agent-sessions', JSON.stringify(updated));
+              return updated;
+            });
+          })
+          .catch(() => {});
+      }
     } catch (err: any) {
       setMessages(prev => [...prev, {
         role: 'error',
         content: `Error: ${err.message}`
       }]);
       setStatus('UPLINK: ERROR');
+      setIsAgentTyping(false);
     }
   };
 
@@ -1191,12 +1233,32 @@ function PlaygroundInner() {
                           </span>
                         )}
 
-                        {contentToRender && (
+                        {!contentToRender && isAgentTyping && idx === messages.length - 1 ? (
+                          <div className="flex items-center gap-1 text-sm text-slate-400 px-1 py-2">
+                            <span className="w-1.5 h-1.5 rounded-full bg-slate-400 animate-bounce" />
+                            <span className="w-1.5 h-1.5 rounded-full bg-slate-400 animate-bounce [animation-delay:0.15s]" />
+                            <span className="w-1.5 h-1.5 rounded-full bg-slate-400 animate-bounce [animation-delay:0.3s]" />
+                          </div>
+                        ) : contentToRender && (
                           <div className="w-full markdown-container">
                             <MarkdownViewer content={contentToRender} />
                           </div>
                         )}
-                        
+
+                        {idx === messages.length - 1 && followUpSuggestions.length > 0 && (
+                          <div className="flex flex-wrap gap-2 mt-3">
+                            {followUpSuggestions.map((s, si) => (
+                              <button
+                                key={si}
+                                onClick={() => { setFollowUpSuggestions([]); handleSend(s); }}
+                                className="text-xs text-slate-600 bg-white border border-slate-200 rounded-full px-3 py-1.5 hover:border-indigo-300 hover:text-indigo-600 hover:bg-indigo-50 transition-colors"
+                              >
+                                {s}
+                              </button>
+                            ))}
+                          </div>
+                        )}
+
                         {Array.isArray(jsonArray) && jsonArray.length > 0 && typeof jsonArray[0] === 'object' && (
                            <EditableJsonTable 
                              initialData={jsonArray}
@@ -1283,7 +1345,7 @@ function PlaygroundInner() {
               />
 
               <button
-                onClick={handleSend}
+                onClick={() => handleSend()}
                 disabled={!input.trim() && attachments.length === 0}
                 className="relative p-3 rounded-xl overflow-hidden disabled:opacity-40 ml-2 group"
               >

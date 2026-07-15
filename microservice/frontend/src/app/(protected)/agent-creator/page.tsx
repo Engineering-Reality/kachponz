@@ -4,7 +4,7 @@ import { useState, useRef, useEffect, useCallback } from "react";
 import {
   Bot, Send, Cpu, CheckCircle, Wand2, Headset, LineChart,
   Code2, Landmark, Loader2, Wrench, AlertTriangle, RotateCcw,
-  Globe, Search, ExternalLink, Plus,
+  Globe, Search, ExternalLink, Plus, Sparkles,
 } from "lucide-react";
 
 interface Message {
@@ -55,6 +55,7 @@ export default function AgentCreator() {
   const [saved, setSaved] = useState(false);
   const [selectedTools, setSelectedTools] = useState<Set<string>>(new Set());
   const [installingExternal, setInstallingExternal] = useState<string | null>(null);
+  const [autofilling, setAutofilling] = useState<"description" | "agent_style" | null>(null);
   const messagesEndRef = useRef<HTMLDivElement>(null);
 
   // --- Discover state ---
@@ -198,6 +199,43 @@ export default function AgentCreator() {
       else next.add(toolId);
       return next;
     });
+  };
+
+  // Magic Pen — suggests a value for a single field, using whatever's
+  // already filled in as context. Populates the (editable) field so the
+  // user sees the suggestion and can accept or change it — never applied
+  // silently.
+  const handleAutofillSuggest = async (fieldName: "description" | "agent_style") => {
+    if (!config || autofilling) return;
+    setAutofilling(fieldName);
+    try {
+      const res = await fetch("/api/orchestrator/autofill/suggest", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          fieldName,
+          fieldContext: {
+            agent_name: config.agent_name,
+            description: config.description,
+            agent_style: config.agent_style,
+            keywords: config.keywords,
+          },
+          currentValue: config[fieldName],
+        }),
+      });
+      if (!res.ok) {
+        const data = await res.json().catch(() => ({}));
+        throw new Error(data.error?.message || data.message || `Error ${res.status}`);
+      }
+      const data = await res.json();
+      if (typeof data.value === "string" && data.value.trim()) {
+        setConfig(prev => (prev ? { ...prev, [fieldName]: data.value.trim() } : prev));
+      }
+    } catch (err: any) {
+      setError(`Autofill suggestion failed: ${err.message}`);
+    } finally {
+      setAutofilling(null);
+    }
   };
 
   const handleInstallExternal = async (ext: McpServer) => {
@@ -373,13 +411,43 @@ export default function AgentCreator() {
                       <p className="ui-label text-slate-400">Agent Name</p>
                       <p className="text-sm font-semibold text-slate-800">{config.agent_name}</p>
                     </div>
-                    <div className="bg-white border border-slate-200 rounded-xl p-4 space-y-1">
-                      <p className="ui-label text-slate-400">Description</p>
-                      <p className="text-xs text-slate-600 leading-relaxed">{config.description}</p>
+                    <div className="bg-white border border-slate-200 rounded-xl p-4 space-y-1.5">
+                      <div className="flex items-center justify-between">
+                        <p className="ui-label text-slate-400">Description</p>
+                        <button
+                          onClick={() => handleAutofillSuggest("description")}
+                          disabled={autofilling !== null}
+                          title="Suggest a value with AI"
+                          className="p-1 text-slate-300 hover:text-pink-500 transition-colors disabled:opacity-40 disabled:cursor-not-allowed"
+                        >
+                          {autofilling === "description" ? <Loader2 className="w-3.5 h-3.5 animate-spin" /> : <Sparkles className="w-3.5 h-3.5" />}
+                        </button>
+                      </div>
+                      <textarea
+                        value={config.description}
+                        onChange={e => setConfig(prev => (prev ? { ...prev, description: e.target.value } : prev))}
+                        rows={3}
+                        className="w-full text-xs text-slate-600 leading-relaxed bg-transparent resize-none outline-none focus:bg-slate-50 rounded-lg p-1 -m-1 transition-colors"
+                      />
                     </div>
-                    <div className="bg-white border border-slate-200 rounded-xl p-4 space-y-1">
-                      <p className="ui-label text-slate-400">System Persona</p>
-                      <p className="text-xs text-slate-600 leading-relaxed whitespace-pre-wrap">{config.agent_style}</p>
+                    <div className="bg-white border border-slate-200 rounded-xl p-4 space-y-1.5">
+                      <div className="flex items-center justify-between">
+                        <p className="ui-label text-slate-400">System Persona</p>
+                        <button
+                          onClick={() => handleAutofillSuggest("agent_style")}
+                          disabled={autofilling !== null}
+                          title="Suggest a value with AI"
+                          className="p-1 text-slate-300 hover:text-pink-500 transition-colors disabled:opacity-40 disabled:cursor-not-allowed"
+                        >
+                          {autofilling === "agent_style" ? <Loader2 className="w-3.5 h-3.5 animate-spin" /> : <Sparkles className="w-3.5 h-3.5" />}
+                        </button>
+                      </div>
+                      <textarea
+                        value={config.agent_style}
+                        onChange={e => setConfig(prev => (prev ? { ...prev, agent_style: e.target.value } : prev))}
+                        rows={4}
+                        className="w-full text-xs text-slate-600 leading-relaxed whitespace-pre-wrap bg-transparent resize-none outline-none focus:bg-slate-50 rounded-lg p-1 -m-1 transition-colors"
+                      />
                     </div>
                     <div className="bg-white border border-slate-200 rounded-xl p-4 space-y-2">
                       <p className="ui-label text-slate-400 flex items-center gap-1.5"><Wrench className="w-3 h-3" /> Assigned MCP Tools ({selectedTools.size})</p>

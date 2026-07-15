@@ -20,6 +20,9 @@ import { getRecipeForAgent, upsertRecipeForAgent, deleteRecipeForAgent } from '.
 import { runRecipeStream } from './recipes/executor.js';
 import type { RecipeDef } from './recipes/types.js';
 import { DomainError } from '../types/domain.js';
+import { suggestFieldValue } from './executors/autofillClient.js';
+import { suggestFollowUps } from './executors/recommendationClient.js';
+import { suggestChatTitle } from './executors/chatTitleClient.js';
 
 // Daftarkan agent bawaan sekali saat modul dimuat.
 try {
@@ -130,6 +133,28 @@ const RecipeDefSchema = z.object({
   iterations: z.number().int().min(1).max(20),
   maxConcurrentJobs: z.literal(1).optional(),
   resolvers: z.array(RecipeResolverSchema).optional(),
+}).strict();
+
+// Prompt #14 — Magic Pen Autofill / Chat Recommendation / Real Chat
+// Summaries. All three are lightweight qwenChat() text calls, no new
+// Python/torch/VLM involvement.
+const AutofillSuggestSchema = z.object({
+  fieldName: z.string().min(1).max(100),
+  fieldContext: z.record(z.string(), z.unknown()).default({}),
+  currentValue: z.string().max(4000).optional(),
+}).strict();
+
+const ConversationMessageSchema = z.object({
+  role: z.enum(['user', 'assistant', 'system', 'tool']),
+  content: z.string().max(8000),
+}).strict();
+
+const ChatRecommendationsSchema = z.object({
+  conversationTail: z.array(ConversationMessageSchema).min(1).max(10),
+}).strict();
+
+const ChatTitleSchema = z.object({
+  messages: z.array(ConversationMessageSchema).min(1).max(20),
 }).strict();
 
 export async function registerOrchestratorRoutes(app: FastifyInstance): Promise<void> {
@@ -591,6 +616,39 @@ export async function registerOrchestratorRoutes(app: FastifyInstance): Promise<
       } catch (e) {
         return reply.code(502).send({ error: { code: 'UIPATH_REQUEST_FAILED', message: e instanceof Error ? e.message : String(e) } });
       }
+    });
+
+    // POST /orchestrator/autofill/suggest — Magic Pen: LLM-generated
+    // suggestion for a single Agent Creator form field, given the other
+    // fields already filled in as context. The frontend always shows this
+    // as an editable suggestion — never auto-applies it.
+    typedSecured.post('/orchestrator/autofill/suggest', {
+      schema: { body: AutofillSuggestSchema },
+    }, async (req, reply) => {
+      const body = req.body as z.infer<typeof AutofillSuggestSchema>;
+      const value = await suggestFieldValue(body);
+      return reply.send({ value });
+    });
+
+    // POST /orchestrator/chat/recommendations — 2-4 tappable follow-up
+    // suggestions shown after an assistant turn. suggestFollowUps() never
+    // throws (fails quietly to []), so this route can't break the chat flow.
+    typedSecured.post('/orchestrator/chat/recommendations', {
+      schema: { body: ChatRecommendationsSchema },
+    }, async (req, reply) => {
+      const body = req.body as z.infer<typeof ChatRecommendationsSchema>;
+      const suggestions = await suggestFollowUps(body.conversationTail);
+      return reply.send({ suggestions });
+    });
+
+    // POST /orchestrator/chat/title — real LLM-generated 3-4 word chat
+    // title, replacing the old client-side truncation of the first message.
+    typedSecured.post('/orchestrator/chat/title', {
+      schema: { body: ChatTitleSchema },
+    }, async (req, reply) => {
+      const body = req.body as z.infer<typeof ChatTitleSchema>;
+      const title = await suggestChatTitle(body.messages);
+      return reply.send({ title });
     });
 
     // POST /orchestrator/dispatch — jalankan step saat ini via executor terpilih.
