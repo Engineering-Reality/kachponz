@@ -27,6 +27,19 @@ We are building **Amadeus**, a central orchestration platform bridging this exac
 2. **Tools Registry**: A centralized hub to register and manage capabilities (APIs, scripts).
 3. **Agent Invoke**: A dynamic playground where agents can be summoned to execute tasks by reasoning and utilizing the attached tools.
 
+### Objective Benchmark: Amadeus APA vs. Traditional RPA (e.g., Automation Anywhere)
+*Playing devil's advocate: Where do we shine, and where do we fall short?*
+
+| Feature / Aspect | 🤖 Traditional RPA (Automation Anywhere) | 🧠 Amadeus APA (Agentic Process Automation) |
+| :--- | :--- | :--- |
+| **Core Paradigm** | **Deterministic & Rules-Based.** Strict step-by-step logic. AI is treated as an add-on (Copilot). | **AI-Native & Intent-Based.** Agents reason the best path to execute deterministic tools. |
+| **Development Speed** | **Slow.** Requires specialized RPA developers, rigid scripting, and complex UI mapping. | **Fast.** "Talk once, let agents decide." Natural language configuration via Agent Creator. |
+| **Handling Unstructured Data** | **Rigid.** Relies on specialized document templates (IQ Bot). Fails when formats change. | **Highly Flexible.** LLMs natively understand context, parsing messy data seamlessly. |
+| **Predictability & Compliance** | 🥇 **Superior.** 100% deterministic execution. Extremely robust audit trails; enterprise compliance is built-in. | ⚠️ **Challenging.** Agents can hallucinate or take unpredictable paths. Compliance relies heavily on strictly defined MCP limits. |
+| **Integration Ecosystem** | 🥇 **Superior.** Decades of mature, enterprise-certified connectors (SAP, Oracle, Mainframes). | ⚠️ **Developing.** Highly extensible via MCP, but currently lacks the massive library of legacy system connectors. |
+
+**Verdict:** Amadeus is not here to replace Automation Anywhere. We are here to **orchestrate** it. Amadeus acts as the intelligent "Brain" that can call existing RPA bots as its "Hands" via MCP, turning rigid automation into an adaptive, intelligent system.
+
 ### Detailed Agent Invoke & Orchestration Flow
 
 ```mermaid
