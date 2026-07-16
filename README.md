@@ -6,11 +6,23 @@ Amadeus is an orchestration platform designed to seamlessly integrate intelligen
 
 ## A. Discover -> Problem & Solution
 
-### Why we need this? (Why?)
-Organizations currently struggle with isolated automation bots and disconnected LLM models. While LLMs excel at reasoning, they lack the "hands" to execute actions. Conversely, traditional APIs and RPA bots can execute actions but lack the "brain" to reason dynamically. We need a unified platform where intelligent agents can dynamically select and use tools to solve complex user intents without hardcoded flows.
+### Why we need this? (The Philosophy)
+**Human. AI Agent. Robot.**
 
-### What we gonna do? (What?)
-We are building **Amadeus**, a central orchestration platform centered around:
+**Humans** want automation, but humans also demand compliance.  
+**AI Agents** want to automate. They connect to applications via MCP (Model Context Protocol), which requires an API Key. But not all applications have API keys available due to compliance restrictions. This results in *high automation, less compliance, and restricted access.*  
+**Robots** want to automate too, but within compliance. They connect to applications via UI without API keys. This results in *high compliance, less automation*. But robots cannot talk to each other, nor can they talk to humans.
+
+This creates disorganization between automated business processes. Where humans are fully replaced by AI, *wallahi we’re doomed.* AI doesn’t fix a disorganized company—it turns your disorganization into a system.
+
+### What we gonna do? (The Solution: Amadeus)
+**Humans Whoops. Agents Loop. Robots Shoot.**
+
+Prompt Engineering is Outdated. Welcome to the **Loop Era**. Talk once, let agents decide. Enterprise-grade critical tasks are executed by Robots and orchestrated by AI Agents.
+
+So, **RPA + Agents = APA (Agentic Process Automation)**.
+
+We are building **Amadeus**, a central orchestration platform bridging this exact gap through:
 1. **Agent Creator**: Allowing users to seamlessly design and configure intelligent agents.
 2. **Tools Registry**: A centralized hub to register and manage capabilities (APIs, scripts).
 3. **Agent Invoke**: A dynamic playground where agents can be summoned to execute tasks by reasoning and utilizing the attached tools.
