@@ -186,29 +186,34 @@ flowchart TD
         CR_DRC <-->|TCP 5432| DB_DRC
     end
 
-    subgraph NetraCloud [Netra Private AI Cloud: Localized LLM Inference]
+    subgraph NetraCloud [Netra Private AI Cloud: Localized LLM Inference — HGX H100 Reference]
         direction TB
         subgraph EdgeLayer [Edge + Router Layer]
             NetraAPI[☁️ OpenAI-Compatible API]
-            KVRouter[🚦 KV-Aware Router]
+            KVRouter[🚦 KV-Aware Router - Prefix Affinity]
+            Fixed[⚠️ No Planner / Autoscaler - Fixed 16-GPU Capacity]
             NetraAPI --> KVRouter
         end
 
         subgraph DisaggregatedInference [Disaggregated Inference Architecture]
             direction LR
             subgraph Node0 [Node 0 - HGX H100 8-GPU]
-                Prefill[⚡ Prefill GPUs: Qwen Context Processing]
+                PrefillP[⚡ Prefill GPUs - group P G0-G3]
+                DecodeD1[💭 Decode GPUs - group D#1 G4-G7]
                 NVLink0((🔗 NVLink All-to-All))
-                Prefill <--> NVLink0
+                PrefillP <--> NVLink0
+                DecodeD1 <--> NVLink0
             end
-            
-            subgraph Node1 [Node 1 - HGX H100 8-GPU]
-                Decode[💭 Decode GPUs: Qwen Auto-Regressive Generation]
+
+            subgraph Node1 [Node 1 - HGX H100 8-GPU, all-decode]
+                DecodeD2[💭 Decode GPUs - group D#2 G8-G11]
+                DecodeD3[💭 Decode GPUs - group D#3 G12-G15]
                 NVLink1((🔗 NVLink All-to-All))
-                Decode <--> NVLink1
+                DecodeD2 <--> NVLink1
+                DecodeD3 <--> NVLink1
             end
-            
-            Node0 <-->|RDMA / InfiniBand: Cross-Node KV Transfer| Node1
+
+            Node0 <-->|RDMA / InfiniBand: Cross-Node KV Transfer + Metadata| Node1
         end
 
         subgraph KVCache [KV Cache Hierarchy]
@@ -217,8 +222,8 @@ flowchart TD
             L3[❄️ L3: Shared/Distributed Storage - Cold]
             L1 <--> L2 <--> L3
         end
-        
-        KVRouter -->|Assigns requests based on prefix affinity| Node0
+
+        KVRouter -->|Assigns requests based on prefix affinity + load| Node0
         Node0 --> KVCache
         Node1 --> KVCache
     end
@@ -256,6 +261,39 @@ flowchart TD
     Creator_DRC --> ManagedSystems
 ```
 
+#### Reference Deployment: HGX B300 vs. HGX H100
+
+> ⚠️ **Precision note:** NVFP4 (W4A4) is a Blackwell-generation (B300) tensor core
+> feature. H100 (Hopper) does not have native FP4 support — the H100 deployment
+> runs at **FP8** (or INT8) instead. This changes both the achievable throughput
+> and the effective KV-cache footprint per GPU; the two rows below are **not**
+> directly comparable at face value; H100's numbers are lower on paper but the
+> platform is far more available and proven in production today.
+
+| | HGX B300 (reference) | HGX H100 (this deployment) |
+| :--- | :--- | :--- |
+| **GPUs** | 2× HGX B300, 16 GPUs total | 2× HGX H100, 16 GPUs total |
+| **HBM per GPU** | 288 GB (HBM3e) | 80 GB (HBM3) |
+| **Total HBM** | ≈ 4.6 TB | ≈ 1.28 TB |
+| **Network** | 200–800 Gb/s InfiniBand | 200–800 Gb/s InfiniBand (same fabric assumed) |
+| **Precision** | NVFP4 (W4A4) | FP8 / INT8 (no native FP4 on Hopper) |
+| **Prefill throughput** | ≈ 630k tok/s / cluster (not measured) | **Not yet benchmarked** |
+| **Decode throughput** | ≈ 320k tok/s / cluster (not measured) | **Not yet benchmarked** |
+| **Context window** | 32k–64k | **Pending bring-up** — expect lower than B300 given ~4.5× less HBM/GPU |
+
+*All B300 figures are the vendor reference architecture's own projections, not
+independently measured. H100 figures are intentionally left blank rather than
+extrapolated — run the actual Netra Runtime benchmark suite on the H100 cluster
+once it's provisioned, and fill this table with measured numbers before using it
+in any external-facing benchmarking material.*
+
+**Software / Kernel Stack (both deployments):** Netra Inference Core (SGLang-based
+serving engine) — Full-Attention (DenseFA), GDN Linear-Attention (DeltaScan),
+Quantized GEMM (QGEMM-FP4 on B300 / QGEMM-FP8 on H100), MoE Expert-Parallel routing,
+and a Speculative Decoder (SpecVerify kernel, draft-and-verify at 4–7 tok/step). This
+is the layer worth highlighting in a benchmark deck as genuine technical depth
+underneath the "AI-native" claim in the section above — it's not just an LLM API
+call, it's a purpose-built inference stack.
 
 ---
 
@@ -270,9 +308,16 @@ The development of the platform is divided into iterative sprints focusing on co
 - **Sprint 2: The "Hands" (Tool Integration)**
   - Implement MCP Adapters.
   - Build the Tools registry and enable dynamic tool calling from the Agent Invoke playground.
+- **Sprint 2.5: Recipe Executor (Loop Mode)**
+  - Deterministic, code-owned state machine for multi-step, multi-iteration RPA
+    flows (job IDs and tool arguments tracked in code, not re-derived from model
+    text on every turn).
+  - Proven against the Danantara CX100 use case; being generalized into a
+    per-agent capability inside Agent Creator rather than staying a one-off.
 - **Sprint 3: The "Canvas" (Agent Creator)**
   - Develop the Agent Creator interface.
   - Implement intelligent field autofill and configuration saving.
+  - Expose Loop Mode as an optional, form-based step-chain builder per agent.
 - **Sprint 4: Ecosystem & Collaboration (Bonus)**
   - Feature Sharing (sharing agents/threads with other users).
   - UI Polish and Markdown/Table rendering enhancements.
@@ -308,5 +353,19 @@ We sit exactly at the bridge between **unstructured conversational AI** (like st
 ### Piloting Usecase Examples
 
 **Automated CX100 Danantara Survey Loop**
-- **Scenario**: End-to-end automation of the Danantara survey and queue transaction process via the CX100 legacy application.
-- **Execution**: The Agent (Brain) is configured with the *Danantara Survey Loop* recipe. It autonomously orchestrates a multi-step deterministic workflow: it triggers the initial `Danantara_LoginFlow` via RPA, waits for verification (OTP/Login resolution), and executes the transaction ("Buka aplikasi CX100, buat transaksi baru dengan nomor antrian berikutnya, lalu tutup"). This proves Amadeus's ability to wrap rigid, multi-stage legacy RPA scripts inside a resilient, state-aware agentic loop without losing track of context.
+- **Scenario**: End-to-end automation of a disposable-email-driven survey submission
+  flow via the CX100 application, repeated across N iterations.
+- **Execution**: The Agent (Brain) is configured with the *Danantara Survey Loop*
+  recipe (Recipe Executor / Loop Mode). Per iteration, it: (1) requests a disposable
+  email — rotating across pre-provisioned variants if one is rate-limited or fails,
+  (2) waits for that job to reach a terminal state and verifies the resulting asset
+  is populated before continuing, (3) triggers `Danantara_LoginFlow` with that email,
+  (4) requests and verifies the OTP the same way, (5) submits it via
+  `Danantara_InputOTPFlow` to complete the survey, then advances to the next
+  iteration. Every job ID and tool argument is tracked as data in the executor, not
+  re-derived from the model's own text — this is what makes the loop reliable across
+  many iterations instead of drifting or hallucinating state partway through.
+- *(If a separate queue-ticketing flow — e.g. "buat transaksi dengan nomor antrian
+  berikutnya" — is also a real, distinct capability of this agent, document it as its
+  own usecase rather than folding it into this one; the description above reflects
+  only the disposable-email/OTP/survey flow that's been built and tested so far.)*
