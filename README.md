@@ -126,21 +126,21 @@ The persistent memory and configuration storage.
 %%{init: {'theme': 'base', 'themeVariables': { 'primaryColor': '#F3E8FF', 'primaryTextColor': '#1E1B4B', 'primaryBorderColor': '#D946EF', 'lineColor': '#3B82F6', 'clusterBkg': '#E0F2FE', 'clusterBorder': '#3B82F6'}}}%%
 flowchart LR
     subgraph Canvas [Presentation Layer: Canvas]
-        UI[Playground / Agent Creator]
+        UI[🖥️ Playground / Agent Creator]
     end
     
     subgraph Brain [Orchestration Core: Brain]
-        Engine[Agentic Engine]
-        Memory[Context & State]
+        Engine[🧠 Agentic Engine]
+        Memory[🗂️ Context & State]
     end
     
     subgraph Hands [Integration Layer: Hands]
-        MCP[MCP Adapters]
-        API[External Tools / APIs]
+        MCP[🔌 MCP Adapters]
+        API[🌐 External Tools / APIs]
     end
     
     subgraph Storage [Data Layer: Storage]
-        DB[(PostgreSQL)]
+        DB[(🗄️ PostgreSQL)]
     end
     
     UI <-->|REST / SSE| Engine
@@ -156,18 +156,18 @@ flowchart LR
 %%{init: {'theme': 'base', 'themeVariables': { 'primaryColor': '#F3E8FF', 'primaryTextColor': '#1E1B4B', 'primaryBorderColor': '#D946EF', 'lineColor': '#3B82F6', 'clusterBkg': '#E0F2FE', 'clusterBorder': '#3B82F6'}}}%%
 flowchart TD
     subgraph ExternalServices [External Services]
-        LDAP[LDAP Server]
-        SMTP[Corporate SMTP]
-        DNS_CR[DNS Load Balancer - Orchestrator]
-        DNS_DB[DNS Load Balancer - Database]
+        LDAP[🔐 LDAP Server]
+        SMTP[📧 Corporate SMTP]
+        DNS_CR[⚖️ DNS Load Balancer - Orchestrator]
+        DNS_DB[⚖️ DNS Load Balancer - Database]
     end
 
     subgraph DC [Site 1: Prod - DC]
         direction TB
-        CR_DC[Amadeus Orchestrator Server]
-        DB_DC[(PostgreSQL DB-DC)]
-        Runner_DC[MCP Runners / Agents]
-        Creator_DC[Agent Creator Node]
+        CR_DC[🖥️ Amadeus Orchestrator Server]
+        DB_DC[(🗄️ PostgreSQL DB-DC)]
+        Runner_DC[🤖 MCP Runners / Agents]
+        Creator_DC[🏗️ Agent Creator Node]
         
         CR_DC <-->|WSS / HTTPS| Runner_DC
         CR_DC <-->|WSS / HTTPS| Creator_DC
@@ -176,10 +176,10 @@ flowchart TD
 
     subgraph DRC [Site 2: Prod - DRC]
         direction TB
-        CR_DRC[Amadeus Orchestrator Server]
-        DB_DRC[(PostgreSQL DB-DRC)]
-        Runner_DRC[MCP Runners / Agents]
-        Creator_DRC[Agent Creator Node]
+        CR_DRC[🖥️ Amadeus Orchestrator Server]
+        DB_DRC[(🗄️ PostgreSQL DB-DRC)]
+        Runner_DRC[🤖 MCP Runners / Agents]
+        Creator_DRC[🏗️ Agent Creator Node]
         
         CR_DRC <-->|WSS / HTTPS| Runner_DRC
         CR_DRC <-->|WSS / HTTPS| Creator_DRC
@@ -189,22 +189,22 @@ flowchart TD
     subgraph NetraCloud [Netra Private AI Cloud: Localized LLM Inference]
         direction TB
         subgraph EdgeLayer [Edge + Router Layer]
-            NetraAPI[OpenAI-Compatible API]
-            KVRouter[KV-Aware Router]
+            NetraAPI[☁️ OpenAI-Compatible API]
+            KVRouter[🚦 KV-Aware Router]
             NetraAPI --> KVRouter
         end
 
         subgraph DisaggregatedInference [Disaggregated Inference Architecture]
             direction LR
             subgraph Node0 [Node 0 - HGX H100 8-GPU]
-                Prefill[Prefill GPUs: Qwen Context Processing]
-                NVLink0((NVLink All-to-All))
+                Prefill[⚡ Prefill GPUs: Qwen Context Processing]
+                NVLink0((🔗 NVLink All-to-All))
                 Prefill <--> NVLink0
             end
             
             subgraph Node1 [Node 1 - HGX H100 8-GPU]
-                Decode[Decode GPUs: Qwen Auto-Regressive Generation]
-                NVLink1((NVLink All-to-All))
+                Decode[💭 Decode GPUs: Qwen Auto-Regressive Generation]
+                NVLink1((🔗 NVLink All-to-All))
                 Decode <--> NVLink1
             end
             
@@ -212,9 +212,9 @@ flowchart TD
         end
 
         subgraph KVCache [KV Cache Hierarchy]
-            L1[L1: GPU HBM - Hot]
-            L2[L2: Host DRAM + NVMe - Warm]
-            L3[L3: Shared/Distributed Storage - Cold]
+            L1[🔥 L1: GPU HBM - Hot]
+            L2[☀️ L2: Host DRAM + NVMe - Warm]
+            L3[❄️ L3: Shared/Distributed Storage - Cold]
             L1 <--> L2 <--> L3
         end
         
@@ -224,10 +224,10 @@ flowchart TD
     end
 
     subgraph ManagedSystems [Managed Systems & APIs]
-        Server[Internal Servers]
-        WebApp[Web Applications]
-        Desktop[Desktop / Legacy RPA]
-        CoreDB[(Core Databases)]
+        Server[🏢 Internal Servers]
+        WebApp[🌐 Web Applications]
+        Desktop[💻 Desktop / Legacy RPA]
+        CoreDB[(🗄️ Core Databases)]
     end
 
     %% DC to DRC Replication
