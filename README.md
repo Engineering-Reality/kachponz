@@ -15,6 +15,21 @@ Amadeus is an orchestration platform designed to seamlessly integrate intelligen
 
 This creates disorganization between automated business processes. Where humans are fully replaced by AI, *wallahi we’re doomed.* AI doesn’t fix a disorganized company—it turns your disorganization into a system.
 
+### The Data-Driven Reality
+**Your roadmap to enterprise-ready APA.**
+
+> 📊 *“More than 90% of so-called ‘agentic’ AI solutions are simply repackaged generative AI layered atop legacy systems, with only around 130 vendors among thousands actually delivering genuine agent-driven orchestration, according to Gartner.”*
+
+**A Practical Playbook for Enterprise-Ready Automation**
+- **Ask Yourself:** Are you Solving Problems or Just Chasing AI?
+- **Assess:** How to Define an APA Maturity Model.
+- **Execute:** How to Make Your Business Case for APA Investment.
+
+While competitors struggle to bridge the gap, enterprise architects recognize the need for mature orchestration. As Venkata K., Solution Architect at CMG Mortgage, Inc., noted:
+> 🗣️ *"We also explored Microsoft’s Power Automate. However, it wasn’t as mature or up to enterprise level at the time. Automation Anywhere had good standards and excellent support, in terms of architecture, design, and user interface, we chose Automation Anywhere. It also has good community support."*
+
+The industry demands the maturity and stability of legacy RPA, combined with genuine agentic intelligence.
+
 ### What we gonna do? (The Solution: Amadeus)
 **Humans Whoops. Agents Loop. Robots Shoot.**
 
