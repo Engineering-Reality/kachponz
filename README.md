@@ -15,24 +15,42 @@ We are building **Amadeus**, a central orchestration platform centered around:
 2. **Tools Registry**: A centralized hub to register and manage capabilities (APIs, scripts).
 3. **Agent Invoke**: A dynamic playground where agents can be summoned to execute tasks by reasoning and utilizing the attached tools.
 
-### Non-technical Flowchart
+### Detailed Agent Invoke & Orchestration Flow
 
 ```mermaid
-flowchart TD
-    User([User Intent]) -->|Asks Question/Task| Brain(Amadeus Agent)
+sequenceDiagram
+    participant User as Canvas (Playground)
+    participant Core as Brain (Amadeus Orchestrator)
+    participant LC as LangChain / LangGraph Engine
+    participant DB as PostgreSQL Storage
+    participant MCP as Hands (MCP Adapters)
+    participant External as External APIs / RPA
+
+    User->>Core: 1. Send User Intent (Prompt via SSE)
+    Core->>DB: 2. Fetch Agent Config & Chat History
+    DB-->>Core: Agent Config (Role, Allowed Tools)
+    Core->>LC: 3. Initialize Agentic Workflow (ReAct Loop)
     
-    subgraph Reasoning & Planning
-        Brain -->|Analyzes Intent| Plan{Needs Tool?}
+    rect rgb(240, 248, 255)
+        note right of LC: LangGraph Reasoning Cycle
+        LC->>LC: 4. Analyze Intent & Planning
+        
+        alt Tool Required
+            LC->>Core: 5. Tool Call Requested
+            Core->>MCP: 6. Resolve MCP Standard Protocol
+            MCP->>External: 7. Execute External API / RPA Script
+            External-->>MCP: 8. Return Execution Data
+            MCP-->>Core: 9. Format Data for LLM
+            Core-->>LC: 10. Inject Tool Output into Context
+            LC->>LC: 11. Synthesize Data (Re-evaluate Plan)
+        else No Tool Required
+            LC->>LC: Direct Synthesis
+        end
     end
     
-    Plan -->|Yes| Tools[Selects Appropriate Tool]
-    Tools -->|Executes Action| External[(External System/API)]
-    External -->|Returns Data| Brain
-    
-    Plan -->|No| Synthesize
-    
-    Brain -->|Synthesizes Answer| Synthesize[Final Response]
-    Synthesize --> User
+    LC-->>Core: 12. Final Response Generated
+    Core-->>DB: 13. Persist New Chat State
+    Core-->>User: 14. Stream Response to UI (Markdown)
 ```
 
 ---
@@ -89,6 +107,70 @@ flowchart LR
     MCP <--> API
     Engine <--> DB
 ```
+
+### Enterprise DC / DRC Infrastructure Topology
+
+```mermaid
+flowchart TD
+    subgraph ExternalServices [External Services]
+        LDAP[LDAP Server]
+        SMTP[Corporate SMTP]
+        DNS_CR[DNS Load Balancer - Orchestrator]
+        DNS_DB[DNS Load Balancer - Database]
+    end
+
+    subgraph DC [Site 1: Prod - DC]
+        direction TB
+        CR_DC[Amadeus Orchestrator Server]
+        DB_DC[(PostgreSQL DB-DC)]
+        Runner_DC[MCP Runners / Agents]
+        Creator_DC[Agent Creator Node]
+        
+        CR_DC <-->|WSS / HTTPS| Runner_DC
+        CR_DC <-->|WSS / HTTPS| Creator_DC
+        CR_DC <-->|TCP 5432| DB_DC
+    end
+
+    subgraph DRC [Site 2: Prod - DRC]
+        direction TB
+        CR_DRC[Amadeus Orchestrator Server]
+        DB_DRC[(PostgreSQL DB-DRC)]
+        Runner_DRC[MCP Runners / Agents]
+        Creator_DRC[Agent Creator Node]
+        
+        CR_DRC <-->|WSS / HTTPS| Runner_DRC
+        CR_DRC <-->|WSS / HTTPS| Creator_DRC
+        CR_DRC <-->|TCP 5432| DB_DRC
+    end
+
+    subgraph ManagedSystems [Managed Systems & APIs]
+        Server[Internal Servers]
+        WebApp[Web Applications]
+        Desktop[Desktop / Legacy RPA]
+        CoreDB[(Core Databases)]
+    end
+
+    %% DC to DRC Replication
+    DB_DC <.->|DB Replication / Streaming| DB_DRC
+
+    %% External Connections
+    DNS_CR -.->|HTTPS / WSS| CR_DC
+    DNS_CR -.->|HTTPS / WSS| CR_DRC
+    
+    DNS_DB -.->|TCP 5432| DB_DC
+    DNS_DB -.->|TCP 5432| DB_DRC
+
+    CR_DC <-->|Port 389| LDAP
+    CR_DC <-->|Port 587| SMTP
+    CR_DRC <-->|Port 389| LDAP
+    CR_DRC <-->|Port 587| SMTP
+
+    Runner_DC --> ManagedSystems
+    Creator_DC --> ManagedSystems
+    Runner_DRC --> ManagedSystems
+    Creator_DRC --> ManagedSystems
+```
+
 
 ---
 
