@@ -261,6 +261,82 @@ export default function Home() {
         </div>
       </section>
 
+      {/* Section 1.5: The Philosophy */}
+      <section className="bg-white py-24 border-b border-slate-100 scroll-reveal">
+        <div className="max-w-6xl mx-auto px-6">
+          <div className="text-center space-y-4 mb-16">
+            <p className="ui-label text-slate-400">The Philosophy</p>
+            <h3 className="section-head text-3xl md:text-4xl text-slate-900">Why Amadeus?</h3>
+            <p className="text-[16px] text-slate-500 max-w-2xl mx-auto leading-relaxed">
+              AI doesn't fix a disorganized company—it turns your disorganization into a system. We built Amadeus to bridge the critical gap between humans, intelligent agents, and rigid robots.
+            </p>
+          </div>
+
+          <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
+            {/* Humans - Pink */}
+            <div className="rounded-[2.5rem] bg-pink-50 border border-pink-100 p-10 relative overflow-hidden group hover:shadow-xl hover:shadow-pink-500/10 transition-all duration-300">
+              <div className="absolute top-0 right-0 w-32 h-32 bg-pink-500/10 rounded-full blur-3xl -mr-10 -mt-10 group-hover:bg-pink-500/20 transition-colors" />
+              <div className="relative z-10 space-y-6">
+                <div className="w-14 h-14 rounded-2xl bg-white border border-pink-200 flex items-center justify-center text-2xl shadow-sm">
+                  👩‍💻
+                </div>
+                <div>
+                  <h4 className="text-2xl font-bold text-slate-900 mb-3">Humans <span className="text-pink-500">Whoops.</span></h4>
+                  <p className="text-[15px] text-slate-600 leading-relaxed">
+                    Humans want automation, but humans also demand compliance. Where humans are fully replaced by AI, <em>wallahi we&apos;re doomed</em>.
+                  </p>
+                </div>
+              </div>
+            </div>
+
+            {/* Agents - Yellow */}
+            <div className="rounded-[2.5rem] bg-yellow-50 border border-yellow-100 p-10 relative overflow-hidden group hover:shadow-xl hover:shadow-yellow-500/10 transition-all duration-300">
+              <div className="absolute top-0 right-0 w-32 h-32 bg-yellow-500/10 rounded-full blur-3xl -mr-10 -mt-10 group-hover:bg-yellow-500/20 transition-colors" />
+              <div className="relative z-10 space-y-6">
+                <div className="w-14 h-14 rounded-2xl bg-white border border-yellow-200 flex items-center justify-center text-2xl shadow-sm">
+                  🧠
+                </div>
+                <div>
+                  <h4 className="text-2xl font-bold text-slate-900 mb-3">Agents <span className="text-yellow-500">Loop.</span></h4>
+                  <p className="text-[15px] text-slate-600 leading-relaxed">
+                    AI Agents want to automate. But they connect via MCP and API keys, which often clash with strict enterprise compliance. 
+                    <br/><br/>
+                    <span className="font-semibold text-slate-800">Result:</span> High automation, less compliance, restricted access.
+                  </p>
+                </div>
+              </div>
+            </div>
+
+            {/* Robots - Blue */}
+            <div className="rounded-[2.5rem] bg-blue-50 border border-blue-100 p-10 relative overflow-hidden group hover:shadow-xl hover:shadow-blue-500/10 transition-all duration-300">
+              <div className="absolute top-0 right-0 w-32 h-32 bg-blue-500/10 rounded-full blur-3xl -mr-10 -mt-10 group-hover:bg-blue-500/20 transition-colors" />
+              <div className="relative z-10 space-y-6">
+                <div className="w-14 h-14 rounded-2xl bg-white border border-blue-200 flex items-center justify-center text-2xl shadow-sm">
+                  🤖
+                </div>
+                <div>
+                  <h4 className="text-2xl font-bold text-slate-900 mb-3">Robots <span className="text-blue-500">Shoot.</span></h4>
+                  <p className="text-[15px] text-slate-600 leading-relaxed">
+                    Robots (RPA) operate within compliance via UI. But they are rigid, deterministic, and cannot communicate dynamically.
+                    <br/><br/>
+                    <span className="font-semibold text-slate-800">Result:</span> High compliance, less automation.
+                  </p>
+                </div>
+              </div>
+            </div>
+          </div>
+
+          <div className="mt-16 text-center">
+            <div className="inline-flex items-center gap-3 bg-slate-900 px-6 py-3 rounded-full shadow-xl">
+              <span className="text-white font-mono text-[14px]">RPA + Agents =</span>
+              <span className="bg-gradient-to-r from-blue-400 via-pink-400 to-yellow-400 bg-clip-text text-transparent font-extrabold text-[16px] tracking-wide">
+                Agentic Process Automation (APA)
+              </span>
+            </div>
+          </div>
+        </div>
+      </section>
+
       {/* Section 2: Live Flow Ticker */}
       <section className="bg-[#fafafa] border-b border-slate-100 py-14">
         <div className="max-w-6xl mx-auto px-6">
