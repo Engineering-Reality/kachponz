@@ -58,7 +58,7 @@ We are building **Amadeus**, a central orchestration platform bridging this exac
 ### Detailed Agent Invoke & Orchestration Flow
 
 ```mermaid
-%%{init: {'theme': 'base', 'themeVariables': { 'primaryColor': '#f8fafc', 'primaryTextColor': '#0f172a', 'primaryBorderColor': '#3b82f6', 'lineColor': '#94a3b8', 'noteBkgColor': '#e0f2fe', 'noteTextColor': '#0f172a', 'actorBkg': '#f1f5f9', 'actorTextColor': '#0f172a', 'signalColor': '#94a3b8'}}}%%
+%%{init: {'theme': 'base', 'themeVariables': { 'primaryColor': '#F3E8FF', 'primaryTextColor': '#1E1B4B', 'primaryBorderColor': '#D946EF', 'lineColor': '#3B82F6', 'noteBkgColor': '#FCE7F3', 'noteTextColor': '#1E1B4B', 'actorBkg': '#E0E7FF', 'actorTextColor': '#1E1B4B', 'signalColor': '#D946EF'}}}%%
 sequenceDiagram
     participant User as Canvas (Playground)
     participant Core as Brain (Amadeus Orchestrator)
@@ -123,7 +123,7 @@ The persistent memory and configuration storage.
 ### System Architecture Flowchart
 
 ```mermaid
-%%{init: {'theme': 'base', 'themeVariables': { 'primaryColor': '#f8fafc', 'primaryTextColor': '#0f172a', 'primaryBorderColor': '#3b82f6', 'lineColor': '#94a3b8', 'clusterBkg': '#1e293b', 'clusterBorder': '#334155'}}}%%
+%%{init: {'theme': 'base', 'themeVariables': { 'primaryColor': '#F3E8FF', 'primaryTextColor': '#1E1B4B', 'primaryBorderColor': '#D946EF', 'lineColor': '#3B82F6', 'clusterBkg': '#E0F2FE', 'clusterBorder': '#3B82F6'}}}%%
 flowchart LR
     subgraph Canvas [Presentation Layer: Canvas]
         UI[Playground / Agent Creator]
@@ -153,7 +153,7 @@ flowchart LR
 ### Enterprise DC / DRC Infrastructure Topology
 
 ```mermaid
-%%{init: {'theme': 'base', 'themeVariables': { 'primaryColor': '#f8fafc', 'primaryTextColor': '#0f172a', 'primaryBorderColor': '#3b82f6', 'lineColor': '#94a3b8', 'clusterBkg': '#1e293b', 'clusterBorder': '#334155'}}}%%
+%%{init: {'theme': 'base', 'themeVariables': { 'primaryColor': '#F3E8FF', 'primaryTextColor': '#1E1B4B', 'primaryBorderColor': '#D946EF', 'lineColor': '#3B82F6', 'clusterBkg': '#E0F2FE', 'clusterBorder': '#3B82F6'}}}%%
 flowchart TD
     subgraph ExternalServices [External Services]
         LDAP[LDAP Server]
@@ -280,7 +280,7 @@ The development of the platform is divided into iterative sprints focusing on co
 ### Timeline
 
 ```mermaid
-%%{init: {'theme': 'base', 'themeVariables': { 'primaryColor': '#f8fafc', 'primaryTextColor': '#0f172a', 'primaryBorderColor': '#3b82f6', 'lineColor': '#94a3b8', 'titleColor': '#f8fafc'}}}%%
+%%{init: {'theme': 'base', 'themeVariables': { 'primaryColor': '#F3E8FF', 'primaryTextColor': '#1E1B4B', 'primaryBorderColor': '#D946EF', 'lineColor': '#3B82F6', 'titleColor': '#D946EF'}}}%%
 gantt
     title Amadeus Development Timeline
     dateFormat  YYYY-MM-DD
