@@ -139,10 +139,6 @@ We sit exactly at the bridge between **unstructured conversational AI** (like st
 
 ### Piloting Usecase Examples
 
-1. **Intelligent Data Researcher**
-   - **Scenario**: A user needs a summary of current stock market trends combined with internal company metrics.
-   - **Execution**: The Agent (Brain) understands the prompt, uses a Web Search Tool (Hands) for market trends, and an Internal Database Tool (Hands) for company metrics, synthesizing both into a cohesive report on the Canvas.
-
-2. **Automated IT Support Triage**
-   - **Scenario**: An employee reports a system issue.
-   - **Execution**: The Agent uses a Diagnostics Tool to check system status, attempts to resolve it using a Script Execution Tool, and if it fails, uses a Ticketing Tool to escalate it—all within a single Agent Invoke thread.
+**Automated CX100 Danantara Survey Loop**
+- **Scenario**: End-to-end automation of the Danantara survey and queue transaction process via the CX100 legacy application.
+- **Execution**: The Agent (Brain) is configured with the *Danantara Survey Loop* recipe. It autonomously orchestrates a multi-step deterministic workflow: it triggers the initial `Danantara_LoginFlow` via RPA, waits for verification (OTP/Login resolution), and executes the transaction ("Buka aplikasi CX100, buat transaksi baru dengan nomor antrian berikutnya, lalu tutup"). This proves Amadeus's ability to wrap rigid, multi-stage legacy RPA scripts inside a resilient, state-aware agentic loop without losing track of context.
