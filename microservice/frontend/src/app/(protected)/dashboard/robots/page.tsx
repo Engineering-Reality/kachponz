@@ -53,8 +53,8 @@ function StateBadge({ state }: { state: string }) {
 function KpiCard({ label, value, color }: { label: string; value: number; color: string }) {
   return (
     <GlassCard className="flex flex-col gap-1">
-      <div className={`text-xs font-mono ${color} font-bold`}>{label}</div>
-      <div className="text-3xl font-black text-slate-900 tracking-tight">{value}</div>
+      <div className={`text-xs font-mono ${color} font-medium`}>{label}</div>
+      <div className="text-3xl font-semibold text-slate-900 tracking-tight">{value}</div>
     </GlassCard>
   );
 }

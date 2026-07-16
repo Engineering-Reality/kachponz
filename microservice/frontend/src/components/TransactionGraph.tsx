@@ -45,7 +45,7 @@ const CustomNode = ({ data, isConnectable }: any) => {
       )}
       <div className={`relative z-10 flex flex-col p-4 border-[1.5px] rounded-xl ${nodeStyle} hover:brightness-[0.98] transition-all duration-300`}>
         <div className="flex justify-between items-center mb-2">
-          <span className={`text-[9px] font-mono ${textColor} font-bold flex items-center gap-1.5`}>
+          <span className={`text-[9px] font-mono ${textColor} font-medium flex items-center gap-1.5`}>
             {isCompleted && <CheckCircle className="w-3.5 h-3.5" />}
             {isFailed && <AlertTriangle className="w-3.5 h-3.5" />}
             {data.actorHint}
@@ -58,7 +58,7 @@ const CustomNode = ({ data, isConnectable }: any) => {
           <div className="mt-2.5 flex items-center gap-2">
              <div className="w-2 h-2 rounded-full bg-indigo-500 animate-ping" />
              <div className="w-2 h-2 rounded-full bg-indigo-500 absolute" />
-             <span className="text-[9px] text-indigo-600 font-bold animate-pulse">Running Agent Protocol...</span>
+             <span className="text-[9px] text-indigo-600 font-medium animate-pulse">Running Agent Protocol...</span>
           </div>
         )}
       </div>
@@ -234,8 +234,8 @@ export function TransactionGraph({ tx, events }: { tx: any, events: any[] }) {
           <>
             <div className="p-4 border-b border-slate-100 flex items-center justify-between bg-slate-50">
               <div>
-                <div className="text-[10px] font-bold text-blue-600 mb-1">{selectedNode.data.actorHint}</div>
-                <h3 className="text-sm font-bold text-slate-800">{selectedNode.data.label}</h3>
+                <div className="text-[10px] font-medium text-blue-600 mb-1">{selectedNode.data.actorHint}</div>
+                <h3 className="text-sm font-medium text-slate-800">{selectedNode.data.label}</h3>
               </div>
               <button 
                 onClick={() => setSelectedNode(null)}
@@ -247,7 +247,7 @@ export function TransactionGraph({ tx, events }: { tx: any, events: any[] }) {
             
             <div className="p-4 flex-1 overflow-y-auto">
               <div className="mb-6">
-                <h4 className="text-[10px] font-bold text-slate-500 mb-2">Agent Context</h4>
+                <h4 className="text-[10px] font-medium text-slate-500 mb-2">Agent Context</h4>
                 <div className="bg-slate-50 rounded-lg p-3 border border-slate-100 text-xs text-slate-600">
                   <div className="flex justify-between py-1 border-b border-slate-100">
                     <span className="text-slate-400">Environment</span>
@@ -265,7 +265,7 @@ export function TransactionGraph({ tx, events }: { tx: any, events: any[] }) {
               </div>
 
               <div>
-                <h4 className="text-[10px] font-bold text-slate-500 mb-2">Execution Logs</h4>
+                <h4 className="text-[10px] font-medium text-slate-500 mb-2">Execution Logs</h4>
                 {selectedNodeEvents.length === 0 ? (
                   <div className="text-center py-6 text-slate-400 text-xs">
                     <Clock className="w-6 h-6 mx-auto mb-2 opacity-30" />
@@ -276,7 +276,7 @@ export function TransactionGraph({ tx, events }: { tx: any, events: any[] }) {
                     {selectedNodeEvents.map((evt, i) => (
                       <div key={i} className="bg-white border border-slate-200 rounded-lg p-3 text-[11px] shadow-sm">
                         <div className="flex justify-between items-center mb-2">
-                          <span className={`px-1.5 py-0.5 rounded font-bold ${evt.event_type === 'step_completed' ? 'bg-emerald-100 text-emerald-700' : 'bg-slate-100 text-slate-600'}`}>
+                          <span className={`px-1.5 py-0.5 rounded font-medium ${evt.event_type === 'step_completed' ? 'bg-emerald-100 text-emerald-700' : 'bg-slate-100 text-slate-600'}`}>
                             {evt.event_type}
                           </span>
                           <span className="text-slate-400 font-mono">{new Date(evt.created_at).toLocaleTimeString()}</span>

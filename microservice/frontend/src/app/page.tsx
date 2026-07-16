@@ -16,11 +16,20 @@ import {
   Cpu,
   Layers,
   Send,
-  ChevronDown
+  ChevronDown,
+  Bot,
+  Monitor,
+  Plug
 } from "lucide-react";
+import { FiUser, FiCpu, FiTool } from "react-icons/fi";
 import { MarketingHeader } from "@/components/MarketingHeader";
 import { MarketingFooter } from "@/components/MarketingFooter";
-import { PLATFORM_APPS as NAV_APPS } from "@/lib/platformApps";
+import { ParticleGlowText } from "@/components/ParticleGlowText";
+import { FeatureShowcase } from "@/components/FeatureShowcase";
+import { BenchmarkSection } from "@/components/BenchmarkSection";
+import { AuroraBackground } from "@/components/AuroraBackground";
+import { AuroraDivider } from "@/components/AuroraDivider";
+import { AuroraThread } from "@/components/AuroraThread";
 
 const EMPTY_EVENTS: any[] = [];
 
@@ -87,275 +96,311 @@ export default function Home() {
     const elements = document.querySelectorAll(".scroll-reveal");
     elements.forEach((el) => observer.observe(el));
 
+    setTimeout(() => {
+      const h1 = document.querySelector("h1");
+      const p = document.querySelector("h1 + p");
+      document.title = `bw=${document.body.scrollWidth} iw=${window.innerWidth} h1w=${h1?.scrollWidth} pw=${p?.scrollWidth} h1cw=${h1?.clientWidth}`;
+    }, 500);
+
     return () => {
       observer.disconnect();
     };
   }, []);
 
-  const gridApps = NAV_APPS.filter((a) => a.href !== "/playground");
+
 
   return (
-    <div className="min-h-screen bg-white text-slate-900 overflow-x-hidden">
+    <div className="min-h-screen bg-background text-foreground overflow-x-hidden w-full max-w-[100vw]">
       <MarketingHeader />
 
-      {/* Hero Section — Light theme */}
-      <section className="bg-gradient-to-b from-[#fafafa] to-white relative pt-40 pb-20 md:pt-48 md:pb-28 overflow-hidden">
-        <div className="max-w-6xl mx-auto px-6 grid grid-cols-1 lg:grid-cols-12 gap-12 items-center relative z-10">
-          {/* Left Text Column */}
-          <div className="lg:col-span-6 text-left z-20">
-            <div className="inline-flex items-center gap-2.5 bg-pink-50 border border-pink-100 px-4 py-1.5 rounded-full mb-6 shadow-sm">
-              <span className="w-2 h-2 rounded-full bg-pink-500 animate-pulse" />
-              <p className="font-mono text-[11px] font-bold text-pink-700 tracking-widest uppercase m-0">The 1st Agentic Platform for RPA</p>
-            </div>
+      {/* Hero Section — Redesigned Centered */}
+      <section className="relative pt-24 pb-16 md:pt-32 md:pb-24 overflow-hidden flex flex-col items-center justify-center text-center">
+        {/* Aurora Thread — hero mesh variant */}
+        <div className="absolute top-[40%] left-1/2 -translate-x-1/2 -translate-y-1/2 w-full max-w-[900px] h-[700px] md:h-[900px] z-0">
+          <AuroraThread variant="mesh" />
+        </div>
 
-            <h1 className="display-hero text-5xl md:text-6xl lg:text-7xl text-slate-900 relative z-20 leading-tight mb-6">
-              Human Whoops,<br />
-              <SpectralText text="Agent Loops," /><br />
-              Robot Shoots.
-            </h1>
+        <div className="max-w-5xl mx-auto px-6 relative z-10 flex flex-col items-center">
+          <h1 className="display-hero text-[2.5rem] md:text-5xl lg:text-6xl xl:text-7xl tracking-tight leading-[1.1] mb-8 font-light flex flex-col md:flex-row flex-wrap justify-center items-center gap-y-2 md:gap-y-0 gap-x-2 md:gap-x-5 w-full">
+            <span className="w-full md:w-auto text-center bg-gradient-to-br from-slate-900 via-slate-700 to-black dark:from-white dark:via-slate-200 dark:to-slate-400 bg-clip-text text-transparent pb-1 drop-shadow-md">Human <ParticleGlowText text="Whoops," className="italic ml-1 md:ml-2" /></span>
+            <span className="w-full md:w-auto text-center bg-gradient-to-br from-slate-800 via-slate-600 to-slate-900 dark:from-slate-100 dark:via-slate-300 dark:to-slate-500 bg-clip-text text-transparent pb-1 drop-shadow-md">Agent <ParticleGlowText text="Loops," className="italic ml-1 md:ml-2" /></span>
+            <span className="w-full md:w-auto text-center bg-gradient-to-br from-slate-700 via-slate-500 to-slate-800 dark:from-slate-200 dark:via-slate-400 dark:to-slate-600 bg-clip-text text-transparent pb-1 drop-shadow-md">Robot <ParticleGlowText text="Shoots." className="italic ml-1 md:ml-2" /></span>
+          </h1>
 
-            <p className="text-[16px] text-slate-600 leading-relaxed max-w-lg mb-10">
-              The only startup enterprise-grade orchestration platform built specifically to target the Robotic Process Automation market. Seamlessly coordinate human analysts, intelligent AI agents, and legacy RPA bots to fully automate your complex operations.
-            </p>
+          <p className="text-[17px] text-slate-600 dark:text-slate-300 leading-relaxed max-w-2xl mb-8">
+            The only enterprise-grade orchestration platform built specifically to target the Robotic Process Automation market. Seamlessly coordinate human analysts, intelligent AI agents, and legacy RPA bots to fully automate your complex operations.
+          </p>
 
-            <div className="flex flex-wrap items-center gap-4">
-              <Link href="/playground" className="inline-flex items-center gap-2 bg-gradient-to-r from-blue-500 via-pink-500 to-yellow-500 text-white px-7 py-3.5 text-[15px] font-bold rounded-full hover:scale-105 transition-transform shadow-lg shadow-pink-500/20">
-                Experience Agent Playground <ArrowRight className="w-4 h-4" />
-              </Link>
-              <Link href="#demo" className="inline-flex items-center gap-2 border-2 border-slate-200 text-slate-700 px-7 py-3 text-[15px] font-bold rounded-full hover:text-slate-900 hover:border-slate-300 transition-colors bg-white shadow-sm">
-                Watch Demo
-              </Link>
-            </div>
+          <div className="flex flex-col md:flex-row items-stretch md:items-center justify-center gap-4 mb-12 w-full max-w-[280px] md:max-w-none">
+            <Link href="/playground" className="inline-flex justify-center items-center gap-2 bg-fuchsia-600/90 text-white px-8 py-4 text-[15px] font-medium rounded-full hover:bg-fuchsia-500 transition-colors shadow-[0_0_24px_rgba(217,70,239,0.3)] w-full md:w-auto ring-1 ring-fuchsia-500/50">
+              Experience Agent Playground <ArrowRight className="w-4 h-4" />
+            </Link>
+            <Link href="#demo" className="inline-flex justify-center items-center gap-2 border border-slate-700/50 text-slate-200 px-8 py-4 text-[15px] font-medium rounded-full hover:bg-slate-800/50 transition-colors bg-slate-900/40 backdrop-blur shadow-sm w-full md:w-auto">
+              Watch Demo
+            </Link>
           </div>
 
-          {/* Right Column: Agent Flow & Loop Feature Mockup */}
-          <div className="lg:col-span-6 flex justify-center relative min-h-[480px] items-center">
-            <div className="absolute w-[450px] h-[450px] rounded-full bg-gradient-to-r from-blue-500 via-pink-500 to-yellow-500 opacity-[0.15] blur-[90px] pointer-events-none" />
-
-            <div className="float-soft relative w-[520px] max-w-full z-10">
-              {/* Floating orchestration badge */}
-              <div className="hidden lg:flex absolute -top-4 -right-4 z-20 items-center gap-2 bg-white border border-slate-200 rounded-[1rem] px-4 py-2.5 shadow-xl shadow-slate-200/50">
-                <span className="relative flex w-2.5 h-2.5">
-                  <span className="absolute inline-flex w-full h-full rounded-full bg-pink-500 opacity-75 animate-ping" />
-                  <span className="relative inline-flex w-2.5 h-2.5 rounded-full bg-pink-500" />
-                </span>
-                <span className="font-mono text-[11px] font-bold text-slate-700">LOOP MODE: CX-100</span>
-              </div>
-
-              {/* Main Container */}
-              <div className="bg-white border border-slate-200 rounded-[2.5rem] overflow-hidden shadow-2xl shadow-slate-200/80 flex flex-col">
+          {/* Playground / Danantara Mockup */}
+          <div className="w-full max-w-6xl relative group mx-auto mt-4">
+            {/* Glossy overlay reflection */}
+            <div className="absolute inset-0 bg-gradient-to-br from-white/30 to-transparent rounded-[1.5rem] pointer-events-none z-20" />
+            
+            <div className="bg-[#FAFAFA] border border-slate-200 rounded-[1.5rem] overflow-hidden shadow-2xl shadow-slate-900/10 flex flex-col md:flex-row relative z-10 transition-transform duration-500 group-hover:-translate-y-2 min-h-[500px] md:min-h-0 md:h-[600px] text-left">
+              
+              {/* Left Column: Chat Console */}
+              <div className="flex-1 flex flex-col border-r border-slate-200 bg-white relative">
                 
-                {/* 1. VISUAL AGENT FLOW (NODE GRAPH) */}
-                <div className="p-6 bg-slate-50 border-b border-slate-200 relative">
-                  <p className="font-mono text-[10px] text-slate-400 mb-5 tracking-widest text-center">AUTONOMOUS EXECUTION GRAPH</p>
-                  
-                  <div className="relative flex items-center justify-between px-2 h-[120px]">
-                    {/* Background SVG Lines */}
-                    <svg className="absolute inset-0 w-full h-full pointer-events-none" style={{ zIndex: 0 }}>
-                      {/* Line from Brain to RPA */}
-                      <path d="M 60,60 L 220,60" stroke="#cbd5e1" strokeWidth="2" strokeDasharray="4 4" fill="none" />
-                      <path d="M 60,60 L 220,60" stroke="#ec4899" strokeWidth="2" strokeDasharray="4 4" fill="none" className="animate-pulse" />
-                      
-                      {/* Error loop line from RPA back to Brain (curved) */}
-                      <path d="M 220,50 Q 140,-10 60,50" stroke="#ef4444" strokeWidth="2" strokeDasharray="4 4" fill="none" />
-                      <circle cx="140" cy="20" r="4" fill="#ef4444" className="animate-ping" />
-
-                      {/* Line from Brain to Vision Agent (Loop fallback) */}
-                      <path d="M 60,70 Q 140,130 220,130" stroke="#3b82f6" strokeWidth="2" strokeDasharray="4 4" fill="none" />
-                      <circle cx="140" cy="100" r="4" fill="#3b82f6" className="animate-ping" style={{ animationDelay: '0.5s' }} />
-
-                      {/* Line from Vision back to RPA */}
-                      <path d="M 260,130 Q 300,95 260,60" stroke="#3b82f6" strokeWidth="2" fill="none" />
-                      <polygon points="255,60 265,65 265,55" fill="#3b82f6" />
-                    </svg>
-
-                    {/* Nodes (z-10 relative) */}
-                    {/* Node 1: Orchestrator */}
-                    <div className="relative z-10 flex flex-col items-center group">
-                      <div className="w-14 h-14 rounded-[1rem] bg-white border border-pink-200 flex items-center justify-center text-xl shadow-sm">
-                        🧠
+                {/* Console Header */}
+                <div className="border-b border-slate-200 bg-white flex flex-col w-full shrink-0 min-w-0">
+                  <div className="h-10 flex items-center justify-between px-4 md:px-6 border-b border-slate-100 bg-slate-50/80">
+                    <div className="flex items-center gap-3">
+                      <div className="flex gap-1.5 mr-2">
+                        <div className="w-2.5 h-2.5 rounded-full bg-red-400" />
+                        <div className="w-2.5 h-2.5 rounded-full bg-amber-400" />
+                        <div className="w-2.5 h-2.5 rounded-full bg-emerald-400" />
                       </div>
-                      <span className="font-mono text-[9px] text-pink-600 mt-2 font-bold">Orchestrator</span>
+                      <span className="ui-label text-slate-500 font-semibold tracking-widest text-[10px]">Amadeus Console</span>
                     </div>
-
-                    {/* Node 2: RPA Bot (Legacy) */}
-                    <div className="relative z-10 flex flex-col items-center">
-                      <div className="w-14 h-14 rounded-[1rem] bg-red-50 border border-red-200 flex items-center justify-center text-xl shadow-sm relative">
-                        🤖
-                        <span className="absolute -top-1.5 -right-1.5 w-4 h-4 bg-red-500 text-white text-[8px] font-bold rounded-full flex items-center justify-center border-2 border-white">!</span>
-                      </div>
-                      <span className="font-mono text-[9px] text-red-600 mt-2">UiPath Bot 01</span>
-                    </div>
-
-                    {/* Node 3: Vision Agent (Fallback) */}
-                    <div className="relative z-10 flex flex-col items-center translate-y-[35px]">
-                      <div className="w-14 h-14 rounded-[1rem] bg-white border border-blue-200 flex items-center justify-center text-xl shadow-sm">
-                        👁️
-                      </div>
-                      <span className="font-mono text-[9px] text-blue-600 mt-2 font-bold">Vision Agent</span>
-                    </div>
-
-                  </div>
-                </div>
-
-                {/* 2. CHAT / EXECUTION LOGS */}
-                <div className="p-5 space-y-4 bg-white">
-                  {/* RPA Error */}
-                  <div className="flex items-start gap-3 chat-msg" style={{ animationDelay: "0.2s" }}>
-                    <span className="w-7 h-7 rounded-full bg-red-50 border border-red-200 flex items-center justify-center text-xs flex-shrink-0">
-                      🤖
-                    </span>
-                    <div className="max-w-[85%]">
-                      <div className="bg-red-50 border border-red-100 rounded-2xl rounded-tl-sm px-3.5 py-2.5">
-                        <p className="text-[12px] text-red-600 font-mono">
-                          [ERROR] SelectorNotFound: 'Submit_Btn' on CX-100 legacy form.
-                        </p>
-                      </div>
+                    <div className="flex items-center gap-2">
+                      <div className="w-2 h-2 rounded-full bg-emerald-500 animate-pulse"></div>
+                      <span className="ui-label text-slate-500 text-[10px]">UPLINK: STABLE</span>
                     </div>
                   </div>
                   
-                  {/* Orchestrator Triggering Loop */}
-                  <div className="flex items-start gap-3 chat-msg" style={{ animationDelay: "0.6s" }}>
-                    <span className="w-7 h-7 rounded-full bg-white border border-pink-200 flex items-center justify-center text-xs flex-shrink-0 shadow-sm">
-                      🧠
-                    </span>
-                    <div className="max-w-[85%]">
-                      <div className="bg-slate-50 border border-slate-200 rounded-2xl rounded-tl-sm px-3.5 py-2.5">
-                        <p className="text-[12.5px] text-slate-700 leading-relaxed">
-                          Failure detected. <span className="text-pink-600 font-medium">Initiating Agent Loop (1/3)</span>. Engaging Vision Agent to dynamically locate button via DOM snapshot.
-                        </p>
-                      </div>
+                  {/* Controls Row */}
+                  <div className="px-4 md:px-6 py-2.5 flex items-center gap-4 md:gap-6 overflow-x-auto scrollbar-hide w-full max-w-full">
+                    <div className="flex items-center gap-3 shrink-0">
+                      <label className="ui-label text-slate-400 text-[9px]">Active Node</label>
+                      <div className="text-[11px] font-medium text-slate-700 bg-slate-100 px-3 py-1 rounded">TradeFinance_Bot</div>
                     </div>
-                  </div>
-
-                  {/* Vision Agent Working */}
-                  <div className="flex items-start gap-3 chat-msg" style={{ animationDelay: "1s" }}>
-                    <span className="w-7 h-7 rounded-full bg-white border border-blue-200 flex items-center justify-center text-xs flex-shrink-0">
-                      👁️
-                    </span>
-                    <div>
-                      <div className="bg-blue-50 border border-blue-100 rounded-2xl rounded-tl-sm px-3.5 py-2.5 inline-flex items-center gap-2">
-                        <span className="text-[12.5px] text-blue-700">Analyzing DOM...</span>
-                        <span className="flex gap-0.5">
-                          <span className="w-1 h-1 rounded-full bg-blue-500 animate-bounce" style={{ animationDelay: "0s" }} />
-                          <span className="w-1 h-1 rounded-full bg-blue-500 animate-bounce" style={{ animationDelay: "0.15s" }} />
-                          <span className="w-1 h-1 rounded-full bg-blue-500 animate-bounce" style={{ animationDelay: "0.3s" }} />
-                        </span>
+                    <div className="w-px h-4 bg-slate-200 shrink-0" />
+                    <div className="flex items-center gap-3 shrink-0">
+                      <label className="ui-label text-slate-400 text-[9px]">Target</label>
+                      <div className="text-[11px] font-medium text-blue-600 bg-blue-50 px-3 py-1 rounded">Danantara CX 100</div>
+                    </div>
+                    <div className="w-px h-4 bg-slate-200 shrink-0" />
+                    <div className="flex items-center gap-2 shrink-0">
+                      <label className="ui-label text-slate-400 text-[9px]">Loop Mode</label>
+                      <div className="relative w-8 h-4 rounded-full bg-indigo-600">
+                        <span className="absolute top-0.5 left-0.5 w-3 h-3 bg-white rounded-full shadow translate-x-4" />
                       </div>
                     </div>
                   </div>
                 </div>
 
-                {/* Input Area */}
-                <div className="flex items-center gap-3 px-5 py-4 border-t border-slate-100 bg-slate-50">
-                  <div className="flex-1 bg-white border border-slate-200 rounded-full px-5 py-2.5 text-[13px] text-slate-500 font-medium shadow-inner shadow-slate-100/50">
-                    Inject override command...
+                {/* Chat Log */}
+                <div className="flex-1 overflow-y-auto md:overflow-y-hidden overflow-x-hidden p-4 md:p-6 space-y-6 w-full">
+                  {/* User Message */}
+                  <div className="flex gap-4">
+                    <div className="w-8 h-8 rounded-full bg-slate-900 flex items-center justify-center shrink-0">
+                      <span className="text-white text-xs">US</span>
+                    </div>
+                    <div className="flex-1 min-w-0">
+                      <p className="font-semibold text-[13px] text-slate-900 mb-1">User</p>
+                      <p className="text-[13px] text-slate-700 break-words whitespace-pre-wrap">Please process LC Settlement #4012 on Danantara CX 100. Fallback to vision extraction if DOM selectors fail.</p>
+                    </div>
                   </div>
-                  <button className="relative w-9 h-9 rounded-full overflow-hidden flex items-center justify-center flex-shrink-0 bg-gradient-to-br from-blue-500 to-pink-500 hover:scale-105 transition-transform shadow-md shadow-pink-500/20">
-                    <Send className="w-3.5 h-3.5 text-white ml-0.5" />
-                  </button>
+
+                  {/* System Log */}
+                  <div className="flex gap-4">
+                    <div className="w-8 h-8 rounded-full border border-slate-200 bg-slate-50 flex items-center justify-center shrink-0 text-[10px]">⚙️</div>
+                    <div className="flex-1 min-w-0">
+                      <p className="font-semibold text-[13px] text-slate-900 mb-1">System</p>
+                      <p className="text-[13px] text-slate-500 font-mono break-words whitespace-pre-wrap">[Agent Call] Using tool execute_cx100_bot( {"{"} "target": "LC_Settlement", "loop_mode": true {"}"} )</p>
+                    </div>
+                  </div>
+
+                  {/* Assistant Message */}
+                  <div className="flex gap-4">
+                    <div className="w-8 h-8 rounded-full bg-gradient-to-br from-blue-500 to-pink-500 flex items-center justify-center shrink-0 shadow-md">
+                      <Bot className="w-4 h-4 text-white" />
+                    </div>
+                    <div className="flex-1 min-w-0">
+                      <p className="font-semibold text-[13px] text-slate-900 mb-1">Amadeus</p>
+                      <div className="bg-blue-50/50 border border-blue-100 rounded-lg p-3 md:p-4 space-y-3 w-full">
+                        <p className="text-[13px] text-slate-700 break-words whitespace-pre-wrap">Connecting to Danantara CX 100... Established HMAC-SHA512 session.</p>
+                        <div className="space-y-1">
+                          <p className="text-[12px] text-slate-500 font-mono break-words whitespace-pre-wrap">Iteration 1: Searching for DOM Selector 'Submit_Btn'...</p>
+                          <p className="text-[12px] text-red-500 font-mono break-words whitespace-pre-wrap">SelectorNotFound. Loop mode triggered.</p>
+                          <p className="text-[12px] text-slate-500 font-mono break-words whitespace-pre-wrap">Iteration 2: Engaging Vision Agent for spatial coordinate mapping...</p>
+                          <p className="text-[12px] text-green-600 font-mono font-medium break-words whitespace-pre-wrap">Coordinate mapped at (X: 1042, Y: 430). Click simulated.</p>
+                        </div>
+                        <p className="text-[13px] text-slate-700 font-medium break-words whitespace-pre-wrap">LC Settlement processed successfully using Agent Loop.</p>
+                      </div>
+                    </div>
+                  </div>
+                </div>
+
+                {/* Chat Input */}
+                <div className="p-4 bg-white border-t border-slate-100">
+                  <div className="relative flex items-center">
+                    <input type="text" disabled placeholder="Type a command..." className="w-full bg-slate-50 border border-slate-200 rounded-xl px-4 py-3 text-[13px] focus:outline-none" />
+                    <button className="absolute right-2 p-1.5 bg-slate-900 rounded-lg shadow-sm">
+                      <Send className="w-4 h-4 text-white" />
+                    </button>
+                  </div>
                 </div>
               </div>
+
+              {/* Right Column: Context Panel */}
+              <div className="w-[40%] hidden lg:flex flex-col bg-slate-50 relative">
+                <div className="h-10 flex items-center px-6 border-b border-slate-200 bg-slate-100/50">
+                  <span className="ui-label text-slate-500 text-[10px]">Agent Context / Live Graph</span>
+                </div>
+                
+                <div className="flex-1 p-6 flex flex-col gap-6">
+                  {/* Visual Node Graph */}
+                  <div className="bg-white rounded-xl border border-slate-200 p-5 shadow-sm">
+                    <p className="ui-label text-slate-400 mb-4 text-[9px] text-center">AUTONOMOUS EXECUTION GRAPH</p>
+                    <div className="relative flex items-center justify-between px-2 h-[100px]">
+                      {/* Lines */}
+                      <svg className="absolute inset-0 w-full h-full pointer-events-none" style={{ zIndex: 0 }}>
+                        <path d="M 40,50 L 140,50" stroke="#cbd5e1" strokeWidth="2" strokeDasharray="4 4" fill="none" className="animate-pulse" />
+                        <path d="M 140,40 Q 90,0 40,40" stroke="#ef4444" strokeWidth="2" strokeDasharray="4 4" fill="none" />
+                        <path d="M 40,60 Q 90,100 140,100" stroke="#3b82f6" strokeWidth="2" strokeDasharray="4 4" fill="none" />
+                        <path d="M 170,100 Q 200,75 170,50" stroke="#3b82f6" strokeWidth="2" fill="none" />
+                        <polygon points="167,50 173,55 173,45" fill="#3b82f6" />
+                      </svg>
+                      {/* Nodes */}
+                      <div className="relative z-10 flex flex-col items-center group">
+                        <div className="w-12 h-12 rounded-[0.8rem] bg-white border border-pink-200 flex items-center justify-center text-lg shadow-sm">🧠</div>
+                        <span className="font-mono text-[8px] text-pink-600 mt-2">Orchestrator</span>
+                      </div>
+                      <div className="relative z-10 flex flex-col items-center">
+                        <div className="w-12 h-12 rounded-[0.8rem] bg-red-50 border border-red-200 flex items-center justify-center text-lg shadow-sm">🤖</div>
+                        <span className="font-mono text-[8px] text-red-600 mt-2">UiPath Bot</span>
+                      </div>
+                      <div className="relative z-10 flex flex-col items-center translate-y-[25px]">
+                        <div className="w-12 h-12 rounded-[0.8rem] bg-white border border-blue-200 flex items-center justify-center text-lg shadow-sm">👁️</div>
+                        <span className="font-mono text-[8px] text-blue-600 mt-2">Vision Agent</span>
+                      </div>
+                    </div>
+                  </div>
+
+                  {/* Robot Logs / Metrics */}
+                  <div className="flex-1 bg-slate-900 rounded-xl border border-slate-800 p-5 font-mono text-[11px] text-slate-300 shadow-inner overflow-hidden flex flex-col">
+                    <div className="flex items-center justify-between mb-3 border-b border-slate-800 pb-2">
+                      <span className="text-slate-400">ROBOT EXECUTION TRAIL</span>
+                      <span className="text-emerald-400 flex items-center gap-1"><div className="w-1.5 h-1.5 rounded-full bg-emerald-400 animate-pulse" /> LIVE</span>
+                    </div>
+                    <div className="space-y-2 opacity-90">
+                      <div className="flex gap-2"><span className="text-pink-500">10:42:01</span><span className="text-blue-400">[CX-100]</span> <span>Ping received.</span></div>
+                      <div className="flex gap-2"><span className="text-pink-500">10:42:02</span><span className="text-blue-400">[CX-100]</span> <span className="text-slate-500">Extracting DOM structure...</span></div>
+                      <div className="flex gap-2"><span className="text-pink-500">10:42:03</span><span className="text-yellow-400">[WARN]</span> <span className="text-red-400">Selector mismatch.</span></div>
+                      <div className="flex gap-2"><span className="text-pink-500">10:42:03</span><span className="text-blue-400">[ORCH]</span> <span>Triggering Vision Agent mapping.</span></div>
+                      <div className="flex gap-2"><span className="text-pink-500">10:42:05</span><span className="text-blue-400">[VISN]</span> <span className="text-emerald-400">Map success (X:1042, Y:430)</span></div>
+                    </div>
+                  </div>
+                </div>
+              </div>
+
             </div>
           </div>
         </div>
+
+        {/* Bottom Fade to blend into next section */}
+        <div className="absolute bottom-0 left-0 w-full h-32 bg-gradient-to-t from-background to-transparent pointer-events-none z-20" />
       </section>
 
+      <AuroraThread variant="divider" />
+
       {/* Section 1.5: The Philosophy */}
-      <section className="bg-white py-24 border-b border-slate-100 scroll-reveal">
-        <div className="max-w-6xl mx-auto px-6">
-          <div className="text-center space-y-4 mb-16">
-            <p className="ui-label text-slate-400">The Philosophy</p>
-            <h3 className="section-head text-3xl md:text-4xl text-slate-900">Why Amadeus?</h3>
-            <p className="text-[16px] text-slate-500 max-w-2xl mx-auto leading-relaxed">
-              AI doesn't fix a disorganized company—it turns your disorganization into a system. We built Amadeus to bridge the critical gap between humans, intelligent agents, and rigid robots.
-            </p>
+      <section className="bg-transparent py-24 scroll-reveal relative z-10">
+        <div className="max-w-[1200px] mx-auto px-6 lg:px-12 space-y-16">
+          
+          {/* Row 1: The Thesis (Asymmetric 65/35) */}
+          <div className="flex flex-col lg:flex-row gap-12 lg:gap-24 items-center">
+            <div className="w-full lg:w-[65%]">
+              <p className="ui-label text-cyan-500 mb-6">The Philosophy</p>
+              <div className="relative pl-8 before:absolute before:inset-y-0 before:left-0 before:w-[2px] before:bg-gradient-to-b before:from-cyan-400 before:via-fuchsia-500 before:to-yellow-400">
+                <h3 className="text-[clamp(1.5rem,3vw,2.2rem)] font-semibold text-foreground leading-snug tracking-tight">
+                  AI doesn't fix a disorganized company—it turns your disorganization into a system. We built Amadeus to bridge the critical gap between humans, intelligent agents, and rigid robots.
+                </h3>
+              </div>
+            </div>
+            
+            {/* Abstract SVG Composition (35%) */}
+            <div className="w-full lg:w-[35%] flex justify-center relative">
+              <div className="relative w-64 h-64">
+                <div className="absolute inset-0 border border-fuchsia-500/20 rounded-full animate-spin-slow opacity-50" style={{ animationDuration: '20s' }} />
+                <div className="absolute inset-4 border border-cyan-400/30 rounded-full animate-reverse-spin opacity-50" style={{ animationDuration: '25s' }} />
+                <div className="absolute inset-8 border border-yellow-400/20 rounded-full animate-spin-slow opacity-50" style={{ animationDuration: '15s' }} />
+                <div className="absolute inset-0 bg-gradient-to-tr from-cyan-500/5 via-fuchsia-500/10 to-yellow-500/5 rounded-full blur-2xl" />
+              </div>
+            </div>
           </div>
 
-          <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
-            {/* Humans - Pink */}
-            <div className="rounded-[2.5rem] bg-pink-50 border border-pink-100 p-10 relative overflow-hidden group hover:shadow-xl hover:shadow-pink-500/10 transition-all duration-300">
-              <div className="absolute top-0 right-0 w-32 h-32 bg-pink-500/10 rounded-full blur-3xl -mr-10 -mt-10 group-hover:bg-pink-500/20 transition-colors" />
-              <div className="relative z-10 space-y-6">
-                <div className="w-14 h-14 rounded-2xl bg-white border border-pink-200 flex items-center justify-center text-2xl shadow-sm">
-                  👩‍💻
+          {/* Row 2: The Three Actors */}
+          <div className="w-full bg-white dark:bg-[#1E1B4B] rounded-3xl border border-slate-200 dark:border-slate-800/50 shadow-2xl overflow-hidden relative">
+            <div className="absolute top-0 right-0 w-64 h-64 bg-fuchsia-500/5 rounded-full blur-3xl pointer-events-none" />
+            
+            <div className="flex flex-col">
+              {[
+                {
+                  icon: FiUser,
+                  title: "Humans",
+                  desc: "Want automation. Demand compliance.",
+                },
+                {
+                  icon: FiCpu,
+                  title: "AI Agents",
+                  desc: "Connect via MCP. High automation — compliance trade-off.",
+                },
+                {
+                  icon: FiTool,
+                  title: "Robots (RPA)",
+                  desc: "Operate via UI. High compliance — flexibility trade-off.",
+                }
+              ].map((item, idx) => (
+                <div key={item.title} className={`p-8 md:p-10 flex flex-col md:flex-row md:items-center gap-6 relative group ${idx !== 2 ? 'border-b border-b-slate-100 dark:border-b-[rgba(217,70,239,0.15)]' : ''}`}>
+                  {/* Subtle hover gradient */}
+                  <div className="absolute inset-0 bg-gradient-to-r from-fuchsia-500/0 via-fuchsia-500/5 to-transparent opacity-0 group-hover:opacity-100 transition-opacity duration-500 pointer-events-none" />
+                  
+                  <div className="flex items-center gap-6 md:w-1/3 flex-shrink-0 relative z-10">
+                    <item.icon className="w-6 h-6 text-[#d946ef]" />
+                    <h4 className="text-xl font-bold text-foreground tracking-tight">{item.title}</h4>
+                  </div>
+                  <div className="md:w-2/3 relative z-10">
+                    <p className="text-[15px] text-slate-600 dark:text-slate-400 leading-relaxed">
+                      {item.desc}
+                    </p>
+                  </div>
                 </div>
-                <div>
-                  <h4 className="text-2xl font-bold text-slate-900 mb-3">Humans <span className="text-pink-500">Whoops.</span></h4>
-                  <p className="text-[15px] text-slate-600 leading-relaxed">
-                    Humans want automation, but humans also demand compliance. Where humans are fully replaced by AI, <em>wallahi we&apos;re doomed</em>.
-                  </p>
-                </div>
-              </div>
-            </div>
-
-            {/* Agents - Yellow */}
-            <div className="rounded-[2.5rem] bg-yellow-50 border border-yellow-100 p-10 relative overflow-hidden group hover:shadow-xl hover:shadow-yellow-500/10 transition-all duration-300">
-              <div className="absolute top-0 right-0 w-32 h-32 bg-yellow-500/10 rounded-full blur-3xl -mr-10 -mt-10 group-hover:bg-yellow-500/20 transition-colors" />
-              <div className="relative z-10 space-y-6">
-                <div className="w-14 h-14 rounded-2xl bg-white border border-yellow-200 flex items-center justify-center text-2xl shadow-sm">
-                  🧠
-                </div>
-                <div>
-                  <h4 className="text-2xl font-bold text-slate-900 mb-3">Agents <span className="text-yellow-500">Loop.</span></h4>
-                  <p className="text-[15px] text-slate-600 leading-relaxed">
-                    AI Agents want to automate. But they connect via MCP and API keys, which often clash with strict enterprise compliance. 
-                    <br/><br/>
-                    <span className="font-semibold text-slate-800">Result:</span> High automation, less compliance, restricted access.
-                  </p>
-                </div>
-              </div>
-            </div>
-
-            {/* Robots - Blue */}
-            <div className="rounded-[2.5rem] bg-blue-50 border border-blue-100 p-10 relative overflow-hidden group hover:shadow-xl hover:shadow-blue-500/10 transition-all duration-300">
-              <div className="absolute top-0 right-0 w-32 h-32 bg-blue-500/10 rounded-full blur-3xl -mr-10 -mt-10 group-hover:bg-blue-500/20 transition-colors" />
-              <div className="relative z-10 space-y-6">
-                <div className="w-14 h-14 rounded-2xl bg-white border border-blue-200 flex items-center justify-center text-2xl shadow-sm">
-                  🤖
-                </div>
-                <div>
-                  <h4 className="text-2xl font-bold text-slate-900 mb-3">Robots <span className="text-blue-500">Shoot.</span></h4>
-                  <p className="text-[15px] text-slate-600 leading-relaxed">
-                    Robots (RPA) operate within compliance via UI. But they are rigid, deterministic, and cannot communicate dynamically.
-                    <br/><br/>
-                    <span className="font-semibold text-slate-800">Result:</span> High compliance, less automation.
-                  </p>
-                </div>
-              </div>
+              ))}
             </div>
           </div>
 
           <div className="mt-16 text-center">
-            <div className="inline-flex items-center gap-3 bg-slate-900 px-6 py-3 rounded-full shadow-xl">
-              <span className="text-white font-mono text-[14px]">RPA + Agents =</span>
-              <span className="bg-gradient-to-r from-blue-400 via-pink-400 to-yellow-400 bg-clip-text text-transparent font-extrabold text-[16px] tracking-wide">
-                Agentic Process Automation (APA)
+            <div className="inline-flex items-center gap-3 bg-fuchsia-500/15 border border-fuchsia-500/30 px-6 py-2.5 rounded-full shadow-lg">
+              <span className="text-fuchsia-400 font-mono text-[14px] font-medium tracking-wide">
+                RPA + Agents = Agentic Process Automation (APA)
               </span>
             </div>
           </div>
         </div>
       </section>
 
+      <AuroraThread variant="divider" />
+
       {/* Section 2: Live Flow Ticker */}
-      <section className="bg-[#fafafa] border-b border-slate-100 py-14">
+      <section className="bg-transparent py-14 relative z-10">
         <div className="max-w-6xl mx-auto px-6">
 
           <div className="flex flex-col md:flex-row md:items-end justify-between mb-8 gap-4">
             <div>
-              <h2 className="text-3xl font-extrabold text-slate-900 tracking-tight mb-2">Your Enterprise-Grade Agent Laboratory.</h2>
+              <h2 className="text-3xl font-semibold text-foreground tracking-tight mb-2">Your Enterprise-Grade Agent Laboratory.</h2>
               <p className="text-slate-500 text-sm max-w-xl leading-relaxed">
                 Real-world business workflows require more than just a single tool. Seamlessly orchestrate AI agents, legacy RPA bots, document parsers, and human oversight into one unified pipeline.
               </p>
             </div>
 
-            <div className="bg-white border border-slate-200 shadow-[0_4px_20px_rgba(0,0,0,0.03)] rounded-2xl px-5 py-3 flex flex-col sm:flex-row items-center gap-4">
-              <span className="text-[10px] font-bold text-slate-400 text-center sm:text-left">We Support<br />A2A Communication</span>
-              <div className="hidden sm:block w-px h-8 bg-slate-100" />
-              <div className="flex items-center gap-6">
-                <img src="/1uipath.png" alt="UiPath" className="h-7 w-auto object-contain grayscale hover:grayscale-0 transition-all duration-300 opacity-80 hover:opacity-100 cursor-pointer" title="UiPath" />
-                <img src="/2powerautomate.png" alt="Power Automate" className="h-7 w-auto object-contain grayscale hover:grayscale-0 transition-all duration-300 opacity-80 hover:opacity-100 cursor-pointer" title="Microsoft Power Automate" />
-                <img src="/3automationanyywhere.png" alt="Automation Anywhere" className="h-7 w-auto object-contain grayscale hover:grayscale-0 transition-all duration-300 opacity-80 hover:opacity-100 cursor-pointer" title="Automation Anywhere" />
+            <div className="bg-slate-900/50 backdrop-blur border border-slate-800 shadow-[0_4px_20px_rgba(0,0,0,0.3)] rounded-2xl px-5 py-3 flex flex-col sm:flex-row items-center gap-4">
+              <span className="text-[10px] font-medium text-slate-400 text-center sm:text-left">We Support<br />A2A Communication</span>
+              <div className="hidden sm:block w-px h-8 bg-slate-800" />
+              <div className="flex flex-wrap justify-center items-center gap-4 md:gap-6">
+                <img src="/1uipath.png" alt="UiPath" className="h-6 md:h-7 w-auto object-contain grayscale hover:grayscale-0 transition-all duration-300 opacity-80 hover:opacity-100 cursor-pointer" title="UiPath" />
+                <img src="/2powerautomate.png" alt="Power Automate" className="h-6 md:h-7 w-auto object-contain grayscale hover:grayscale-0 transition-all duration-300 opacity-80 hover:opacity-100 cursor-pointer" title="Microsoft Power Automate" />
+                <img src="/3automationanyywhere.png" alt="Automation Anywhere" className="h-6 md:h-7 w-auto object-contain grayscale hover:grayscale-0 transition-all duration-300 opacity-80 hover:opacity-100 cursor-pointer" title="Automation Anywhere" />
               </div>
             </div>
           </div>
@@ -375,125 +420,101 @@ export default function Home() {
         </div>
       </section>
 
-      {/* Section 3: App Grid */}
-      <section className="py-24 bg-[#fafafa]">
-        <div className="max-w-6xl mx-auto px-6 space-y-10">
-          <div className="text-left space-y-2 max-w-xl">
-            <p className="ui-label text-slate-400">Our Features</p>
-            <h2 className="section-head text-3xl text-slate-900">
-              Where Robots, Agents, and Humans collaborates.
-            </h2>
-            <p className="text-[15px] text-slate-500 leading-relaxed">
-              Everything you need to orchestrate at scale
-            </p>
-          </div>
+      <AuroraThread variant="divider" className="max-w-6xl mx-auto" />
 
-          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6 relative z-0">
-            {gridApps.map(({ href, step, label, desc, icon: Icon, accent, bg }, index) => (
-              <div key={href} className="scroll-reveal" style={{ transitionDelay: `${index * 120}ms` }}>
-                <Link
-                  href={href}
-                  className="relative group rounded-[2rem] p-[2px] overflow-hidden transition-all duration-500 hover:-translate-y-1.5 block h-full shadow-sm hover:shadow-2xl"
-                >
-                <div className="absolute inset-0 bg-gradient-to-br from-slate-200 to-slate-100 group-hover:from-blue-400 group-hover:via-pink-500 group-hover:to-yellow-400 transition-colors duration-500 opacity-60 group-hover:opacity-100" />
-                <div className="relative z-10 flex flex-col h-full bg-white rounded-[30px] p-8 shadow-sm hover:shadow-2xl hover:shadow-blue-500/10 transition-all duration-500">
-                  <div className="flex justify-between items-start mb-6">
-                    <div className={`w-14 h-14 rounded-3xl ${bg} flex items-center justify-center shadow-inner`}>
-                      <Icon className={`w-7 h-7 ${accent}`} />
-                    </div>
-                    <span className="text-[10px] font-bold text-slate-400 bg-slate-50 px-3 py-1.5 rounded-full border border-slate-100 group-hover:bg-blue-50 group-hover:text-blue-600 group-hover:border-blue-200 transition-colors">
-                      {step}
-                    </span>
-                  </div>
+      {/* Section 3: Feature Showcase */}
+      <FeatureShowcase />
 
-                  <h3 className="section-head text-[21px] text-slate-900 mb-2">{label}</h3>
-                  <p className="text-[15px] text-slate-500 leading-relaxed flex-1">{desc}</p>
+      <AuroraThread variant="divider" className="max-w-6xl mx-auto" />
 
-                  <div className={`mt-6 flex items-center gap-2 text-sm font-bold ${accent} opacity-70 group-hover:opacity-100 transition-opacity`}>
-                    Explore <ArrowRight className="w-4 h-4 transform group-hover:translate-x-1.5 transition-transform" />
-                  </div>
+      {/* Section 3.5: Benchmark Section */}
+      <BenchmarkSection />
+
+      {/* Section 4 & 5: FAQ and Security */}
+      <section className="bg-transparent py-24 relative overflow-hidden z-10">
+        <div className="max-w-[1400px] mx-auto px-6 lg:px-12 relative">
+          
+          {/* Unified Container */}
+          <div className="relative bg-white dark:bg-[#0B0A1F] border border-slate-200 dark:border-[rgba(139,92,246,0.15)] rounded-[2.5rem] p-10 lg:p-16 shadow-2xl overflow-hidden">
+            {/* Top-Right subtle Aurora mesh glow */}
+            <div className="absolute top-0 right-0 w-[500px] h-[500px] bg-gradient-to-bl from-fuchsia-500/10 via-cyan-500/5 to-transparent rounded-full blur-3xl -mt-48 -mr-48 pointer-events-none" />
+            
+            <div className="grid grid-cols-1 lg:grid-cols-2 gap-16 xl:gap-24 relative z-10">
+              
+              {/* Left Column: FAQ */}
+              <div className="space-y-10">
+                <div className="space-y-4">
+                  <p className="ui-label text-cyan-500">Questions? We got answers</p>
+                  <h3 className="section-head text-3xl md:text-4xl text-foreground">FAQ</h3>
                 </div>
-                </Link>
-              </div>
-            ))}
-          </div>
-
-          {/* Playground — featured full-width light */}
-          <div className="bg-white rounded-[2.5rem] overflow-hidden border border-slate-200 relative shadow-2xl shadow-slate-200/50">
-            <div className="absolute top-0 left-0 w-full h-1.5 bg-gradient-to-r from-blue-500 via-pink-500 to-yellow-500"></div>
-            <div className="flex flex-col lg:flex-row items-stretch">
-              <div className="flex-1 p-10 md:p-14 space-y-6">
-                <div className="inline-flex items-center gap-2 bg-pink-50 border border-pink-100 px-3 py-1 rounded-full mb-2">
-                  <span className="w-2 h-2 rounded-full bg-pink-500 animate-pulse" />
-                  <p className="ui-label text-pink-700 m-0">Sneak Peek • Demo Feature</p>
-                </div>
-                <h3 className="section-head text-3xl md:text-4xl text-slate-900">Agent Playground</h3>
-                <p className="text-[16px] text-slate-600 leading-relaxed max-w-md">
-                  Stream real-time agent reasoning over a selected transaction. Watch
-                  MCP tool calls, state transitions, and telemetry flow through a
-                  control panel built for enterprise ops — completely observable.
-                </p>
-                <Link href="/playground" className="inline-flex items-center gap-2 bg-gradient-to-r from-blue-500 to-pink-500 text-white px-7 py-3.5 text-[15px] font-bold rounded-full hover:scale-105 transition-transform shadow-lg shadow-pink-500/20">
-                  Launch Agent Console <ArrowRight className="w-4 h-4" />
-                </Link>
-              </div>
-
-              {/* Mini terminal preview */}
-              <div className="flex-1 p-8 md:p-12 flex items-center">
-                <div className="terminal-card w-full overflow-hidden shadow-xl shadow-slate-200/60 rounded-[1.5rem] border border-slate-200 bg-slate-50">
-                  <div className="terminal-card-header bg-white px-5 py-3 border-b border-slate-200">
-                    <span className="terminal-dot bg-red-400 w-3 h-3" />
-                    <span className="terminal-dot bg-yellow-400 w-3 h-3" />
-                    <span className="terminal-dot bg-emerald-400 w-3 h-3" />
-                    <span className="ui-label text-slate-400 ml-3 text-xs tracking-wider">Playground Console</span>
-                  </div>
-                  <div className="p-0 flex flex-col h-[360px] bg-slate-50">
-                    <div className="flex-1 overflow-y-auto p-5 space-y-6 flex flex-col justify-end">
-                      {/* User */}
-                      <div className="flex justify-end stream-in" style={{ animationDelay: '0.1s' }}>
-                        <div className="bg-white border border-slate-200 shadow-sm rounded-2xl rounded-tr-sm px-4 py-2.5">
-                          <p className="text-[13px] text-slate-700 font-medium">Execute settlement for LC #8F3A</p>
+                
+                <div className="space-y-2">
+                  {FAQ_DATA.map((faq, index) => {
+                    const isOpen = openFaq === index;
+                    return (
+                      <div key={index} className="flex flex-col group relative">
+                        <button
+                          onClick={() => setOpenFaq(isOpen ? null : index)}
+                          className="w-full flex items-center justify-between py-6 text-left focus:outline-none"
+                        >
+                          <span className={`text-[17px] font-semibold pr-8 transition-colors duration-300 ${isOpen ? 'text-slate-900 dark:text-white' : 'text-slate-600 group-hover:text-slate-900 dark:text-slate-400 dark:group-hover:text-slate-200'}`}>
+                            {faq.question}
+                          </span>
+                          <ChevronDown className={`w-5 h-5 text-fuchsia-500 transition-transform duration-300 flex-shrink-0 ${isOpen ? 'rotate-180' : ''}`} />
+                        </button>
+                        <div 
+                          className={`overflow-hidden transition-all duration-300 ease-in-out relative ${isOpen ? 'max-h-96 opacity-100 mb-6' : 'max-h-0 opacity-0'}`}
+                        >
+                          <div className="absolute left-0 top-0 bottom-0 w-[2px] bg-gradient-to-b from-cyan-400 via-fuchsia-500 to-yellow-400" />
+                          <p className="text-[15px] text-slate-600 dark:text-slate-400 leading-relaxed pl-6">
+                            {faq.answer}
+                          </p>
                         </div>
                       </div>
+                    );
+                  })}
+                </div>
+              </div>
 
-                      {/* Agent */}
-                      <div className="flex items-start gap-3 stream-in" style={{ animationDelay: '0.3s' }}>
-                        <div className="w-8 h-8 rounded-full bg-gradient-to-br from-indigo-500 to-purple-600 flex items-center justify-center flex-shrink-0 shadow-md">
-                          <span className="text-white text-xs font-bold">AM</span>
+              {/* Right Column: Security */}
+              <div className="space-y-10">
+                <div className="space-y-4">
+                  <p className="ui-label text-emerald-400">Enterprise Ready</p>
+                  <h3 className="section-head text-3xl md:text-4xl text-foreground">Compliance &amp; Security</h3>
+                </div>
+
+                <div className="relative">
+                  {[
+                    { icon: ShieldCheck, name: "ISO 27001 Ready", note: "Information security management aligned to certification controls." },
+                    { icon: Lock, name: "HMAC-SHA512", note: "Financial step transitions are request-signed and tamper-evident." },
+                    { icon: Server, name: "Air-Gapped Node", note: "On-premise deployment with zero outbound database exposure." },
+                    { icon: FileCheck, name: "OJK / BI Compliant", note: "Meets Indonesian regulatory requirements for trade finance." },
+                    { icon: Database, name: "Immutable Audit", note: "Append-only ledger with cryptographic proof of every mutation." },
+                  ].map(({ icon: Icon, name, note }, i) => (
+                    <div key={name} className="relative">
+                      {i !== 0 && (
+                        <div className="absolute top-0 left-0 right-0 h-[1px] bg-gradient-to-r from-cyan-500/0 via-fuchsia-500/20 to-yellow-500/0" />
+                      )}
+                      <div
+                        className="grid grid-cols-12 gap-4 items-center py-6 group hover:bg-slate-50 dark:hover:bg-slate-900/30 transition-colors -mx-4 px-4 rounded-xl"
+                      >
+                        <div className="col-span-2 md:col-span-1">
+                          <span className="font-mono font-medium text-fuchsia-500 text-lg transition-colors">
+                            {String(i + 1).padStart(2, "0")}
+                          </span>
                         </div>
-                        <div className="space-y-3 w-full max-w-[85%]">
-                          <div className="flex items-center gap-2 mb-1">
-                            <span className="ui-label text-slate-400">Amadeus Orchestrator</span>
-                            <span className="text-[9px] font-mono text-emerald-600 border border-emerald-200 bg-emerald-50 px-1.5 py-0.5 rounded-sm">system</span>
+                        <div className="col-span-10 md:col-span-11 flex flex-col sm:flex-row sm:items-center gap-1 sm:gap-4">
+                          <div className="flex items-center gap-2.5 sm:w-2/5 flex-shrink-0">
+                            <Icon className="w-[18px] h-[18px] text-[#8b5cf6] transition-colors flex-shrink-0" />
+                            <span className="font-semibold text-[15px] text-slate-800 dark:text-slate-200">{name}</span>
                           </div>
-                          <div className="text-[13px] text-slate-700 leading-relaxed font-sans">
-                            I will now trigger the UiPath robot via MCP to execute the MT202 conversion.
-                          </div>
-
-                          {/* Tool Call Block */}
-                          <div className="bg-white border border-slate-200 rounded-xl overflow-hidden shadow-sm">
-                            <div className="px-3 py-2 border-b border-slate-200 bg-slate-50 flex items-center justify-between">
-                              <div className="flex items-center gap-2">
-                                <span className="text-amber-500 text-xs">⚙</span>
-                                <span className="text-slate-600 text-xs font-mono font-medium">execute_mcp_tool</span>
-                              </div>
-                              <span className="flex items-center gap-1.5 text-[10px] font-mono text-emerald-500">
-                                <span className="w-1.5 h-1.5 rounded-full bg-emerald-500 animate-pulse" /> Running...
-                              </span>
-                            </div>
-                            <div className="p-3 bg-slate-100 font-mono text-[11.5px] text-slate-500 leading-loose overflow-x-auto">
-                              <span className="text-indigo-500">"server_name"</span>: <span className="text-amber-600">"UiPath MCP"</span>,<br />
-                              <span className="text-indigo-500">"tool_name"</span>: <span className="text-amber-600">"trigger_job"</span>,<br />
-                              <span className="text-indigo-500">"arguments"</span>: {"{"}<br />
-                              &nbsp;&nbsp;<span className="text-indigo-500">"processName"</span>: <span className="text-amber-600">"MT202_Converter"</span>,<br />
-                              &nbsp;&nbsp;<span className="text-indigo-500">"txId"</span>: <span className="text-amber-600">"8F3A"</span><br />
-                              {"}"}
-                            </div>
+                          <div className="text-[14px] text-slate-600 dark:text-slate-400 leading-relaxed sm:w-3/5">
+                            {note}
                           </div>
                         </div>
                       </div>
                     </div>
-                  </div>
+                  ))}
                 </div>
               </div>
             </div>
@@ -501,143 +522,93 @@ export default function Home() {
         </div>
       </section>
 
-      {/* Section 4: FAQ — light */}
-      <section className="bg-slate-50 py-24 border-y border-slate-200">
-        <div className="max-w-4xl mx-auto px-6">
-          <div className="text-center space-y-4 mb-16">
-            <p className="ui-label text-blue-600">You got questions? We got answers</p>
-            <h3 className="section-head text-3xl md:text-4xl text-slate-900">Frequently Asked Questions</h3>
-          </div>
-
-          <div className="space-y-4">
-            {FAQ_DATA.map((faq, index) => {
-              const isOpen = openFaq === index;
-              return (
-                <div 
-                  key={index} 
-                  className={`border border-slate-200 rounded-[2rem] overflow-hidden transition-all duration-300 ${isOpen ? 'bg-white shadow-md' : 'bg-white shadow-sm hover:shadow-md'}`}
-                >
-                  <button
-                    onClick={() => setOpenFaq(isOpen ? null : index)}
-                    className="w-full flex items-center justify-between p-6 text-left focus:outline-none"
-                  >
-                    <span className="text-lg font-medium text-slate-800 pr-8">{faq.question}</span>
-                    <ChevronDown className={`w-5 h-5 text-slate-400 transition-transform duration-300 flex-shrink-0 ${isOpen ? 'rotate-180' : ''}`} />
-                  </button>
-                  <div 
-                    className={`px-6 overflow-hidden transition-all duration-300 ease-in-out ${isOpen ? 'max-h-96 pb-6 opacity-100' : 'max-h-0 opacity-0'}`}
-                  >
-                    <p className="text-[15px] text-slate-600 leading-relaxed">
-                      {faq.answer}
-                    </p>
-                  </div>
-                </div>
-              );
-            })}
-          </div>
-        </div>
-      </section>
-
-      {/* Section 5: Security / Compliance Strip — editorial spec sheet */}
-      <section className="bg-white py-20">
-        <div className="max-w-6xl mx-auto px-6">
-          <p className="ui-label text-slate-400 mb-8">Compliance &amp; Security Controls</p>
-          <div className="border-t border-slate-200">
-            {[
-              { icon: ShieldCheck, name: "ISO 27001 Ready", note: "Information security management aligned to certification controls." },
-              { icon: Lock, name: "HMAC-SHA512", note: "Financial step transitions are request-signed and tamper-evident." },
-              { icon: Server, name: "Air-Gapped Node", note: "On-premise deployment with zero outbound database exposure." },
-              { icon: FileCheck, name: "OJK / BI Compliant", note: "Meets Indonesian regulatory requirements for trade finance." },
-              { icon: Database, name: "Immutable Audit", note: "Append-only ledger with cryptographic proof of every mutation." },
-            ].map(({ icon: Icon, name, note }, i) => (
-              <div
-                key={name}
-                className="grid grid-cols-12 gap-4 items-center py-5 border-b border-slate-200"
-              >
-                <div className="col-span-2 md:col-span-1">
-                  <span className="metric-value text-slate-300 text-lg">
-                    {String(i + 1).padStart(2, "0")}
-                  </span>
-                </div>
-                <div className="col-span-10 md:col-span-4 flex items-center gap-2.5">
-                  <Icon className="w-4 h-4 text-slate-400 flex-shrink-0" />
-                  <span className="section-head text-[15px] text-slate-900">{name}</span>
-                </div>
-                <div className="col-span-12 md:col-span-7 text-[14px] text-slate-500 leading-relaxed">
-                  {note}
-                </div>
-              </div>
-            ))}
-          </div>
-        </div>
-      </section>
+      <AuroraThread variant="divider" />
 
       {/* System Architecture at a Glance */}
-      <section className="py-24 bg-[#fafafa] border-y border-slate-100 scroll-reveal">
-        <div className="max-w-6xl mx-auto px-6 space-y-10">
-          <div className="text-left space-y-2 max-w-xl">
-            <p className="ui-label text-slate-400">System Map</p>
-            <h2 className="section-head text-3xl text-slate-900">Architecture at a glance</h2>
-            <p className="text-slate-500 text-[15px] leading-relaxed">
-              Two systems live in this codebase: the actively-developed LC settlement
-              stack, and a separate Supabase-backed agent platform it grew alongside.
+      <section className="py-24 bg-transparent relative z-10 scroll-reveal">
+        <div className="max-w-[1400px] mx-auto px-6 lg:px-12 space-y-16">
+          <div className="text-left space-y-4 max-w-2xl">
+            <p className="ui-label text-cyan-500">System Map</p>
+            <h2 className="section-head text-3xl md:text-4xl text-foreground">Architecture at a glance</h2>
+            <p className="text-slate-400 text-lg leading-relaxed">
+              Amadeus is strictly divided into four specialized layers to ensure scalability and separation of concerns. From the interactive canvas to the persistent storage, every layer is built for enterprise orchestration.
             </p>
           </div>
 
-          <div className="grid grid-cols-1 lg:grid-cols-2 gap-8">
-            {/* LC Settlement Stack */}
-            <div className="rounded-[2.5rem] border border-[#e5e7eb] bg-white p-10 shadow-sm hover:shadow-xl transition-shadow">
-              <div className="space-y-4">
-                <div className="flex items-center gap-2">
-                  <Cpu className="w-5 h-5 text-blue-600" />
-                  <h3 className="section-head text-lg text-slate-900">LC Settlement Orchestrator Stack</h3>
+          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6">
+            
+            {/* Presentation Layer */}
+            <div className="group relative bg-white dark:bg-[#0B0A1F] border border-slate-200 dark:border-slate-800 rounded-3xl p-8 hover:border-cyan-500/50 transition-colors overflow-hidden">
+              <div className="absolute top-0 right-0 w-32 h-32 bg-cyan-500/10 rounded-full blur-2xl -mt-16 -mr-16 pointer-events-none group-hover:bg-cyan-500/20 transition-colors" />
+              <div className="relative z-10 space-y-4">
+                <div className="w-12 h-12 rounded-2xl bg-cyan-500/10 flex items-center justify-center border border-cyan-500/20">
+                  <Monitor className="w-6 h-6 text-cyan-500 dark:text-cyan-400" />
                 </div>
-                <p className="text-[15px] text-slate-500 leading-relaxed">
-                  A 9-step state machine for Import LC/SKBDN/SBLC settlement, with a
-                  cost-aware router that picks the cheapest of an LLM, PAD, or UiPath
-                  executor per step — and HMAC-signed financial steps.
+                <h3 className="text-xl font-bold text-slate-800 dark:text-slate-200">1. Canvas</h3>
+                <p className="text-[14px] text-cyan-600 dark:text-cyan-500 font-mono tracking-wide">Presentation Layer</p>
+                <p className="text-sm text-slate-600 dark:text-slate-400 leading-relaxed pt-2">
+                  The interactive interface where users configure agents and test them. Features the Agent Creator UI and Interactive Playground.
                 </p>
-                <ul className="space-y-1.5 text-xs font-mono text-slate-600">
-                  <li><span className="text-blue-600 font-bold">amadeus-core</span> — Fastify + Postgres, :8080</li>
-                  <li><span className="text-blue-600 font-bold">MCP tools</span> — registered via the Tools page; Amadeus discovers &amp; spawns them dynamically (npx)</li>
-                  <li><span className="text-blue-600 font-bold">amadeus-orchestrator-mcp / amadeus-uipath-mcp</span> — self-contained npm packages, ports auto-allocated</li>
-                  <li><span className="text-blue-600 font-bold">this console</span> — Next.js, :3000</li>
-                </ul>
-                <Link href="/docs/lc-settlement-stack" className="inline-flex items-center gap-1.5 text-xs font-semibold text-blue-600 pt-1">
-                  Read the settlement stack docs <ArrowRight className="w-3.5 h-3.5" />
-                </Link>
+                <div className="pt-4 flex flex-wrap gap-2">
+                  <span className="px-2.5 py-1 rounded-md bg-slate-100 dark:bg-slate-800/50 text-xs font-mono text-slate-600 dark:text-slate-300 border border-slate-200 dark:border-slate-700/50">React / Next.js</span>
+                </div>
               </div>
             </div>
 
-            {/* Legacy Agent Platform */}
-            <div className="rounded-[2.5rem] border border-[#e5e7eb] bg-white p-10 shadow-sm hover:shadow-xl transition-shadow">
-              <div className="space-y-4">
-                <div className="flex items-center gap-2">
-                  <Layers className="w-5 h-5 text-violet-600" />
-                  <h3 className="section-head text-lg text-slate-900">Agent Platform (Legacy)</h3>
+            {/* Orchestration Core */}
+            <div className="group relative bg-white dark:bg-[#0B0A1F] border border-slate-200 dark:border-slate-800 rounded-3xl p-8 hover:border-fuchsia-500/50 transition-colors overflow-hidden">
+              <div className="absolute top-0 right-0 w-32 h-32 bg-fuchsia-500/10 rounded-full blur-2xl -mt-16 -mr-16 pointer-events-none group-hover:bg-fuchsia-500/20 transition-colors" />
+              <div className="relative z-10 space-y-4">
+                <div className="w-12 h-12 rounded-2xl bg-fuchsia-500/10 flex items-center justify-center border border-fuchsia-500/20">
+                  <Cpu className="w-6 h-6 text-fuchsia-500 dark:text-fuchsia-400" />
                 </div>
-                <p className="text-[15px] text-slate-500 leading-relaxed">
-                  A general-purpose &quot;describe an agent in plain text, wire up MCP
-                  tools, run it&quot; platform that predates the settlement stack, backed by
-                  one shared Supabase project.
+                <h3 className="text-xl font-bold text-slate-800 dark:text-slate-200">2. Brain</h3>
+                <p className="text-[14px] text-fuchsia-600 dark:text-fuchsia-500 font-mono tracking-wide">Orchestration Core</p>
+                <p className="text-sm text-slate-600 dark:text-slate-400 leading-relaxed pt-2">
+                  The reasoning engine that manages agent states and tool selection. Handles LLM Routing and Session Memory.
                 </p>
-                <ul className="space-y-1.5 text-xs font-mono text-slate-600">
-                  <li><span className="text-violet-600 font-bold">app.py</span> — Combined FastAPI API, :8080</li>
-                  <li><span className="text-violet-600 font-bold">agent_backend / agent_creator</span> — agent CRUD + NL builder</li>
-                  <li><span className="text-violet-600 font-bold">agent_boilerplate</span> — LangGraph runtime, MultiServerMCPClient</li>
-                  <li><span className="text-violet-600 font-bold">mcp_tools / mcp_2</span> — MCP process managers</li>
-                </ul>
-                <Link href="/docs/agent-platform-legacy" className="inline-flex items-center gap-1.5 text-xs font-semibold text-violet-600 pt-1">
-                  Read the agent platform docs <ArrowRight className="w-3.5 h-3.5" />
-                </Link>
+                <div className="pt-4 flex flex-wrap gap-2">
+                  <span className="px-2.5 py-1 rounded-md bg-slate-100 dark:bg-slate-800/50 text-xs font-mono text-slate-600 dark:text-slate-300 border border-slate-200 dark:border-slate-700/50">Node.js / LangGraph</span>
+                </div>
               </div>
             </div>
-          </div>
 
-          <div className="flex justify-start pt-4">
-            <Link href="/docs/architecture-overview" className="btn-secondary px-7 py-3.5 text-sm bg-white rounded-full font-bold shadow-sm hover:shadow-md transition-shadow">
-              <BookOpen className="w-4 h-4" /> Full architecture documentation
-            </Link>
+            {/* Integration Layer */}
+            <div className="group relative bg-white dark:bg-[#0B0A1F] border border-slate-200 dark:border-slate-800 rounded-3xl p-8 hover:border-yellow-400/50 transition-colors overflow-hidden">
+              <div className="absolute top-0 right-0 w-32 h-32 bg-yellow-400/10 rounded-full blur-2xl -mt-16 -mr-16 pointer-events-none group-hover:bg-yellow-400/20 transition-colors" />
+              <div className="relative z-10 space-y-4">
+                <div className="w-12 h-12 rounded-2xl bg-yellow-400/10 flex items-center justify-center border border-yellow-400/20">
+                  <Plug className="w-6 h-6 text-yellow-500 dark:text-yellow-400" />
+                </div>
+                <h3 className="text-xl font-bold text-slate-800 dark:text-slate-200">3. Hands</h3>
+                <p className="text-[14px] text-yellow-600 dark:text-yellow-400 font-mono tracking-wide">Integration Layer</p>
+                <p className="text-sm text-slate-600 dark:text-slate-400 leading-relaxed pt-2">
+                  The standardized protocol layer for tool execution. Bridges external APIs and enables dynamic tool discovery.
+                </p>
+                <div className="pt-4 flex flex-wrap gap-2">
+                  <span className="px-2.5 py-1 rounded-md bg-slate-100 dark:bg-slate-800/50 text-xs font-mono text-slate-600 dark:text-slate-300 border border-slate-200 dark:border-slate-700/50">MCP Adapters</span>
+                </div>
+              </div>
+            </div>
+
+            {/* Data Layer */}
+            <div className="group relative bg-white dark:bg-[#0B0A1F] border border-slate-200 dark:border-slate-800 rounded-3xl p-8 hover:border-emerald-400/50 transition-colors overflow-hidden">
+              <div className="absolute top-0 right-0 w-32 h-32 bg-emerald-400/10 rounded-full blur-2xl -mt-16 -mr-16 pointer-events-none group-hover:bg-emerald-400/20 transition-colors" />
+              <div className="relative z-10 space-y-4">
+                <div className="w-12 h-12 rounded-2xl bg-emerald-400/10 flex items-center justify-center border border-emerald-400/20">
+                  <Database className="w-6 h-6 text-emerald-500 dark:text-emerald-400" />
+                </div>
+                <h3 className="text-xl font-bold text-slate-800 dark:text-slate-200">4. Storage</h3>
+                <p className="text-[14px] text-emerald-600 dark:text-emerald-400 font-mono tracking-wide">Data Layer</p>
+                <p className="text-sm text-slate-600 dark:text-slate-400 leading-relaxed pt-2">
+                  The persistent memory and configuration storage. Stores Agent configurations, Tool schemas, and Chat history.
+                </p>
+                <div className="pt-4 flex flex-wrap gap-2">
+                  <span className="px-2.5 py-1 rounded-md bg-slate-100 dark:bg-slate-800/50 text-xs font-mono text-slate-600 dark:text-slate-300 border border-slate-200 dark:border-slate-700/50">PostgreSQL</span>
+                </div>
+              </div>
+            </div>
+
           </div>
         </div>
       </section>

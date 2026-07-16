@@ -1051,7 +1051,7 @@ function PlaygroundInner() {
                         'border-amber-100 bg-amber-50'
                       }`}
                     >
-                      <span className={`font-mono font-bold shrink-0 w-8 text-center ${
+                      <span className={`font-mono font-medium shrink-0 w-8 text-center ${
                         r.status === 'success' ? 'text-emerald-700' : r.status === 'failed' ? 'text-red-700' : 'text-amber-700'
                       }`}>#{r.iteration}</span>
                       <span className="flex-1 text-slate-700 whitespace-pre-wrap break-all">{r.detail}</span>
@@ -1062,7 +1062,7 @@ function PlaygroundInner() {
                   ))}
                   {loopRunning && loopResults.length < loopIterations && (
                     <div className="rounded-xl border border-slate-100 bg-slate-50 p-3 text-xs flex gap-3 items-center">
-                      <span className="font-mono font-bold text-slate-400 w-8 text-center">#{loopResults.length + 1}</span>
+                      <span className="font-mono font-medium text-slate-400 w-8 text-center">#{loopResults.length + 1}</span>
                       <span className="text-slate-400 animate-pulse">Agent sedang berpikir…</span>
                     </div>
                   )}

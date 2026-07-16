@@ -100,7 +100,7 @@ export function ShareModal({ agentId, threadId, resourceName, onClose }: ShareMo
       <div className="bg-white border border-slate-200 rounded-2xl w-full max-w-md shadow-2xl flex flex-col max-h-[90vh]">
         <div className="flex justify-between items-center px-6 py-4 border-b border-slate-100">
           <div>
-            <h2 className="font-extrabold text-slate-900 text-lg">Share {threadId ? "thread" : "agent"}</h2>
+            <h2 className="font-semibold text-slate-900 text-lg">Share {threadId ? "thread" : "agent"}</h2>
             <p className="text-xs text-slate-400 truncate max-w-[280px]">{resourceName}</p>
           </div>
           <button onClick={onClose} className="p-1.5 text-slate-400 hover:text-slate-700 hover:bg-slate-100 rounded-lg">

@@ -14,6 +14,7 @@ import {
   LogOut,
 } from "lucide-react";
 import { GithubIcon, LinkedinIcon } from "@/components/Icons";
+import { AuroraThread } from "@/components/AuroraThread";
 import { MARKETING_CHROMELESS_ROUTES } from "@/lib/marketingNav";
 
 const NAV_SECTIONS = [
@@ -69,7 +70,7 @@ export function AppShell({ children }: { children: React.ReactNode }) {
   return (
     <div className="flex h-[100dvh] bg-[#f8f9fa] overflow-hidden">
       {/* Left Rail — enterprise dark console (Desktop) */}
-      <aside className="hidden md:flex w-64 flex-shrink-0 surface-dark flex-col border-r border-white/10 shadow-[4px_0_24px_rgba(0,0,0,0.02)] z-20">
+      <aside className="hidden md:flex w-64 flex-shrink-0 bg-slate-950 text-slate-100 flex-col border-r border-white/10 shadow-[4px_0_24px_rgba(0,0,0,0.02)] z-20">
         {/* Logo */}
         <div className="h-16 flex items-center px-6 border-b border-white/5">
           <Link href="/" className="flex items-center gap-3 group">
@@ -95,9 +96,9 @@ export function AppShell({ children }: { children: React.ReactNode }) {
                       className={`relative flex items-center gap-3 px-3 py-2.5 rounded-xl text-sm font-medium transition-all duration-200 ${ isActive ? "bg-white/10 text-white shadow-sm backdrop-blur-md border border-white/5" : "text-white/60 hover:bg-white/5 hover:text-white" }`}
                     >
                       {isActive && (
-                        <span className="absolute left-0 top-1/2 -translate-y-1/2 h-6 w-[4px] rounded-r-full bg-blue-500 shadow-[0_0_8px_rgba(59,130,246,0.6)]" />
+                        <span className="absolute left-0 top-1/2 -translate-y-1/2 h-6 w-[4px] rounded-r-full bg-gradient-to-b from-[var(--aurora-blue)] via-[var(--aurora-violet)] to-[var(--aurora-fuchsia)] shadow-[0_0_8px_rgba(139,92,246,0.6)]" />
                       )}
-                      <Icon className={`w-4 h-4 flex-shrink-0 ${isActive ? "text-blue-400" : "text-white/40"}`} />
+                      <Icon className={`w-4 h-4 flex-shrink-0 ${isActive ? "text-violet-400" : "text-white/40"}`} />
                       {label}
                     </Link>
                   );
@@ -124,7 +125,7 @@ export function AppShell({ children }: { children: React.ReactNode }) {
       {/* Main Area */}
       <main className="flex-1 flex flex-col overflow-hidden bg-[#FAFAFA] relative">
         {/* Top Bar */}
-        <header className="h-16 bg-white/80 backdrop-blur-xl border-b border-slate-200/60 flex items-center justify-between px-4 md:px-8 flex-shrink-0 z-10 sticky top-0">
+        <header className="relative h-16 bg-white/80 backdrop-blur-xl border-b border-slate-200/60 flex items-center justify-between px-4 md:px-8 flex-shrink-0 z-10 sticky top-0">
           <div className="flex items-center gap-3">
             <div>
               <h1 className="text-base font-semibold text-slate-800 leading-tight">
@@ -160,7 +161,7 @@ export function AppShell({ children }: { children: React.ReactNode }) {
                 className="flex items-center gap-2 bg-slate-900 border border-slate-900 text-white text-xs font-medium py-1.5 px-3 rounded-full hover:bg-slate-800 transition-colors shadow-sm ml-1"
                 title="Account Menu"
               >
-                <div className="w-4 h-4 rounded-full bg-white/20 flex items-center justify-center text-[9px] font-bold text-white">
+                <div className="w-4 h-4 rounded-full bg-white/20 flex items-center justify-center text-[9px] font-medium text-white">
                   A
                 </div>
                 <span className="hidden md:inline">Account</span>
@@ -197,6 +198,7 @@ export function AppShell({ children }: { children: React.ReactNode }) {
               )}
             </div>
           </div>
+          <AuroraThread variant="divider" position="absolute" className="-bottom-px inset-x-0" />
         </header>
 
         {/* Page Content */}

@@ -47,7 +47,7 @@ export default function SharedAgentPage() {
                 <Bot className="w-6 h-6" />
               </div>
               <div>
-                <h1 className="font-extrabold text-slate-900 text-lg">{agent.agent_name}</h1>
+                <h1 className="font-semibold text-slate-900 text-lg">{agent.agent_name}</h1>
                 <span className="text-[10px] font-mono text-slate-400">Shared agent · read-only</span>
               </div>
             </div>

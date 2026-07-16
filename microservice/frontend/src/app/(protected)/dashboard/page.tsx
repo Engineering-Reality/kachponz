@@ -123,7 +123,7 @@ export default function Dashboard() {
       {/* Compact Header */}
       <header className="h-11 bg-white border-b border-slate-100 flex items-center px-4 justify-between flex-shrink-0">
         <div className="flex items-center gap-3">
-          <h2 className="text-xs font-bold text-slate-900">Transaction Ledger</h2>
+          <h2 className="text-xs font-medium text-slate-900">Transaction Ledger</h2>
           <span className="badge badge-slate">{transactions.length} records</span>
         </div>
         <div className="flex items-center gap-2">
@@ -254,7 +254,7 @@ export default function Dashboard() {
                 <div className="flex items-center justify-between mb-2">
                   <div className="flex items-center gap-2">
                     <Hash className="w-3.5 h-3.5 text-slate-400" />
-                    <span className="font-mono text-sm font-bold text-slate-900">{selectedTx.id.substring(0, 12)}...</span>
+                    <span className="font-mono text-sm font-medium text-slate-900">{selectedTx.id.substring(0, 12)}...</span>
                     <span className={`px-1.5 py-0.5 text-[10px] font-medium rounded ${ selectedTx.status === "completed" ? "bg-emerald-50 text-emerald-700" : selectedTx.status === "failed" ? "bg-red-50 text-red-600" : "bg-blue-50 text-blue-600" }`}>{selectedTx.status}</span>
                   </div>
                   {selectedTx.status === "in_progress" && (
@@ -304,7 +304,7 @@ export default function Dashboard() {
                             </div>
                             <div className="flex-1 min-w-0">
                               <div className="flex items-center gap-2 mb-0.5">
-                                <span className="font-mono font-bold text-slate-800">{evt.step}</span>
+                                <span className="font-mono font-medium text-slate-800">{evt.step}</span>
                                 <span className={`px-1 py-0.5 text-[9px] rounded font-medium ${ evt.status === "completed" ? "bg-emerald-50 text-emerald-600" : evt.status === "failed" ? "bg-red-50 text-red-500" : "bg-slate-50 text-slate-500" }`}>{evt.status}</span>
                               </div>
                               <div className="flex items-center gap-3 text-[10px] text-slate-400">
@@ -328,7 +328,7 @@ export default function Dashboard() {
                     {/* A2A Protocol Reference */}
                     <div className="bg-white border border-slate-200 rounded-lg overflow-hidden">
                       <div className="px-3 py-2 bg-slate-50 border-b border-slate-100 flex items-center justify-between">
-                        <span className="text-[10px] font-bold text-slate-500">A2A Envelope Schema</span>
+                        <span className="text-[10px] font-medium text-slate-500">A2A Envelope Schema</span>
                         <span className="font-mono text-[9px] bg-slate-200 text-slate-600 px-1.5 py-0.5 rounded">amadeus.a2a/0</span>
                       </div>
                       <div className="p-3">
@@ -349,7 +349,7 @@ export default function Dashboard() {
                     {/* A2A Flow Pipeline */}
                     <div className="bg-white border border-slate-200 rounded-lg overflow-hidden">
                       <div className="px-3 py-2 bg-slate-50 border-b border-slate-100">
-                        <span className="text-[10px] font-bold text-slate-500">Step Flow · {selectedTx.type}</span>
+                        <span className="text-[10px] font-medium text-slate-500">Step Flow · {selectedTx.type}</span>
                       </div>
                       <div className="p-3 space-y-1">
                         {STEP_FLOW_DISPLAY.map((step, idx) => {
@@ -358,8 +358,8 @@ export default function Dashboard() {
                           const isCurrent = idx === currentIdx && selectedTx.status !== "completed";
                           return (
                             <div key={step.key} className={`flex items-center gap-2 px-2.5 py-1.5 rounded-md text-xs transition-colors ${ isCurrent ? "bg-blue-50 border border-blue-200" : isCompleted ? "bg-emerald-50/50" : "bg-slate-50/50" }`}>
-                              <div className={`w-4 h-4 rounded-full flex items-center justify-center text-[8px] font-bold flex-shrink-0 ${ isCompleted ? "bg-emerald-500 text-white" : isCurrent ? "bg-blue-500 text-white animate-pulse" : "bg-slate-200 text-slate-400" }`}>{idx + 1}</div>
-                              <span className={`font-mono text-[10px] flex-1 ${isCurrent ? "text-blue-700 font-bold" : isCompleted ? "text-emerald-700" : "text-slate-400"}`}>
+                              <div className={`w-4 h-4 rounded-full flex items-center justify-center text-[8px] font-medium flex-shrink-0 ${ isCompleted ? "bg-emerald-500 text-white" : isCurrent ? "bg-blue-500 text-white animate-pulse" : "bg-slate-200 text-slate-400" }`}>{idx + 1}</div>
+                              <span className={`font-mono text-[10px] flex-1 ${isCurrent ? "text-blue-700 font-medium" : isCompleted ? "text-emerald-700" : "text-slate-400"}`}>
                                 {step.label}
                               </span>
                               <span className="text-[9px] text-slate-400 font-mono">{step.actor}</span>
@@ -374,7 +374,7 @@ export default function Dashboard() {
                     {/* A2A Message Types */}
                     <div className="bg-white border border-slate-200 rounded-lg overflow-hidden">
                       <div className="px-3 py-2 bg-slate-50 border-b border-slate-100">
-                        <span className="text-[10px] font-bold text-slate-500">Supported Message Types</span>
+                        <span className="text-[10px] font-medium text-slate-500">Supported Message Types</span>
                       </div>
                       <div className="p-3 grid grid-cols-2 gap-1.5">
                         {[
@@ -384,7 +384,7 @@ export default function Dashboard() {
                           { type: "task.status", desc: "Query state", color: "bg-blue-50 text-blue-700 border-blue-200" },
                         ].map(m => (
                           <div key={m.type} className={`px-2.5 py-2 rounded-md border text-[10px] ${m.color}`}>
-                            <div className="font-mono font-bold">{m.type}</div>
+                            <div className="font-mono font-medium">{m.type}</div>
                             <div className="opacity-70 mt-0.5">{m.desc}</div>
                           </div>
                         ))}

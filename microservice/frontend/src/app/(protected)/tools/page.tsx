@@ -593,7 +593,7 @@ export default function ToolsPage() {
               className={`border p-4 rounded-2xl text-left hover:shadow-md transition-all duration-200 ${color}`}
             >
               {logo}
-              <div className="font-bold text-xs">{label}</div>
+              <div className="font-medium text-xs">{label}</div>
               <div className="text-[10px] opacity-80 mt-1">{desc}</div>
             </button>
           ))}
@@ -702,13 +702,13 @@ export default function ToolsPage() {
                     {getDynamicIcon(tool.name, isActive)}
                   </div>
                   <div>
-                    <h3 className="font-extrabold text-slate-900 text-base leading-snug">{tool.name}</h3>
+                    <h3 className="font-semibold text-slate-900 text-base leading-snug">{tool.name}</h3>
                     <div className="flex items-center gap-2 mt-1">
                       <span className={`badge text-[9px] px-2 py-0.5 rounded-full ${isActive ? "badge-green" : "badge-slate"}`}>
                         <span className={`w-1.5 h-1.5 rounded-full mr-1 inline-block ${isActive ? "bg-green-500 animate-pulse" : "bg-slate-400"}`} />
                         {isActive ? "Active" : "Offline"}
                       </span>
-                      <span className="text-[10px] font-mono text-slate-400">Transport: <span className="font-bold text-slate-600">{method}</span></span>
+                      <span className="text-[10px] font-mono text-slate-400">Transport: <span className="font-medium text-slate-600">{method}</span></span>
                     </div>
                   </div>
                 </div>
@@ -814,7 +814,7 @@ export default function ToolsPage() {
         <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/25 backdrop-blur-sm p-4 animate-in fade-in duration-200">
           <div className="bg-white border border-slate-200 rounded-2xl w-full max-w-lg shadow-2xl flex flex-col max-h-[90vh]">
             <div className="flex justify-between items-center px-6 py-4 border-b border-slate-100">
-              <h2 className="font-extrabold text-slate-900 text-lg">
+              <h2 className="font-semibold text-slate-900 text-lg">
                 {modalMode === "create" ? "Register MCP Server" : "Edit MCP Server"}
               </h2>
               <button onClick={() => setIsModalOpen(false)} className="p-1.5 text-slate-400 hover:text-slate-700 hover:bg-slate-100 rounded-lg">
@@ -962,7 +962,7 @@ export default function ToolsPage() {
         <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/25 backdrop-blur-sm p-4 animate-in fade-in duration-200">
           <div className="bg-white border border-slate-200 rounded-2xl w-full max-w-md shadow-2xl flex flex-col">
             <div className="flex justify-between items-center px-6 py-4 border-b border-slate-100">
-              <h2 className="font-extrabold text-slate-900 text-lg flex items-center gap-2">
+              <h2 className="font-semibold text-slate-900 text-lg flex items-center gap-2">
                 {authProvider === "uipath" && <span className="text-orange-600">Connect to UiPath</span>}
                 {authProvider === "pad" && <span className="text-blue-600">Connect to Power Automate</span>}
                 {authProvider === "amadeus" && <span className="text-indigo-600">Connect Amadeus Core</span>}
@@ -1118,9 +1118,9 @@ export default function ToolsPage() {
               <div className="w-12 h-12 rounded-full bg-red-100 flex items-center justify-center mx-auto mb-4 text-red-600">
                 <Trash2 className="w-6 h-6" />
               </div>
-              <h3 className="text-lg font-bold text-slate-900 text-center mb-2">Delete MCP Server?</h3>
+              <h3 className="text-lg font-medium text-slate-900 text-center mb-2">Delete MCP Server?</h3>
               <p className="text-sm text-slate-500 text-center mb-6">
-                Are you sure you want to delete <span className="font-bold text-slate-700">{toolToDelete.name}</span>? This action cannot be undone.
+                Are you sure you want to delete <span className="font-medium text-slate-700">{toolToDelete.name}</span>? This action cannot be undone.
               </p>
               <div className="flex gap-3">
                 <button 

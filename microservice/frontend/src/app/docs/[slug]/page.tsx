@@ -40,7 +40,7 @@ export default async function DocViewer(props: { params: Promise<{ slug: string 
             <div className="p-3 bg-blue-50 rounded-xl">
               <BookOpen className="w-8 h-8 text-blue-500" />
             </div>
-            <h1 className="text-3xl md:text-4xl font-extrabold tracking-tight text-slate-900">
+            <h1 className="text-3xl md:text-4xl font-semibold tracking-tight text-slate-900">
               {findDocTitle(params.slug)}
             </h1>
           </div>

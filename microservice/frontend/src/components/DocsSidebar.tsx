@@ -19,7 +19,7 @@ export function DocsSidebar() {
         </Link>
         <Link href="/docs" className="flex items-center gap-2 mb-8">
           <BookOpen className="w-4.5 h-4.5 text-blue-500" />
-          <span className="font-extrabold text-sm tracking-tight text-slate-900">
+          <span className="font-semibold text-sm tracking-tight text-slate-900">
             Amadeus Docs
           </span>
         </Link>
@@ -27,7 +27,7 @@ export function DocsSidebar() {
         <nav className="space-y-6">
           {DOCS_NAV.map((group) => (
             <div key={group.title}>
-              <h4 className="text-[10px] font-bold text-slate-400 mb-2 px-2">
+              <h4 className="text-[10px] font-medium text-slate-400 mb-2 px-2">
                 {group.title}
               </h4>
               <ul className="space-y-0.5">

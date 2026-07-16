@@ -2,7 +2,7 @@
 
 import React, { useState, useRef, useEffect } from 'react';
 
-export function SpectralText({ text }: { text: string }) {
+export function SpectralText({ text, className = "pastel-rainbow-text" }: { text: string; className?: string }) {
   const [mousePos, setMousePos] = useState({ x: 0, y: 0 });
   const [isHovering, setIsHovering] = useState(false);
   const [time, setTime] = useState(0);
@@ -39,7 +39,7 @@ export function SpectralText({ text }: { text: string }) {
       style={{ opacity: flicker }}
     >
       {/* Base Text (Always visible) */}
-      <span className="relative z-10 pastel-rainbow-text transition-opacity duration-300 group-hover:opacity-80">
+      <span className={`relative z-10 transition-opacity duration-300 group-hover:opacity-80 ${className}`}>
         {text}
       </span>
 
@@ -76,6 +76,19 @@ export function SpectralText({ text }: { text: string }) {
           opacity: isHovering ? 0.6 : 0,
           transform: isHovering ? `translate(${(mousePos.y - 0.5) * 5}px, ${(mousePos.x - 0.5) * 4 - Math.sin(time) * 1}px)` : 'translate(0, 0)',
           filter: 'blur(3px)'
+        }}
+        aria-hidden="true"
+      >
+        {text}
+      </span>
+
+      {/* Spectral Layer 4 - Yellow */}
+      <span
+        className="absolute top-0 left-0 text-[#fbbf24] mix-blend-screen pointer-events-none transition-transform duration-[120ms] select-none"
+        style={{
+          opacity: isHovering ? 0.8 : 0,
+          transform: isHovering ? `translate(${(mousePos.x - 0.5) * 4 - Math.cos(time) * 1.5}px, ${(mousePos.y - 0.5) * -4}px)` : 'translate(0, 0)',
+          filter: 'blur(1.5px)'
         }}
         aria-hidden="true"
       >

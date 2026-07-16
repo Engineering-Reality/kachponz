@@ -1,5 +1,6 @@
 @import "tailwindcss";
 @plugin "@tailwindcss/typography";
+@custom-variant dark (&:where(.dark, .dark *));
 
 @theme {
   --color-mono-50: #ffffff;
@@ -29,10 +30,29 @@
   --animate-ribbon: ribbon-stretch 2s ease-in-out infinite alternate;
 }
 
+@layer base {
+  html, body {
+    max-width: 100vw;
+    overflow-x: hidden;
+  }
+}
+
 :root {
   --background: #ffffff;
   --foreground: #0f172a;
   --rainbow: linear-gradient(90deg, #22d3ee, #3b82f6, #d946ef, #ec4899, #fb923c, #facc15, #22d3ee);
+
+  /* Aurora spectrum — Cyan, Fuchsia, Yellow */
+  --aurora-cyan: #22d3ee;
+  --aurora-fuchsia: #d946ef;
+  --aurora-yellow: #fde047;
+  --aurora-spectrum: linear-gradient(90deg, var(--aurora-cyan), var(--aurora-fuchsia), var(--aurora-yellow));
+  --aurora-spectrum-conic: conic-gradient(from 180deg, var(--aurora-cyan), var(--aurora-fuchsia), var(--aurora-yellow), var(--aurora-cyan));
+}
+
+.dark {
+  --background: #0b0a1f;
+  --foreground: #f8f5ff;
 }
 
 @keyframes wave {
@@ -54,6 +74,39 @@
 @keyframes shimmer {
   0% { background-position: -200% 0; }
   100% { background-position: 200% 0; }
+}
+
+/* === AURORA THREAD SYSTEM === */
+@keyframes aurora-drift {
+  0%   { transform: translate(0, 0) scale(1); }
+  33%  { transform: translate(3%, -4%) scale(1.08); }
+  66%  { transform: translate(-3%, 3%) scale(0.96); }
+  100% { transform: translate(0, 0) scale(1); }
+}
+
+@keyframes aurora-draw {
+  to { stroke-dashoffset: 0; }
+}
+
+@keyframes aurora-particle-drift {
+  0%   { offset-distance: 0%; opacity: 0; }
+  10%  { opacity: 1; }
+  90%  { opacity: 1; }
+  100% { offset-distance: 100%; opacity: 0; }
+}
+
+.aurora-blob {
+  position: absolute;
+  border-radius: 9999px;
+  filter: blur(120px);
+  animation: aurora-drift 75s ease-in-out infinite;
+  pointer-events: none;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .aurora-blob { animation: none; }
+  .aurora-draw-path { stroke-dashoffset: 0 !important; transition: none !important; }
+  .aurora-particle { animation: none !important; opacity: 0.6; }
 }
 
 body {

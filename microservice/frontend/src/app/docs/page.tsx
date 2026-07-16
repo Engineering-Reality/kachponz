@@ -9,7 +9,7 @@ export default function DocsIndex() {
 
       <div className="relative z-10 max-w-4xl">
         <header className="mb-12">
-          <h1 className="text-4xl md:text-5xl font-extrabold tracking-tight">
+          <h1 className="text-4xl md:text-5xl font-semibold tracking-tight">
             Developer <span className="vibrant-rainbow-text">Documentation</span>
           </h1>
           <p className="text-xl text-slate-600 mt-4 max-w-2xl">
@@ -22,7 +22,7 @@ export default function DocsIndex() {
         <div className="space-y-10">
           {DOCS_NAV.map((group) => (
             <div key={group.title}>
-              <h2 className="text-xs font-bold text-slate-400 mb-3">
+              <h2 className="text-xs font-medium text-slate-400 mb-3">
                 {group.title}
               </h2>
               <div className="grid grid-cols-1 md:grid-cols-2 gap-3">

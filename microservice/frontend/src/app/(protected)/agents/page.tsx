@@ -534,15 +534,15 @@ export default function AgentsPage() {
                 <div className="grid grid-cols-3 gap-2 py-3 border-t border-b border-slate-100 mb-4 bg-slate-50/50 rounded-xl px-2">
                   <div className="text-center">
                     <p className="text-[9px] font-mono text-slate-400">Invocations</p>
-                    <p className="text-sm font-bold text-slate-800 mt-0.5">{metrics.runs} runs</p>
+                    <p className="text-sm font-medium text-slate-800 mt-0.5">{metrics.runs} runs</p>
                   </div>
                   <div className="text-center border-x border-slate-100">
                     <p className="text-[9px] font-mono text-slate-400">Avg Latency</p>
-                    <p className="text-sm font-bold text-slate-800 mt-0.5">{metrics.latency}s</p>
+                    <p className="text-sm font-medium text-slate-800 mt-0.5">{metrics.latency}s</p>
                   </div>
                   <div className="text-center">
                     <p className="text-[9px] font-mono text-slate-400">Success Rate</p>
-                    <p className="text-sm font-bold text-slate-800 mt-0.5">{metrics.successRate}%</p>
+                    <p className="text-sm font-medium text-slate-800 mt-0.5">{metrics.successRate}%</p>
                   </div>
                 </div>
 
@@ -593,7 +593,7 @@ export default function AgentsPage() {
         <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/25 backdrop-blur-sm p-4 animate-in fade-in duration-200">
           <div className="bg-white border border-slate-200 rounded-2xl w-full max-w-2xl shadow-2xl flex flex-col max-h-[90vh]">
             <div className="flex justify-between items-center px-6 py-4 border-b border-slate-100">
-              <h2 className="font-extrabold text-slate-900 text-lg">
+              <h2 className="font-semibold text-slate-900 text-lg">
                 {modalMode === "create" ? "Register New Agent" : "Edit Agent Details"}
               </h2>
               <button onClick={() => setIsModalOpen(false)} className="p-1.5 text-slate-400 hover:text-slate-700 hover:bg-slate-100 rounded-lg">

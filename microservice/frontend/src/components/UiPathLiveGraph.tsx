@@ -64,7 +64,7 @@ const VerticalCustomNode = ({ data, isConnectable }: any) => {
       <div className={`relative w-full rounded-xl overflow-hidden ${wrapperStyle}`}>
         <div className={`relative z-10 flex flex-col p-4 rounded-[10px] ${nodeStyle} transition-all duration-300`}>
           <div className="flex justify-between items-center mb-2">
-            <span className={`text-[10px] font-mono ${titleColor} font-bold flex items-center gap-1.5`}>
+            <span className={`text-[10px] font-mono ${titleColor} font-medium flex items-center gap-1.5`}>
               {isCompleted && <CheckCircle className="w-3.5 h-3.5" />}
               {isFailed && <AlertTriangle className="w-3.5 h-3.5" />}
               {!isCompleted && !isFailed && !isActive && <Clock className="w-3.5 h-3.5" />}
@@ -81,7 +81,7 @@ const VerticalCustomNode = ({ data, isConnectable }: any) => {
             <div className="mt-3 flex items-center gap-2 bg-black/30 p-2 rounded-lg">
                <div className="w-2 h-2 rounded-full bg-white animate-ping" />
                <div className="w-2 h-2 rounded-full bg-white absolute" />
-               <span className="text-[9px] text-white font-bold animate-pulse">Running...</span>
+               <span className="text-[9px] text-white font-medium animate-pulse">Running...</span>
             </div>
           )}
           {data.selected && (
@@ -405,7 +405,7 @@ export function UiPathLiveGraph({
     <div className="flex flex-col h-full bg-slate-50">
       <div className="px-4 py-3 border-b border-slate-200 bg-white sticky top-0 z-10 flex justify-between items-center shrink-0 shadow-sm">
         <div>
-          <h2 className="text-[11px] font-bold text-slate-800 flex items-center gap-2">
+          <h2 className="text-[11px] font-medium text-slate-800 flex items-center gap-2">
             <span className="w-1.5 h-1.5 rounded-full bg-indigo-500 animate-pulse" />
             Orchestrator Map
           </h2>
@@ -465,7 +465,7 @@ export function UiPathLiveGraph({
         {/* Info Area below canvas */}
         <div className="flex-1 overflow-y-auto p-4 space-y-6">
           <div className="space-y-2">
-            <h3 className="text-[10px] font-bold text-slate-500 mb-3 px-1">
+            <h3 className="text-[10px] font-medium text-slate-500 mb-3 px-1">
                {selectedNode?.type === 'Agent' ? 'Agent Details' : selectedNode?.type === 'Queue' ? 'Queue Details' : 'Process Details'}
             </h3>
             <div className="bg-white rounded-xl border border-slate-200 p-3 text-xs space-y-2 shadow-sm">
@@ -477,7 +477,7 @@ export function UiPathLiveGraph({
                    </div>
                    <div className="flex justify-between items-center pt-1">
                       <span className="text-slate-400">Status</span>
-                      <span className="font-bold text-emerald-600">Online & Polling</span>
+                      <span className="font-medium text-emerald-600">Online & Polling</span>
                    </div>
                  </>
                )}
@@ -491,7 +491,7 @@ export function UiPathLiveGraph({
                      </div>
                      <div className="flex justify-between items-center pt-1">
                         <span className="text-slate-400">Pending Items</span>
-                        <span className="font-bold text-amber-600">{qData?.pendingCount ?? '?'}</span>
+                        <span className="font-medium text-amber-600">{qData?.pendingCount ?? '?'}</span>
                      </div>
                    </>
                  );
@@ -511,7 +511,7 @@ export function UiPathLiveGraph({
                      </div>
                      <div className="flex justify-between items-center pt-1">
                         <span className="text-slate-400">State</span>
-                        <span className={`font-bold ${ selectedJob?.state === 'Successful' ? 'text-emerald-600' : selectedJob?.state === 'Faulted' ? 'text-red-600' : selectedJob?.state === 'Running' ? 'text-indigo-600' : 'text-slate-500' }`}>{selectedJob ? selectedJob.state : 'Idle'}</span>
+                        <span className={`font-medium ${ selectedJob?.state === 'Successful' ? 'text-emerald-600' : selectedJob?.state === 'Faulted' ? 'text-red-600' : selectedJob?.state === 'Running' ? 'text-indigo-600' : 'text-slate-500' }`}>{selectedJob ? selectedJob.state : 'Idle'}</span>
                      </div>
                    </>
                  );
@@ -520,7 +520,7 @@ export function UiPathLiveGraph({
           </div>
 
           <div className="space-y-2 pb-4">
-            <h3 className="text-[10px] font-bold text-slate-500 mb-3 px-1">
+            <h3 className="text-[10px] font-medium text-slate-500 mb-3 px-1">
                {selectedNode?.type === 'Agent' ? 'Agent MCP Logs' : selectedNode?.type === 'Queue' ? 'Queue Transactions Logs' : 'Execution Status & Logs'}
             </h3>
             <div className="bg-[#0f172a] rounded-xl p-3 shadow-inner font-mono text-[11px] leading-relaxed relative overflow-hidden min-h-[120px]">

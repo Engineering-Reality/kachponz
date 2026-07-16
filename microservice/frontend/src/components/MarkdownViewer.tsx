@@ -60,7 +60,7 @@ function parseAlert(text: string) {
 
 export default function MarkdownViewer({ content }: { content: string }) {
   return (
-    <div className="prose prose-slate prose-lg max-w-none prose-headings:font-extrabold prose-headings:tracking-tight prose-headings:text-slate-900 prose-a:text-indigo-600 hover:prose-a:text-indigo-800 prose-blockquote:border-l-4 prose-blockquote:border-indigo-500 prose-blockquote:bg-indigo-50 prose-blockquote:py-1 prose-blockquote:px-6 prose-blockquote:rounded-r-lg prose-blockquote:not-italic prose-blockquote:text-slate-700 prose-th:bg-slate-100 prose-th:px-4 prose-th:py-3 prose-th:border prose-th:border-slate-200 prose-td:px-4 prose-td:py-3 prose-td:border prose-td:border-slate-200 prose-table:border-collapse prose-table:w-full">
+    <div className="prose prose-slate prose-lg max-w-none prose-headings:font-semibold prose-headings:tracking-tight prose-headings:text-slate-900 prose-a:text-indigo-600 hover:prose-a:text-indigo-800 prose-blockquote:border-l-4 prose-blockquote:border-indigo-500 prose-blockquote:bg-indigo-50 prose-blockquote:py-1 prose-blockquote:px-6 prose-blockquote:rounded-r-lg prose-blockquote:not-italic prose-blockquote:text-slate-700 prose-th:bg-slate-100 prose-th:px-4 prose-th:py-3 prose-th:border prose-th:border-slate-200 prose-td:px-4 prose-td:py-3 prose-td:border prose-td:border-slate-200 prose-table:border-collapse prose-table:w-full">
       <ReactMarkdown
         remarkPlugins={[remarkGfm]}
         components={{
@@ -141,7 +141,7 @@ export default function MarkdownViewer({ content }: { content: string }) {
                 <div className={`my-6 flex gap-3 p-4 rounded-xl border-l-4 ${style.border} ${style.bg} ${style.text}`}>
                   <div className="flex-shrink-0">{style.icon}</div>
                   <div className="flex-1 m-0 [&>p]:m-0 [&>p]:leading-relaxed text-[15px]">
-                    <div className="font-bold mb-1">{titleCase}</div>
+                    <div className="font-medium mb-1">{titleCase}</div>
                     {processedChildren}
                   </div>
                 </div>

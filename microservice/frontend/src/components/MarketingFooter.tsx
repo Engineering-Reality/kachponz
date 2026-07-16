@@ -1,11 +1,16 @@
 import Link from "next/link";
 import { GithubIcon, TwitterIcon, LinkedinIcon, YoutubeIcon } from "@/components/Icons";
 import { MARKETING_NAV_LINKS } from "@/lib/marketingNav";
+import { AuroraThread } from "@/components/AuroraThread";
 
 export function MarketingFooter() {
   return (
     <>
-      <div className="rainbow-bar" />
+      {/* CTA close — Aurora Thread bookends the hero's opening motif */}
+      <div className="relative bg-slate-950 py-16 overflow-hidden">
+        <AuroraThread variant="mesh" size="sm" />
+        <AuroraThread variant="divider" className="max-w-6xl mx-auto" />
+      </div>
       <footer className="bg-white pt-16 pb-8 border-t border-slate-200">
         <div className="max-w-6xl mx-auto px-6">
           <div className="grid grid-cols-2 md:grid-cols-5 gap-8 pb-12">
@@ -13,7 +18,7 @@ export function MarketingFooter() {
               <Link href="/" className="flex items-center gap-2.5">
                 {/* eslint-disable-next-line @next/next/no-img-element */}
                 <img src="/amadeus.svg" alt="Amadeus Logo" className="w-7 h-7 object-contain" />
-                <span className="font-extrabold text-base tracking-tight text-slate-900">Amadeus</span>
+                <span className="font-semibold text-base tracking-tight text-slate-900">Amadeus</span>
               </Link>
               <p className="text-[13px] text-slate-500 leading-relaxed max-w-xs">
                 Enterprise agentic orchestration for Trade Finance settlement — coordinating human analysts, AI agents, and RPA robots.

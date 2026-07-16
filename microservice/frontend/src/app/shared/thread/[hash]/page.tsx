@@ -51,7 +51,7 @@ export default function SharedThreadPage() {
           <>
             <div className="flex items-center gap-3 mb-6">
               <MessageSquare className="w-5 h-5 text-slate-400" />
-              <h1 className="font-extrabold text-slate-900 text-lg">Shared conversation</h1>
+              <h1 className="font-semibold text-slate-900 text-lg">Shared conversation</h1>
               <span className="text-[10px] font-mono text-slate-400">read-only</span>
             </div>
             <div className="flex flex-col gap-3">
