@@ -146,6 +146,43 @@ flowchart TD
         CR_DRC <-->|TCP 5432| DB_DRC
     end
 
+    subgraph NetraCloud [Netra Private AI Cloud: Localized LLM Inference]
+        direction TB
+        subgraph EdgeLayer [Edge + Router Layer]
+            NetraAPI[OpenAI-Compatible API]
+            KVRouter[KV-Aware Router]
+            NetraAPI --> KVRouter
+        end
+
+        subgraph DisaggregatedInference [Disaggregated Inference Architecture]
+            direction LR
+            subgraph Node0 [Node 0 - HGX H100 8-GPU]
+                Prefill[Prefill GPUs: Qwen Context Processing]
+                NVLink0((NVLink All-to-All))
+                Prefill <--> NVLink0
+            end
+            
+            subgraph Node1 [Node 1 - HGX H100 8-GPU]
+                Decode[Decode GPUs: Qwen Auto-Regressive Generation]
+                NVLink1((NVLink All-to-All))
+                Decode <--> NVLink1
+            end
+            
+            Node0 <-->|RDMA / InfiniBand: Cross-Node KV Transfer| Node1
+        end
+
+        subgraph KVCache [KV Cache Hierarchy]
+            L1[L1: GPU HBM - Hot]
+            L2[L2: Host DRAM + NVMe - Warm]
+            L3[L3: Shared/Distributed Storage - Cold]
+            L1 <--> L2 <--> L3
+        end
+        
+        KVRouter -->|Assigns requests based on prefix affinity| Node0
+        Node0 --> KVCache
+        Node1 --> KVCache
+    end
+
     subgraph ManagedSystems [Managed Systems & APIs]
         Server[Internal Servers]
         WebApp[Web Applications]
@@ -168,6 +205,11 @@ flowchart TD
     CR_DRC <-->|Port 389| LDAP
     CR_DRC <-->|Port 587| SMTP
 
+    %% Amadeus to Netra LLM Connection
+    CR_DC <-->|HTTPS REST: Invokes Qwen Model| NetraAPI
+    CR_DRC <-->|HTTPS REST: Invokes Qwen Model| NetraAPI
+
+    %% Agents to Internal Tools
     Runner_DC --> ManagedSystems
     Creator_DC --> ManagedSystems
     Runner_DRC --> ManagedSystems
