@@ -1,5 +1,5 @@
 # Amadeus Platform: 4D Lifecycle
-
+<img width="1920" height="1080" alt="Image" src="https://github.com/user-attachments/assets/fd2c7f01-3263-4161-9876-cbfee01d21e9" />
 Amadeus is an orchestration platform designed to seamlessly integrate intelligent Agentic capabilities with deterministic tools and external APIs. This document outlines the project's journey through the 4D Lifecycle: Discover, Design, Develop, and Deploy.
 
 ---
