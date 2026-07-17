@@ -132,24 +132,26 @@ export default function Home() {
           </p>
 
           <div className="flex flex-col md:flex-row items-stretch md:items-center justify-center gap-4 mb-12 w-full max-w-[280px] md:max-w-none">
-            <Link href="/playground" className="inline-flex justify-center items-center gap-2 bg-fuchsia-600/90 text-white px-8 py-4 text-[15px] font-medium rounded-full hover:bg-fuchsia-500 transition-colors shadow-[0_0_24px_rgba(217,70,239,0.3)] w-full md:w-auto ring-1 ring-fuchsia-500/50">
-              Experience Agent Playground <ArrowRight className="w-4 h-4" />
-            </Link>
+            <div className="relative group w-full md:w-auto p-[2px] rounded-full overflow-hidden pastel-rainbow-border animate-border-spin shadow-[0_0_24px_rgba(217,70,239,0.15)]">
+              <Link href="/playground" className="flex justify-center items-center gap-2 bg-white/40 dark:bg-slate-950/60 backdrop-blur-xl text-slate-900 dark:text-white px-8 py-4 text-[15px] font-medium rounded-full hover:bg-white/60 dark:hover:bg-slate-900/80 transition-colors w-full h-full relative z-10">
+                Experience Agent Flow Playground <ArrowRight className="w-4 h-4" />
+              </Link>
+            </div>
             <Link href="#demo" className="inline-flex justify-center items-center gap-2 border border-slate-700/50 text-slate-200 px-8 py-4 text-[15px] font-medium rounded-full hover:bg-slate-800/50 transition-colors bg-slate-900/40 backdrop-blur shadow-sm w-full md:w-auto">
               Watch Demo
             </Link>
           </div>
 
-          {/* Playground / Danantara Mockup */}
+          {/* Agent Flow Playground / Danantara Mockup */}
           <div className="w-full max-w-6xl relative group mx-auto mt-4">
             {/* Glossy overlay reflection */}
             <div className="absolute inset-0 bg-gradient-to-br from-white/30 to-transparent rounded-[1.5rem] pointer-events-none z-20" />
-            
+
             <div className="bg-[#FAFAFA] border border-slate-200 rounded-[1.5rem] overflow-hidden shadow-2xl shadow-slate-900/10 flex flex-col md:flex-row relative z-10 transition-transform duration-500 group-hover:-translate-y-2 min-h-[500px] md:min-h-0 md:h-[600px] text-left">
-              
+
               {/* Left Column: Chat Console */}
               <div className="flex-1 flex flex-col border-r border-slate-200 bg-white relative">
-                
+
                 {/* Console Header */}
                 <div className="border-b border-slate-200 bg-white flex flex-col w-full shrink-0 min-w-0">
                   <div className="h-10 flex items-center justify-between px-4 md:px-6 border-b border-slate-100 bg-slate-50/80">
@@ -166,7 +168,7 @@ export default function Home() {
                       <span className="ui-label text-slate-500 text-[10px]">UPLINK: STABLE</span>
                     </div>
                   </div>
-                  
+
                   {/* Controls Row */}
                   <div className="px-4 md:px-6 py-2.5 flex items-center gap-4 md:gap-6 overflow-x-auto scrollbar-hide w-full max-w-full">
                     <div className="flex items-center gap-3 shrink-0">
@@ -247,7 +249,7 @@ export default function Home() {
                 <div className="h-10 flex items-center px-6 border-b border-slate-200 bg-slate-100/50">
                   <span className="ui-label text-slate-500 text-[10px]">Agent Context / Live Graph</span>
                 </div>
-                
+
                 <div className="flex-1 p-6 flex flex-col gap-6">
                   {/* Visual Node Graph */}
                   <div className="bg-white rounded-xl border border-slate-200 p-5 shadow-sm">
@@ -307,25 +309,35 @@ export default function Home() {
       {/* Section 1.5: The Philosophy */}
       <section className="bg-transparent py-24 scroll-reveal relative z-10">
         <div className="max-w-[1200px] mx-auto px-6 lg:px-12 space-y-16">
-          
+
           {/* Row 1: The Thesis (Asymmetric 65/35) */}
           <div className="flex flex-col lg:flex-row gap-12 lg:gap-24 items-center">
             <div className="w-full lg:w-[65%]">
-              <p className="ui-label text-cyan-500 mb-6">The Philosophy</p>
+              <p className="ui-label text-cyan-500 mb-6">Our Mission</p>
               <div className="relative pl-8 before:absolute before:inset-y-0 before:left-0 before:w-[2px] before:bg-gradient-to-b before:from-cyan-400 before:via-fuchsia-500 before:to-yellow-400">
                 <h3 className="text-[clamp(1.5rem,3vw,2.2rem)] font-semibold text-foreground leading-snug tracking-tight">
-                  AI doesn't fix a disorganized company—it turns your disorganization into a system. We built Amadeus to bridge the critical gap between humans, intelligent agents, and rigid robots.
+                  AI doesn't fix a disorganized company, it transforms your disorganization into a system. We built Amadeus to bridge the critical gap between humans, intelligent agents, and rigid robots.
                 </h3>
               </div>
             </div>
-            
-            {/* Abstract SVG Composition (35%) */}
-            <div className="w-full lg:w-[35%] flex justify-center relative">
-              <div className="relative w-64 h-64">
-                <div className="absolute inset-0 border border-fuchsia-500/20 rounded-full animate-spin-slow opacity-50" style={{ animationDuration: '20s' }} />
-                <div className="absolute inset-4 border border-cyan-400/30 rounded-full animate-reverse-spin opacity-50" style={{ animationDuration: '25s' }} />
-                <div className="absolute inset-8 border border-yellow-400/20 rounded-full animate-spin-slow opacity-50" style={{ animationDuration: '15s' }} />
-                <div className="absolute inset-0 bg-gradient-to-tr from-cyan-500/5 via-fuchsia-500/10 to-yellow-500/5 rounded-full blur-2xl" />
+
+            {/* Amadeus Logo Composition (35%) */}
+            <div className="w-full lg:w-[35%] flex justify-center items-center relative min-h-[300px]">
+              <div className="relative w-48 h-48 md:w-56 md:h-56">
+                {/* Background Glow */}
+                <div className="absolute inset-0 bg-gradient-to-tr from-cyan-500/20 via-fuchsia-500/20 to-yellow-500/20 rounded-full blur-3xl animate-pulse" style={{ animationDuration: '4s' }} />
+                
+                {/* The Logo */}
+                {/* eslint-disable-next-line @next/next/no-img-element */}
+                <img 
+                  src="/amadeus.svg" 
+                  alt="Amadeus Enterprise" 
+                  className="relative z-10 w-full h-full object-contain drop-shadow-[0_0_15px_rgba(217,70,239,0.3)] float-soft"
+                />
+                
+                {/* Decorative Rings */}
+                <div className="absolute -inset-4 border border-fuchsia-500/20 dark:border-fuchsia-500/10 rounded-full animate-spin-slow pointer-events-none" style={{ animationDuration: '20s' }} />
+                <div className="absolute -inset-8 border border-cyan-400/20 dark:border-cyan-400/10 rounded-full animate-reverse-spin pointer-events-none" style={{ animationDuration: '25s' }} />
               </div>
             </div>
           </div>
@@ -333,31 +345,37 @@ export default function Home() {
           {/* Row 2: The Three Actors */}
           <div className="w-full bg-white dark:bg-[#1E1B4B] rounded-3xl border border-slate-200 dark:border-slate-800/50 shadow-2xl overflow-hidden relative">
             <div className="absolute top-0 right-0 w-64 h-64 bg-fuchsia-500/5 rounded-full blur-3xl pointer-events-none" />
-            
+
             <div className="flex flex-col">
               {[
                 {
                   icon: FiUser,
                   title: "Humans",
                   desc: "Want automation. Demand compliance.",
+                  iconClass: "text-pink-500",
+                  gradientClass: "from-pink-500/0 via-pink-500/10",
                 },
                 {
                   icon: FiCpu,
                   title: "AI Agents",
                   desc: "Connect via MCP. High automation — compliance trade-off.",
+                  iconClass: "text-yellow-500",
+                  gradientClass: "from-yellow-500/0 via-yellow-500/10",
                 },
                 {
                   icon: FiTool,
                   title: "Robots (RPA)",
                   desc: "Operate via UI. High compliance — flexibility trade-off.",
+                  iconClass: "text-cyan-500",
+                  gradientClass: "from-cyan-500/0 via-cyan-500/10",
                 }
               ].map((item, idx) => (
-                <div key={item.title} className={`p-8 md:p-10 flex flex-col md:flex-row md:items-center gap-6 relative group ${idx !== 2 ? 'border-b border-b-slate-100 dark:border-b-[rgba(217,70,239,0.15)]' : ''}`}>
+                <div key={item.title} className={`p-8 md:p-10 flex flex-col md:flex-row md:items-center gap-6 relative group ${idx !== 2 ? 'border-b border-b-slate-100 dark:border-b-slate-800/50' : ''}`}>
                   {/* Subtle hover gradient */}
-                  <div className="absolute inset-0 bg-gradient-to-r from-fuchsia-500/0 via-fuchsia-500/5 to-transparent opacity-0 group-hover:opacity-100 transition-opacity duration-500 pointer-events-none" />
-                  
+                  <div className={`absolute inset-0 bg-gradient-to-r ${item.gradientClass} to-transparent opacity-0 group-hover:opacity-100 transition-opacity duration-500 pointer-events-none`} />
+
                   <div className="flex items-center gap-6 md:w-1/3 flex-shrink-0 relative z-10">
-                    <item.icon className="w-6 h-6 text-[#d946ef]" />
+                    <item.icon className={`w-6 h-6 ${item.iconClass}`} />
                     <h4 className="text-xl font-bold text-foreground tracking-tight">{item.title}</h4>
                   </div>
                   <div className="md:w-2/3 relative z-10">
@@ -394,13 +412,13 @@ export default function Home() {
               </p>
             </div>
 
-            <div className="bg-slate-900/50 backdrop-blur border border-slate-800 shadow-[0_4px_20px_rgba(0,0,0,0.3)] rounded-2xl px-5 py-3 flex flex-col sm:flex-row items-center gap-4">
-              <span className="text-[10px] font-medium text-slate-400 text-center sm:text-left">We Support<br />A2A Communication</span>
-              <div className="hidden sm:block w-px h-8 bg-slate-800" />
+            <div className="bg-white/50 dark:bg-slate-900/50 backdrop-blur border border-slate-200 dark:border-slate-800 shadow-sm dark:shadow-[0_4px_20px_rgba(0,0,0,0.3)] rounded-2xl px-5 py-3 flex flex-col sm:flex-row items-center gap-4">
+              <span className="text-[10px] font-medium text-slate-600 dark:text-slate-400 text-center sm:text-left">We Support<br />A2A Communication</span>
+              <div className="hidden sm:block w-px h-8 bg-slate-300 dark:bg-slate-800" />
               <div className="flex flex-wrap justify-center items-center gap-4 md:gap-6">
-                <img src="/1uipath.png" alt="UiPath" className="h-6 md:h-7 w-auto object-contain grayscale hover:grayscale-0 transition-all duration-300 opacity-80 hover:opacity-100 cursor-pointer" title="UiPath" />
-                <img src="/2powerautomate.png" alt="Power Automate" className="h-6 md:h-7 w-auto object-contain grayscale hover:grayscale-0 transition-all duration-300 opacity-80 hover:opacity-100 cursor-pointer" title="Microsoft Power Automate" />
-                <img src="/3automationanyywhere.png" alt="Automation Anywhere" className="h-6 md:h-7 w-auto object-contain grayscale hover:grayscale-0 transition-all duration-300 opacity-80 hover:opacity-100 cursor-pointer" title="Automation Anywhere" />
+                <img src="/1uipath.png" alt="UiPath" className="h-6 md:h-7 w-auto object-contain transition-all duration-300 opacity-80 hover:opacity-100 cursor-pointer" title="UiPath" />
+                <img src="/2powerautomate.png" alt="Power Automate" className="h-6 md:h-7 w-auto object-contain transition-all duration-300 opacity-80 hover:opacity-100 cursor-pointer" title="Microsoft Power Automate" />
+                <img src="/3automationanyywhere.png" alt="Automation Anywhere" className="h-6 md:h-7 w-auto object-contain transition-all duration-300 opacity-80 hover:opacity-100 cursor-pointer" title="Automation Anywhere" />
               </div>
             </div>
           </div>
@@ -433,21 +451,21 @@ export default function Home() {
       {/* Section 4 & 5: FAQ and Security */}
       <section className="bg-transparent py-24 relative overflow-hidden z-10">
         <div className="max-w-[1400px] mx-auto px-6 lg:px-12 relative">
-          
+
           {/* Unified Container */}
           <div className="relative bg-white dark:bg-[#0B0A1F] border border-slate-200 dark:border-[rgba(139,92,246,0.15)] rounded-[2.5rem] p-10 lg:p-16 shadow-2xl overflow-hidden">
             {/* Top-Right subtle Aurora mesh glow */}
             <div className="absolute top-0 right-0 w-[500px] h-[500px] bg-gradient-to-bl from-fuchsia-500/10 via-cyan-500/5 to-transparent rounded-full blur-3xl -mt-48 -mr-48 pointer-events-none" />
-            
+
             <div className="grid grid-cols-1 lg:grid-cols-2 gap-16 xl:gap-24 relative z-10">
-              
+
               {/* Left Column: FAQ */}
               <div className="space-y-10">
                 <div className="space-y-4">
                   <p className="ui-label text-cyan-500">Questions? We got answers</p>
                   <h3 className="section-head text-3xl md:text-4xl text-foreground">FAQ</h3>
                 </div>
-                
+
                 <div className="space-y-2">
                   {FAQ_DATA.map((faq, index) => {
                     const isOpen = openFaq === index;
@@ -462,7 +480,7 @@ export default function Home() {
                           </span>
                           <ChevronDown className={`w-5 h-5 text-fuchsia-500 transition-transform duration-300 flex-shrink-0 ${isOpen ? 'rotate-180' : ''}`} />
                         </button>
-                        <div 
+                        <div
                           className={`overflow-hidden transition-all duration-300 ease-in-out relative ${isOpen ? 'max-h-96 opacity-100 mb-6' : 'max-h-0 opacity-0'}`}
                         >
                           <div className="absolute left-0 top-0 bottom-0 w-[2px] bg-gradient-to-b from-cyan-400 via-fuchsia-500 to-yellow-400" />
@@ -536,7 +554,7 @@ export default function Home() {
           </div>
 
           <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6">
-            
+
             {/* Presentation Layer */}
             <div className="group relative bg-white dark:bg-[#0B0A1F] border border-slate-200 dark:border-slate-800 rounded-3xl p-8 hover:border-cyan-500/50 transition-colors overflow-hidden">
               <div className="absolute top-0 right-0 w-32 h-32 bg-cyan-500/10 rounded-full blur-2xl -mt-16 -mr-16 pointer-events-none group-hover:bg-cyan-500/20 transition-colors" />
@@ -547,7 +565,7 @@ export default function Home() {
                 <h3 className="text-xl font-bold text-slate-800 dark:text-slate-200">1. Canvas</h3>
                 <p className="text-[14px] text-cyan-600 dark:text-cyan-500 font-mono tracking-wide">Presentation Layer</p>
                 <p className="text-sm text-slate-600 dark:text-slate-400 leading-relaxed pt-2">
-                  The interactive interface where users configure agents and test them. Features the Agent Creator UI and Interactive Playground.
+                  The interactive interface where users configure agents and test them. Features the Agent Architect UI and Agent Flow Playground.
                 </p>
                 <div className="pt-4 flex flex-wrap gap-2">
                   <span className="px-2.5 py-1 rounded-md bg-slate-100 dark:bg-slate-800/50 text-xs font-mono text-slate-600 dark:text-slate-300 border border-slate-200 dark:border-slate-700/50">React / Next.js</span>

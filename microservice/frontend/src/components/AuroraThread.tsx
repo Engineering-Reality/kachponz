@@ -52,9 +52,6 @@ function AuroraMesh({ size, className }: { size: "sm" | "lg"; className: string 
 function AuroraDivider({ className, position }: { className: string; position: "relative" | "absolute" }) {
   const ref = useRef<SVGPathElement>(null);
   const [drawn, setDrawn] = useState(false);
-  const particles = useRef(
-    Array.from({ length: 5 }).map((_, i) => ({ id: i, delay: i * 3.2 }))
-  ).current;
 
   useEffect(() => {
     const el = ref.current;
@@ -92,17 +89,6 @@ function AuroraDivider({ className, position }: { className: string; position: "
           }}
         />
       </svg>
-      {particles.map((p) => (
-        <span
-          key={p.id}
-          className="aurora-particle absolute top-1/2 -translate-y-1/2 w-[3px] h-[3px] rounded-full bg-white shadow-[0_0_6px_2px_rgba(217,70,239,0.6)]"
-          style={{
-            offsetPath: "path('M0,1 L1000,1')",
-            animation: `aurora-particle-drift ${14 + p.id * 2}s linear infinite`,
-            animationDelay: `${p.delay}s`,
-          }}
-        />
-      ))}
     </div>
   );
 }

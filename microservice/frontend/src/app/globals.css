@@ -156,6 +156,14 @@ body {
 }
 
 .vibrant-rainbow-border {
+  position: relative;
+}
+.vibrant-rainbow-border::before {
+  content: "";
+  position: absolute;
+  inset: 0;
+  border-radius: inherit;
+  padding: 2px;
   background: linear-gradient(
     90deg,
     #22d3ee,
@@ -167,9 +175,39 @@ body {
     #22d3ee
   );
   background-size: 200% 200%;
+  -webkit-mask: linear-gradient(#fff 0 0) content-box, linear-gradient(#fff 0 0);
+  -webkit-mask-composite: xor;
+  mask-composite: exclude;
+  pointer-events: none;
 }
 
-.animate-border-spin {
+.pastel-rainbow-border {
+  position: relative;
+}
+.pastel-rainbow-border::before {
+  content: "";
+  position: absolute;
+  inset: 0;
+  border-radius: inherit;
+  padding: 2px;
+  background: linear-gradient(
+    90deg,
+    #bae6fd,
+    #a7f3d0,
+    #fef08a,
+    #fed7aa,
+    #fbcfe8,
+    #bae6fd
+  );
+  background-size: 200% 200%;
+  -webkit-mask: linear-gradient(#fff 0 0) content-box, linear-gradient(#fff 0 0);
+  -webkit-mask-composite: xor;
+  mask-composite: exclude;
+  pointer-events: none;
+}
+
+.animate-border-spin,
+.animate-border-spin::before {
   animation: border-spin 4s linear infinite;
 }
 
@@ -596,4 +634,31 @@ body {
 }
 .fade-up.reveal-active {
   transform: translateY(0);
+}
+
+/* === TESSERACT LOGO ANIMATIONS === */
+.perspective-1000 {
+  perspective: 1000px;
+}
+
+.preserve-3d {
+  transform-style: preserve-3d;
+}
+
+@keyframes tesseract-spin {
+  0% { transform: rotateX(0deg) rotateY(0deg) rotateZ(0deg); }
+  100% { transform: rotateX(360deg) rotateY(720deg) rotateZ(360deg); }
+}
+
+.animate-tesseract-spin {
+  animation: tesseract-spin 20s linear infinite;
+}
+
+@keyframes nucleus-spin {
+  0% { transform: rotateX(0deg) rotateY(0deg); }
+  100% { transform: rotateX(-720deg) rotateY(-360deg); }
+}
+
+.animate-nucleus-spin {
+  animation: nucleus-spin 15s linear infinite;
 }

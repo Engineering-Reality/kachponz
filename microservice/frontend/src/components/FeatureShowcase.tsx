@@ -7,8 +7,8 @@ import { ArrowRight, Bot, Wrench, Wand2, Zap } from "lucide-react";
 const FEATURES = [
   {
     id: "agent-creator",
-    title: "1. Agent Creator",
-    navLabel: "Agent Creator",
+    title: "Agent Architect",
+    navLabel: "Agent Architect",
     description: "Visually construct powerful AI agents with our intuitive natural language builder. Assemble tools, assign personas, and test in real-time.",
     bullets: [
       "Attach any MCP-compatible tool — UiPath, Power Automate, custom APIs",
@@ -21,8 +21,8 @@ const FEATURES = [
   },
   {
     id: "tools",
-    title: "2. Tools Registry",
-    navLabel: "Tools",
+    title: "Tools Registry",
+    navLabel: "Tools Registry",
     description: "A centralized hub to register capabilities. Connect internal APIs, external services, or legacy RPA bots securely via the Model Context Protocol (MCP).",
     bullets: [
       "Unified MCP tool integration across disparate platforms",
@@ -35,8 +35,8 @@ const FEATURES = [
   },
   {
     id: "playground",
-    title: "3. Agent Playground",
-    navLabel: "Playground",
+    title: "Agent Flow Playground",
+    navLabel: "Agent Flow Playground",
     description: "Stream real-time agent reasoning over selected transactions. Watch MCP tool calls, state transitions, and telemetry flow through a secure control panel.",
     bullets: [
       "Live reasoning streaming via Server-Sent Events (SSE)",
@@ -49,8 +49,8 @@ const FEATURES = [
   },
   {
     id: "agents",
-    title: "4. Agents Roster",
-    navLabel: "Agents",
+    title: "Agent Gallery",
+    navLabel: "Agent Gallery",
     description: "Manage your workforce of intelligent agents. Monitor their performance, assign tasks, and track their interaction with legacy RPA systems.",
     bullets: [
       "Centralized agent lifecycle and version management",
@@ -136,7 +136,14 @@ export function FeatureShowcase() {
               >
                 {/* Text Description */}
                 <div className="flex-1 space-y-6 w-full">
-                  <h3 className="text-3xl md:text-4xl font-semibold text-foreground tracking-tight">{feature.title}</h3>
+                  <div className="flex items-center gap-5">
+                    <div className="relative p-[2px] rounded-2xl overflow-hidden pastel-rainbow-border animate-border-spin shadow-[0_0_24px_rgba(217,70,239,0.25)] dark:shadow-[0_0_24px_rgba(217,70,239,0.4)] flex-shrink-0">
+                      <div className="relative z-10 bg-white/80 dark:bg-slate-900/80 backdrop-blur-xl p-3 rounded-[14px] flex items-center justify-center">
+                        <feature.icon className="w-8 h-8 text-slate-800 dark:text-white" />
+                      </div>
+                    </div>
+                    <h3 className="text-3xl md:text-4xl font-semibold text-foreground tracking-tight">{feature.title}</h3>
+                  </div>
                   <p className="text-lg text-slate-600 dark:text-slate-400 leading-relaxed max-w-xl">
                     {feature.description}
                   </p>
@@ -153,10 +160,12 @@ export function FeatureShowcase() {
                     ))}
                   </ul>
                   <div className="pt-6">
-                    <Link href={feature.href} className={`inline-flex items-center gap-2 px-7 py-3.5 rounded-full text-[15px] font-semibold transition-transform hover:-translate-y-1 bg-fuchsia-600/10 text-fuchsia-400 border border-fuchsia-600/20 hover:bg-fuchsia-600/20 shadow-[0_0_20px_rgba(217,70,239,0.15)]`}>
-                      Explore {feature.navLabel} 
-                      <ArrowRight className="w-4 h-4" />
-                    </Link>
+                    <div className="inline-block relative group p-[2px] rounded-full overflow-hidden pastel-rainbow-border animate-border-spin shadow-sm">
+                      <Link href={feature.href} className="flex justify-center items-center gap-2 bg-white/60 dark:bg-slate-900/60 backdrop-blur-md text-slate-900 dark:text-white px-7 py-3.5 text-[15px] font-semibold rounded-full hover:bg-white/80 dark:hover:bg-slate-900/80 transition-colors relative z-10">
+                        Explore {feature.navLabel} 
+                        <ArrowRight className="w-4 h-4" />
+                      </Link>
+                    </div>
                   </div>
                 </div>
 

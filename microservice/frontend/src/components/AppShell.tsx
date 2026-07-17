@@ -22,10 +22,10 @@ const NAV_SECTIONS = [
     label: "Platform",
     items: [
       { href: "/dashboard", label: "Dashboard", icon: LayoutDashboard },
-      { href: "/agents", label: "Agents", icon: Bot },
-      { href: "/tools", label: "Tools", icon: Wrench },
-      { href: "/agent-creator", label: "Creator", icon: Wand2 },
-      { href: "/playground", label: "Playground", icon: Zap },
+      { href: "/agents", label: "Agent Gallery", icon: Bot },
+      { href: "/tools", label: "Tools Registry", icon: Wrench },
+      { href: "/agent-creator", label: "Agent Architect", icon: Wand2 },
+      { href: "/playground", label: "Agent Flow Playground", icon: Zap },
     ],
   },
   {

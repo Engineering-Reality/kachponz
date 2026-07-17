@@ -39,7 +39,7 @@ export function MarketingFooter() {
                     <Link href={href} className="text-[13px] text-slate-600 hover:text-slate-900 transition-colors">{label}</Link>
                   </li>
                 ))}
-                <li><Link href="/playground" className="text-[13px] text-slate-600 hover:text-slate-900 transition-colors">Playground</Link></li>
+                <li><Link href="/playground" className="text-[13px] text-slate-600 hover:text-slate-900 transition-colors">Agent Flow Playground</Link></li>
               </ul>
             </div>
 

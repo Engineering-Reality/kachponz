@@ -25,7 +25,7 @@ export const PLATFORM_APPS: PlatformApp[] = [
   {
     href: "/tools",
     step: "Step 02",
-    label: "MCP Tool Registry",
+    label: "Tools Registry",
     desc: "Register and connect external tools (UiPath, APIs) for agents to use.",
     icon: Wrench,
     accent: "text-orange-600",
@@ -34,7 +34,7 @@ export const PLATFORM_APPS: PlatformApp[] = [
   {
     href: "/agent-creator",
     step: "Step 03",
-    label: "Agent Creator",
+    label: "Agent Architect",
     desc: "Design new AI agents easily using natural language descriptions.",
     icon: Wand2,
     accent: "text-pink-600",
@@ -43,7 +43,7 @@ export const PLATFORM_APPS: PlatformApp[] = [
   {
     href: "/agents",
     step: "Step 04",
-    label: "Agent Matrix",
+    label: "Agent Gallery",
     desc: "Manage your agent registry, assign personas, and attach MCP tools.",
     icon: Bot,
     accent: "text-violet-600",
@@ -61,7 +61,7 @@ export const PLATFORM_APPS: PlatformApp[] = [
   {
     href: "/playground",
     step: "Step 05",
-    label: "Playground",
+    label: "Agent Flow Playground",
     desc: "Stream real-time agent reasoning over a selected transaction.",
     icon: Zap,
     accent: "text-cyan-600",

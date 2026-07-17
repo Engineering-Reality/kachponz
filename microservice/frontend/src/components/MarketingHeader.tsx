@@ -64,7 +64,7 @@ export function MarketingHeader() {
             <div className="w-px h-5 bg-slate-300 dark:bg-slate-700 hidden xl:block" />
             <div className="flex items-center gap-3">
               <ThemeToggle />
-              <Link href="/login" className="inline-flex items-center gap-1.5 bg-slate-900 dark:bg-white text-white dark:text-slate-900 text-[13px] font-medium py-2 px-5 rounded-full hover:bg-slate-800 dark:hover:bg-slate-100 transition-colors shadow-lg shadow-slate-900/10 active:scale-[0.98]">
+              <Link href="/login" className="inline-flex items-center gap-1.5 bg-[#1E1B4B] dark:bg-white text-white dark:text-[#1E1B4B] text-[13px] font-medium py-2 px-5 rounded-full hover:bg-[#2D286B] dark:hover:bg-slate-100 transition-colors shadow-lg shadow-[#1E1B4B]/20 active:scale-[0.98]">
                 Sign in <ArrowRight className="w-3.5 h-3.5" />
               </Link>
             </div>

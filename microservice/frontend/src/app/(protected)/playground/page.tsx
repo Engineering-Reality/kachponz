@@ -842,16 +842,8 @@ function PlaygroundInner() {
                 >
                   <Menu className="w-4 h-4" />
                 </button>
-                <span className="terminal-dot bg-red-400" />
-                <span className="terminal-dot bg-amber-400" />
-                <span className="terminal-dot bg-emerald-400" />
-                <span className="ui-label text-slate-500 ml-2">Amadeus Console</span>
               </div>
               <div className="flex items-center gap-4">
-                <div className="flex items-center gap-2">
-                  <div className="w-2 h-2 rounded-full bg-emerald-500 animate-pulse"></div>
-                  <span className="ui-label text-slate-500">{status}</span>
-                </div>
                 {selectedAgentObj && (
                   <span className="ui-label text-slate-500 truncate max-w-[150px]">{selectedAgentObj.agent_name}</span>
                 )}
