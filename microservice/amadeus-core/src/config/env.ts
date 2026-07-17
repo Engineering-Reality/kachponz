@@ -133,6 +133,19 @@ const EnvSchema = z.object({
   MCP_HOST: z.string().optional(),
   MCP_START_PORT: z.coerce.number().int().positive().optional(),
   MCP_END_PORT: z.coerce.number().int().positive().optional(),
+
+  // ─── AML/CFT alert outbox email worker (apu.md Task 5) ──────────────
+  // scripts/mcpAutoManager.ts's pollAlertOutbox() reads alert_outbox and
+  // emails these addresses depending on verdict. All optional — if SMTP_HOST
+  // is unset the poller logs a warning and leaves rows pending instead of
+  // crashing the daemon (same posture as UIPATH_* being optional).
+  SMTP_HOST: z.string().optional(),
+  SMTP_PORT: z.coerce.number().int().positive().default(587),
+  SMTP_USER: z.string().optional(),
+  SMTP_PASS: z.string().optional(),
+  SMTP_FROM: z.string().default('aml-alerts@amadeus.local'),
+  COMPLIANCE_ALERT_EMAIL: z.string().optional(),
+  OPS_ALERT_EMAIL: z.string().optional(),
 });
 
 export type Env = z.infer<typeof EnvSchema>;

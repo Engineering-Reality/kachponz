@@ -253,14 +253,14 @@ function PlaygroundInner() {
     const parts = content.split(/(\*\*.*?\*\*|\*.*?\*|`.*?`)/g);
     return parts.map((part, index) => {
       if (part.startsWith('**') && part.endsWith('**')) {
-        return <strong key={index} className="font-semibold text-slate-900">{part.slice(2, -2)}</strong>;
+        return <strong key={index} className="font-semibold text-slate-900 dark:text-white">{part.slice(2, -2)}</strong>;
       }
       if (part.startsWith('*') && part.endsWith('*')) {
-        return <strong key={index} className="font-semibold text-slate-900">{part.slice(1, -1)}</strong>;
+        return <strong key={index} className="font-semibold text-slate-900 dark:text-white">{part.slice(1, -1)}</strong>;
       }
       if (part.startsWith('`') && part.endsWith('`')) {
         return (
-          <code key={index} className="font-mono bg-slate-100 text-rose-600 border border-slate-200 px-1.5 py-0.5 rounded text-xs font-semibold mx-0.5">
+          <code key={index} className="font-mono bg-slate-100 dark:bg-slate-800 text-rose-600 border border-slate-200 dark:border-slate-700 px-1.5 py-0.5 rounded text-xs font-semibold mx-0.5">
             {part.slice(1, -1)}
           </code>
         );
@@ -361,6 +361,23 @@ function PlaygroundInner() {
           console.error("Failed to parse PDF as images", err);
           alert("Failed to read PDF file.");
         }
+      } else if (f.type === 'text/plain' || f.name.toLowerCase().endsWith('.txt')) {
+        // Plain chat attachment — separate from the /knowledge-base ingestion
+        // flow. Read as text and inlined into the prompt (no vision model
+        // involved), unlike image/PDF attachments above.
+        try {
+          const text = await f.text();
+          setAttachments(prev => [...prev, {
+            file: f,
+            preview: null,
+            name: f.name,
+            type: 'text',
+            extractedText: text,
+          }]);
+        } catch (err) {
+          console.error("Failed to read text file", err);
+          alert("Failed to read text file.");
+        }
       } else {
         alert("Unsupported file type: " + f.name);
       }
@@ -402,13 +419,20 @@ function PlaygroundInner() {
     // right after this turn's assistant response completes (Part D).
     const wasFirstTurn = messages.length === 0;
     const currentInputDisplay = effectiveInput.trim();
-    const systemInstruction = attachments.length > 0 
+    const imageAttachments = attachments.filter(a => a.type === 'image');
+    const textFileAttachments = attachments.filter(a => a.type === 'text');
+    // Text attachments aren't images — no vision model needed, so they're
+    // inlined into the prompt text directly instead of triggering the
+    // image-reading system instruction below.
+    const systemInstruction = imageAttachments.length > 0
       ? `\n\n[SYSTEM INSTRUCTION: Baca gambar lampiran secara langsung menggunakan kemampuan vision Anda (JANGAN memanggil fungsi/tools eksternal apapun untuk membaca dokumen ini). Jika terdapat data tabel, form, atau kolom pada dokumen, tulis ulang data tersebut HANYA berupa JSON Array of Objects di dalam blok \`\`\`json (tanpa teks lain). SANGAT PENTING: Anda TIDAK BOLEH mengubah format penulisan header/kolom (jangan menghilangkan spasi, jangan mengubah huruf besar/kecil). Jika di dokumen tertulis "First Name", tulis key sebagai "First Name" BUKAN "FirstName". Ekstrak apa adanya sesuai yang tertera secara visual. Jangan memanggil fungsi apapun. Contoh: \`\`\`json\n[{"First Name": "A", "Company Name": "B"}]\n\`\`\`]`
       : ``;
-    const promptToSend = currentInputDisplay + systemInstruction;
-    
+    const textFilesBlock = textFileAttachments.length > 0
+      ? '\n\n' + textFileAttachments.map(a => `[Attached file: ${a.name}]\n${a.extractedText ?? ''}`).join('\n\n')
+      : ``;
+    const promptToSend = currentInputDisplay + textFilesBlock + systemInstruction;
+
     let apiContent: any;
-    const imageAttachments = attachments.filter(a => a.type === 'image');
     if (imageAttachments.length > 0) {
       apiContent = [
         { type: 'text', text: promptToSend },
@@ -781,12 +805,12 @@ function PlaygroundInner() {
   };
 
   return (
-    <div className="flex h-full text-slate-900 overflow-hidden bg-[#FAFAFA]">
+    <div className="flex h-full text-slate-900 dark:text-white overflow-hidden bg-[#FAFAFA] dark:bg-[var(--background)]">
 
       {/* Sessions Sidebar (Far Left) */}
-      <aside className={`bg-slate-50 border-r border-slate-200 flex flex-col shrink-0 z-10 transition-all duration-300 ${isSidebarOpen ? 'w-64' : 'w-0 overflow-hidden border-r-0'}`}>
-        <div className="p-4 border-b border-slate-200 whitespace-nowrap">
-          <button onClick={startNewSession} className="w-full flex items-center justify-center gap-2 bg-white border border-slate-200 shadow-sm text-slate-700 py-2.5 rounded-xl text-sm font-medium hover:bg-slate-50 transition-colors">
+      <aside className={`bg-slate-50 dark:bg-slate-800/50 border-r border-slate-200 dark:border-slate-700 flex flex-col shrink-0 z-10 transition-all duration-300 ${isSidebarOpen ? 'w-64' : 'w-0 overflow-hidden border-r-0'}`}>
+        <div className="p-4 border-b border-slate-200 dark:border-slate-700 whitespace-nowrap">
+          <button onClick={startNewSession} className="w-full flex items-center justify-center gap-2 bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-700 shadow-sm text-slate-700 dark:text-slate-300 py-2.5 rounded-xl text-sm font-medium hover:bg-slate-50 dark:bg-slate-800/50 transition-colors">
             <MessageSquarePlus className="w-4 h-4" />
             New Chat
           </button>
@@ -796,14 +820,14 @@ function PlaygroundInner() {
             if (groupSessions.length === 0) return null;
             return (
               <div key={groupName} className="space-y-1">
-                <div className="px-3 py-1 text-[11px] font-semibold text-slate-400">
+                <div className="px-3 py-1 text-[11px] font-semibold text-slate-400 dark:text-slate-500">
                   {groupName}
                 </div>
                 {groupSessions.map(session => (
                   <div key={session.id} className="relative group px-1">
                     <button
                       onClick={() => switchSession(session.id)}
-                      className={`w-full text-left px-3 py-2 rounded-xl text-[13px] transition-colors flex items-center gap-2 pr-8 ${currentSessionId === session.id ? 'bg-slate-200/50 text-slate-900 font-medium' : 'text-slate-600 hover:bg-slate-200/30'}`}
+                      className={`w-full text-left px-3 py-2 rounded-xl text-[13px] transition-colors flex items-center gap-2 pr-8 ${currentSessionId === session.id ? 'bg-slate-200 dark:bg-slate-700/50 text-slate-900 dark:text-white font-medium' : 'text-slate-600 dark:text-slate-400 hover:bg-slate-200 dark:bg-slate-700/30'}`}
                     >
                       <div className="flex-1 min-w-0 truncate" title={session.title}>
                         {session.title}
@@ -811,7 +835,7 @@ function PlaygroundInner() {
                     </button>
                     <button
                       onClick={(e) => { e.stopPropagation(); deleteSession(session.id); }}
-                      className={`absolute right-3 top-1/2 -translate-y-1/2 p-1.5 text-slate-400 hover:text-red-500 rounded-lg transition-opacity ${currentSessionId === session.id ? 'opacity-100' : 'opacity-0 group-hover:opacity-100'}`}
+                      className={`absolute right-3 top-1/2 -translate-y-1/2 p-1.5 text-slate-400 dark:text-slate-500 hover:text-red-500 rounded-lg transition-opacity ${currentSessionId === session.id ? 'opacity-100' : 'opacity-0 group-hover:opacity-100'}`}
                       title="Delete Chat"
                     >
                       <Trash2 className="w-3.5 h-3.5" />
@@ -828,16 +852,16 @@ function PlaygroundInner() {
       {/* Main Split */}
       <div className="flex flex-1 overflow-hidden">
         {/* Chat Area — Stream Console */}
-        <main className="flex-1 flex flex-col relative bg-[#FAFAFA] min-w-0">
+        <main className="flex-1 flex flex-col relative bg-[#FAFAFA] dark:bg-[var(--background)] min-w-0">
 
           {/* Chat Header / Amadeus Console Top Bar */}
-          <div className="border-b border-slate-200 bg-white flex flex-col sticky top-0 z-20 w-full shrink-0 shadow-sm">
+          <div className="border-b border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-900 flex flex-col sticky top-0 z-20 w-full shrink-0 shadow-sm">
             {/* Top Row: Title & Basic Info */}
-            <div className="h-10 flex items-center justify-between px-6 border-b border-slate-100 bg-slate-50/80 backdrop-blur">
+            <div className="h-10 flex items-center justify-between px-6 border-b border-slate-100 dark:border-slate-800 bg-slate-50 dark:bg-slate-800/50/80 backdrop-blur">
               <div className="flex items-center gap-3">
                 <button
                   onClick={() => setIsSidebarOpen(!isSidebarOpen)}
-                  className="p-1.5 text-slate-400 hover:text-slate-700 hover:bg-slate-100 transition-colors rounded-lg mr-1"
+                  className="p-1.5 text-slate-400 dark:text-slate-500 hover:text-slate-700 dark:hover:text-slate-300 hover:bg-slate-100 dark:bg-slate-800 transition-colors rounded-lg mr-1"
                   title="Toggle Sidebar"
                 >
                   <Menu className="w-4 h-4" />
@@ -845,9 +869,9 @@ function PlaygroundInner() {
               </div>
               <div className="flex items-center gap-4">
                 {selectedAgentObj && (
-                  <span className="ui-label text-slate-500 truncate max-w-[150px]">{selectedAgentObj.agent_name}</span>
+                  <span className="ui-label text-slate-500 dark:text-slate-400 truncate max-w-[150px]">{selectedAgentObj.agent_name}</span>
                 )}
-                <button onClick={clearChat} className="p-1.5 text-slate-400 hover:text-red-500 transition-colors rounded-lg hover:bg-red-50" title="Clear Chat">
+                <button onClick={clearChat} className="p-1.5 text-slate-400 dark:text-slate-500 hover:text-red-500 transition-colors rounded-lg hover:bg-red-50 dark:bg-red-900/20" title="Clear Chat">
                   <Trash2 className="w-3.5 h-3.5" />
                 </button>
               </div>
@@ -858,7 +882,7 @@ function PlaygroundInner() {
               
               {/* Agent Select */}
               <div className="flex items-center gap-3 shrink-0">
-                <label className="ui-label text-slate-500">Active Node</label>
+                <label className="ui-label text-slate-500 dark:text-slate-400">Active Node</label>
                 <div className="w-48 relative rounded-md p-[1px] overflow-hidden">
                   <div className={`absolute inset-0 vibrant-rainbow-border ${selectedAgent ? 'animate-border-spin opacity-70' : 'opacity-25'}`} />
                   <Select
@@ -875,7 +899,7 @@ function PlaygroundInner() {
                     }}
                     placeholder={agents.length === 0 ? "Loading agents..." : "Select an agent"}
                     options={agents.map((agent) => ({ value: agent.agent_id, label: agent.agent_name }))}
-                    className="relative z-10 !py-1 text-xs bg-white"
+                    className="relative z-10 !py-1 text-xs bg-white dark:bg-slate-900"
                     triggerClassName="rounded-[5px] border-transparent"
                   />
                 </div>
@@ -884,7 +908,7 @@ function PlaygroundInner() {
                     if (selectedAgent) setIsInspectOpen(true);
                     else alert("Select an agent first!");
                   }}
-                  className="p-1.5 text-slate-400 hover:text-indigo-600 transition-colors rounded-md hover:bg-indigo-50"
+                  className="p-1.5 text-slate-400 dark:text-slate-500 hover:text-cyan-600 transition-colors rounded-md hover:bg-cyan-50 dark:bg-cyan-900/30"
                   title="Inspect Node"
                 >
                   <Search className="w-4 h-4" />
@@ -894,19 +918,19 @@ function PlaygroundInner() {
                     if (selectedAgent) setIsShareOpen(true);
                     else alert("Select an agent first!");
                   }}
-                  className="p-1.5 text-slate-400 hover:text-violet-600 transition-colors rounded-md hover:bg-violet-50"
+                  className="p-1.5 text-slate-400 dark:text-slate-500 hover:text-fuchsia-600 transition-colors rounded-md hover:bg-fuchsia-50 dark:bg-fuchsia-900/30"
                   title="Share Agent"
                 >
                   <Share2 className="w-4 h-4" />
                 </button>
               </div>
 
-              <div className="w-px h-5 bg-slate-200 shrink-0" />
+              <div className="w-px h-5 bg-slate-200 dark:bg-slate-700 shrink-0" />
 
               {/* Runtime Mode Select */}
               <div className="flex items-center gap-3 shrink-0">
-                <label className="ui-label text-slate-500">Model</label>
-                <div className="w-44 relative rounded-md p-[1px] overflow-hidden bg-slate-200">
+                <label className="ui-label text-slate-500 dark:text-slate-400">Model</label>
+                <div className="w-44 relative rounded-md p-[1px] overflow-hidden bg-slate-200 dark:bg-slate-700">
                   <Select
                     value={runtimeMode}
                     onChange={(val: any) => setRuntimeMode(val)}
@@ -914,50 +938,50 @@ function PlaygroundInner() {
                       { value: 'cloud', label: 'Qwen DashScope (Cloud)' },
                       { value: 'on_prem', label: 'Netra Qwen (On-Prem)' }
                     ]}
-                    className="relative z-10 !py-1 text-xs bg-white"
+                    className="relative z-10 !py-1 text-xs bg-white dark:bg-slate-900"
                     triggerClassName="rounded-[5px] border-transparent"
                   />
                 </div>
               </div>
 
-              <div className="w-px h-5 bg-slate-200 shrink-0" />
+              <div className="w-px h-5 bg-slate-200 dark:bg-slate-700 shrink-0" />
 
               {/* Loop Mode toggle — always visible for all agents so users
                   can run any agent in a deterministic loop without needing
                   a recipe configured. */}
               <div className="flex items-center gap-2 shrink-0">
-                <label className="ui-label text-slate-500">Loop Mode</label>
+                <label className="ui-label text-slate-500 dark:text-slate-400">Loop Mode</label>
                 <button
                   onClick={() => setLoopMode((v) => !v)}
-                  className={`relative w-10 h-5 rounded-full transition-colors ${loopMode ? 'bg-indigo-600' : 'bg-slate-200'}`}
+                  className={`relative w-10 h-5 rounded-full transition-colors ${loopMode ? 'bg-cyan-600' : 'bg-slate-200 dark:bg-slate-700'}`}
                   title="Toggle Loop Mode — run this agent multiple times in sequence"
                 >
-                  <span className={`absolute top-0.5 left-0.5 w-4 h-4 bg-white rounded-full shadow transition-transform ${loopMode ? 'translate-x-5' : ''}`} />
+                  <span className={`absolute top-0.5 left-0.5 w-4 h-4 bg-white dark:bg-slate-900 rounded-full shadow transition-transform ${loopMode ? 'translate-x-5' : ''}`} />
                 </button>
               </div>
 
-              <div className="w-px h-5 bg-slate-200 shrink-0" />
+              <div className="w-px h-5 bg-slate-200 dark:bg-slate-700 shrink-0" />
 
               {/* Session Settings */}
               <div className="flex items-center gap-3 shrink-0">
-                <label className="ui-label text-slate-500">Ref ID</label>
+                <label className="ui-label text-slate-500 dark:text-slate-400">Ref ID</label>
                 <input
                   type="text"
                   placeholder="Tx UUID"
                   value={transactionId}
                   onChange={(e) => setTransactionId(e.target.value)}
-                  className="w-32 px-3 py-1.5 text-xs font-mono text-slate-700 bg-slate-50 border border-slate-200 rounded-md outline-none focus:border-indigo-400 transition-colors"
+                  className="w-32 px-3 py-1.5 text-xs font-mono text-slate-700 dark:text-slate-300 bg-slate-50 dark:bg-slate-800/50 border border-slate-200 dark:border-slate-700 rounded-md outline-none focus:border-cyan-400 transition-colors"
                 />
               </div>
 
-              <div className="w-px h-5 bg-slate-200 shrink-0" />
+              <div className="w-px h-5 bg-slate-200 dark:bg-slate-700 shrink-0" />
 
               {/* Telemetry */}
               <div className="flex items-center gap-4 shrink-0">
-                <span className="ui-label text-slate-500">Telemetry <span className="text-[8px] text-white vibrant-rainbow-bg px-1 py-[1px] rounded ml-1">LIVE</span></span>
+                <span className="ui-label text-slate-500 dark:text-slate-400">Telemetry <span className="text-[8px] text-white vibrant-rainbow-bg px-1 py-[1px] rounded ml-1">LIVE</span></span>
                 <div className="flex items-center gap-4 text-[11px]">
-                  <span className="text-slate-400">Init: <span key={`a-${agentInit}`} className={`text-slate-800 font-mono ${agentInit ? 'stream-in' : ''}`}>{agentInit ?? '—'}</span></span>
-                  <span className="text-slate-400">Resp: <span key={`r-${responseTime}`} className={`text-slate-800 font-mono ${responseTime ? 'stream-in' : ''}`}>{responseTime ?? '—'}</span></span>
+                  <span className="text-slate-400 dark:text-slate-500">Init: <span key={`a-${agentInit}`} className={`text-slate-800 dark:text-slate-200 font-mono ${agentInit ? 'stream-in' : ''}`}>{agentInit ?? '—'}</span></span>
+                  <span className="text-slate-400 dark:text-slate-500">Resp: <span key={`r-${responseTime}`} className={`text-slate-800 dark:text-slate-200 font-mono ${responseTime ? 'stream-in' : ''}`}>{responseTime ?? '—'}</span></span>
                 </div>
               </div>
             </div>
@@ -969,17 +993,17 @@ function PlaygroundInner() {
             <div className="max-w-3xl mx-auto w-full space-y-4">
 
               {/* Header card */}
-              <div className="bg-white border border-slate-200 rounded-2xl p-5 shadow-sm">
+              <div className="bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-700 rounded-2xl p-5 shadow-sm">
                 <div className="flex items-center justify-between mb-5">
                   <div>
-                    <h3 className="text-sm font-semibold text-slate-800">Loop Mode</h3>
-                    <p className="text-xs text-slate-500 mt-0.5">Ketik instruksimu sekali — agent akan menjalankannya N kali berturut-turut.</p>
+                    <h3 className="text-sm font-semibold text-slate-800 dark:text-slate-200">Loop Mode</h3>
+                    <p className="text-xs text-slate-500 dark:text-slate-400 mt-0.5">Ketik instruksimu sekali — agent akan menjalankannya N kali berturut-turut.</p>
                   </div>
                   <span className={`text-[10px] font-semibold px-2 py-1 rounded-full border ${
                     loopStatus === 'completed' ? 'bg-emerald-50 text-emerald-700 border-emerald-200' :
-                    loopStatus === 'failed' ? 'bg-red-50 text-red-700 border-red-200' :
+                    loopStatus === 'failed' ? 'bg-red-50 dark:bg-red-900/20 text-red-700 border-red-200 dark:border-red-500/30' :
                     loopStatus === 'running' ? 'bg-amber-50 text-amber-700 border-amber-200 animate-pulse' :
-                    'bg-slate-50 text-slate-500 border-slate-200'
+                    'bg-slate-50 dark:bg-slate-800/50 text-slate-500 dark:text-slate-400 border-slate-200 dark:border-slate-700'
                   }`}>
                     {loopStatus === 'running' ? `Running... ${loopResults.length}/${loopIterations}` : loopStatus}
                   </span>
@@ -987,20 +1011,20 @@ function PlaygroundInner() {
 
                 {/* Prompt input */}
                 <div className="mb-4">
-                  <label className="ui-label text-slate-500 mb-1.5 block">Instruksi / Prompt</label>
+                  <label className="ui-label text-slate-500 dark:text-slate-400 mb-1.5 block">Instruksi / Prompt</label>
                   <textarea
                     value={loopPrompt}
                     onChange={(e) => setLoopPrompt(e.target.value)}
                     disabled={loopRunning}
                     placeholder="Contoh: Buka aplikasi CX100, buat transaksi baru dengan nomor antrian berikutnya, lalu tutup."
                     rows={4}
-                    className="w-full px-3 py-2.5 text-sm text-slate-700 bg-slate-50 border border-slate-200 rounded-xl outline-none focus:border-indigo-400 focus:ring-2 focus:ring-indigo-100 transition-all resize-none disabled:opacity-50 placeholder:text-slate-300"
+                    className="w-full px-3 py-2.5 text-sm text-slate-700 dark:text-slate-300 bg-slate-50 dark:bg-slate-800/50 border border-slate-200 dark:border-slate-700 rounded-xl outline-none focus:border-cyan-400 focus:ring-2 focus:ring-cyan-100 transition-all resize-none disabled:opacity-50 placeholder:text-slate-300"
                   />
                 </div>
 
                 {/* Iterations + Start */}
                 <div className="flex items-center gap-3">
-                  <label className="ui-label text-slate-500 shrink-0">Iterasi</label>
+                  <label className="ui-label text-slate-500 dark:text-slate-400 shrink-0">Iterasi</label>
                   <input
                     type="number"
                     min={1}
@@ -1008,7 +1032,7 @@ function PlaygroundInner() {
                     value={loopIterations}
                     onChange={(e) => setLoopIterations(Math.max(1, Math.min(50, Number(e.target.value) || 1)))}
                     disabled={loopRunning}
-                    className="w-20 px-3 py-1.5 text-xs font-mono text-slate-700 bg-slate-50 border border-slate-200 rounded-md outline-none focus:border-indigo-400 transition-colors disabled:opacity-50"
+                    className="w-20 px-3 py-1.5 text-xs font-mono text-slate-700 dark:text-slate-300 bg-slate-50 dark:bg-slate-800/50 border border-slate-200 dark:border-slate-700 rounded-md outline-none focus:border-cyan-400 transition-colors disabled:opacity-50"
                   />
                   <button
                     onClick={handleRunLoopWithPrompt}
@@ -1022,7 +1046,7 @@ function PlaygroundInner() {
                     <button
                       onClick={() => { setLoopResults([]); setLoopStatus('idle'); }}
                       disabled={loopRunning}
-                      className="text-xs text-slate-400 hover:text-slate-600 transition-colors disabled:opacity-30"
+                      className="text-xs text-slate-400 dark:text-slate-500 hover:text-slate-600 dark:text-slate-400 transition-colors disabled:opacity-30"
                     >
                       Reset
                     </button>
@@ -1032,30 +1056,30 @@ function PlaygroundInner() {
 
               {/* Live results */}
               {loopResults.length > 0 && (
-                <div className="bg-white border border-slate-200 rounded-2xl p-5 shadow-sm space-y-2">
-                  <span className="ui-label text-slate-500 block mb-3">Hasil per Iterasi</span>
+                <div className="bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-700 rounded-2xl p-5 shadow-sm space-y-2">
+                  <span className="ui-label text-slate-500 dark:text-slate-400 block mb-3">Hasil per Iterasi</span>
                   {loopResults.map((r) => (
                     <div
                       key={r.iteration}
                       className={`rounded-xl border p-3 text-xs flex gap-3 ${
                         r.status === 'success' ? 'border-emerald-100 bg-emerald-50' :
-                        r.status === 'failed' ? 'border-red-100 bg-red-50' :
+                        r.status === 'failed' ? 'border-red-100 dark:border-red-500/30 bg-red-50 dark:bg-red-900/20' :
                         'border-amber-100 bg-amber-50'
                       }`}
                     >
                       <span className={`font-mono font-medium shrink-0 w-8 text-center ${
                         r.status === 'success' ? 'text-emerald-700' : r.status === 'failed' ? 'text-red-700' : 'text-amber-700'
                       }`}>#{r.iteration}</span>
-                      <span className="flex-1 text-slate-700 whitespace-pre-wrap break-all">{r.detail}</span>
+                      <span className="flex-1 text-slate-700 dark:text-slate-300 whitespace-pre-wrap break-all">{r.detail}</span>
                       <span className={`shrink-0 text-[9px] font-semibold uppercase ${
                         r.status === 'success' ? 'text-emerald-600' : r.status === 'failed' ? 'text-red-600' : 'text-amber-600'
                       }`}>{r.status}</span>
                     </div>
                   ))}
                   {loopRunning && loopResults.length < loopIterations && (
-                    <div className="rounded-xl border border-slate-100 bg-slate-50 p-3 text-xs flex gap-3 items-center">
-                      <span className="font-mono font-medium text-slate-400 w-8 text-center">#{loopResults.length + 1}</span>
-                      <span className="text-slate-400 animate-pulse">Agent sedang berpikir…</span>
+                    <div className="rounded-xl border border-slate-100 dark:border-slate-800 bg-slate-50 dark:bg-slate-800/50 p-3 text-xs flex gap-3 items-center">
+                      <span className="font-mono font-medium text-slate-400 dark:text-slate-500 w-8 text-center">#{loopResults.length + 1}</span>
+                      <span className="text-slate-400 dark:text-slate-500 animate-pulse">Agent sedang berpikir…</span>
                     </div>
                   )}
                 </div>
@@ -1070,16 +1094,16 @@ function PlaygroundInner() {
               <McpManagerBanner />
             </div>
             {mcpHealth.length > 0 && (
-              <div className="max-w-3xl mx-auto w-full bg-white border border-slate-200 rounded-xl p-3 flex flex-wrap gap-2">
+              <div className="max-w-3xl mx-auto w-full bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-700 rounded-xl p-3 flex flex-wrap gap-2">
                 {mcpHealth.map((h) => {
                   const ok = h.status === 'connected';
                   const neutral = h.status === 'no_versions' || h.status === 'not_running';
-                  const dotColor = ok ? 'bg-emerald-500' : neutral ? 'bg-slate-400' : 'bg-red-500';
+                  const dotColor = ok ? 'bg-emerald-500' : neutral ? 'bg-slate-400' : 'bg-red-50 dark:bg-red-900/200';
                   return (
                     <span
                       key={h.toolId || h.toolName}
                       title={h.error || (ok ? `Tools: ${h.loadedTools.join(', ')}` : h.status)}
-                      className={`inline-flex items-center gap-1.5 text-[11px] font-mono px-2 py-1 rounded-lg border ${ok ? 'border-emerald-100 bg-emerald-50 text-emerald-700' : neutral ? 'border-slate-200 bg-slate-50 text-slate-600' : 'border-red-100 bg-red-50 text-red-700'}`}
+                      className={`inline-flex items-center gap-1.5 text-[11px] font-mono px-2 py-1 rounded-lg border ${ok ? 'border-emerald-100 bg-emerald-50 text-emerald-700' : neutral ? 'border-slate-200 dark:border-slate-700 bg-slate-50 dark:bg-slate-800/50 text-slate-600 dark:text-slate-400' : 'border-red-100 dark:border-red-500/30 bg-red-50 dark:bg-red-900/20 text-red-700'}`}
                     >
                       <span className={`w-1.5 h-1.5 rounded-full ${dotColor}`} />
                       {h.toolName}: {h.status}
@@ -1092,12 +1116,12 @@ function PlaygroundInner() {
               <div className="h-full flex flex-col items-center justify-center text-center px-6">
                 <div className="w-12 h-12 rounded-2xl flex items-center justify-center overflow-hidden relative mb-4">
                   <div className="absolute inset-0 vibrant-rainbow-border animate-border-spin opacity-90" />
-                  <div className="absolute inset-[2px] bg-white rounded-[14px] flex items-center justify-center">
-                    <Bot className="w-5 h-5 text-slate-700" />
+                  <div className="absolute inset-[2px] bg-white dark:bg-slate-900 rounded-[14px] flex items-center justify-center">
+                    <Bot className="w-5 h-5 text-slate-700 dark:text-slate-300" />
                   </div>
                 </div>
-                <p className="text-lg font-semibold text-slate-800">Start a conversation</p>
-                <p className="text-sm text-slate-500 mt-1 max-w-xs">
+                <p className="text-lg font-semibold text-slate-800 dark:text-slate-200">Start a conversation</p>
+                <p className="text-sm text-slate-500 dark:text-slate-400 mt-1 max-w-xs">
                   Select an agent and send a prompt to begin streaming its reasoning.
                 </p>
               </div>
@@ -1111,14 +1135,14 @@ function PlaygroundInner() {
 
                     return (
                       <div key={idx} className="flex gap-4 max-w-3xl mx-auto justify-start w-full stream-in">
-                        <div className="w-full relative overflow-hidden rounded-xl bg-white border border-slate-200 shadow-sm">
+                        <div className="w-full relative overflow-hidden rounded-xl bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-700 shadow-sm">
                           <div className="relative z-10 p-5 flex flex-col gap-3">
-                            <div className="flex items-center justify-between border-b border-slate-100 pb-2">
+                            <div className="flex items-center justify-between border-b border-slate-100 dark:border-slate-800 pb-2">
                               <div className="flex items-center gap-2.5">
                                 <span className="w-2 h-2 rounded-full bg-amber-500 animate-pulse" />
-                                <span className="ui-label text-slate-500">Agent Call Execution</span>
+                                <span className="ui-label text-slate-500 dark:text-slate-400">Agent Call Execution</span>
                               </div>
-                              <span className="text-[11px] text-slate-400">
+                              <span className="text-[11px] text-slate-400 dark:text-slate-500">
                                 {new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}
                               </span>
                             </div>
@@ -1128,15 +1152,15 @@ function PlaygroundInner() {
                                 <Cpu className="w-4 h-4" />
                               </div>
                               <div>
-                                <span className="ui-label text-slate-400 block">Invoking MCP Tool</span>
+                                <span className="ui-label text-slate-400 dark:text-slate-500 block">Invoking MCP Tool</span>
                                 <span className="font-mono text-xs text-amber-700 font-semibold">{toolName}</span>
                               </div>
                             </div>
 
                             {toolArgs && (
-                              <div className="bg-slate-50 border border-slate-200 rounded-xl p-3">
-                                <span className="ui-label text-slate-400 block mb-1">Parameters</span>
-                                <pre className="font-mono text-[11px] text-slate-700 overflow-x-auto whitespace-pre-wrap break-all max-h-32">
+                              <div className="bg-slate-50 dark:bg-slate-800/50 border border-slate-200 dark:border-slate-700 rounded-xl p-3">
+                                <span className="ui-label text-slate-400 dark:text-slate-500 block mb-1">Parameters</span>
+                                <pre className="font-mono text-[11px] text-slate-700 dark:text-slate-300 overflow-x-auto whitespace-pre-wrap break-all max-h-32">
                                   {toolArgs}
                                 </pre>
                               </div>
@@ -1149,9 +1173,9 @@ function PlaygroundInner() {
 
                   return (
                     <div key={idx} className="flex gap-4 max-w-3xl mx-auto justify-start w-full">
-                      <div className="bg-slate-100 border border-slate-200 text-slate-500 text-xs p-3 rounded-lg w-full flex justify-between items-center">
+                      <div className="bg-slate-100 dark:bg-slate-800 border border-slate-200 dark:border-slate-700 text-slate-500 dark:text-slate-400 text-xs p-3 rounded-lg w-full flex justify-between items-center">
                         <span>{msg.content}</span>
-                        <span className="text-[10px] text-slate-400">
+                        <span className="text-[10px] text-slate-400 dark:text-slate-500">
                           {new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}
                         </span>
                       </div>
@@ -1162,7 +1186,7 @@ function PlaygroundInner() {
                 if (msg.role === 'error') {
                   return (
                     <div key={idx} className="flex gap-4 max-w-3xl mx-auto justify-start w-full stream-in">
-                      <div className="w-full bg-red-50 border border-red-200 text-red-700 p-4 rounded-xl text-sm flex items-start gap-2.5">
+                      <div className="w-full bg-red-50 dark:bg-red-900/20 border border-red-200 dark:border-red-500/30 text-red-700 p-4 rounded-xl text-sm flex items-start gap-2.5">
                         <AlertTriangle className="w-4 h-4 flex-shrink-0 mt-0.5 text-red-500" />
                         <p>{msg.content}</p>
                       </div>
@@ -1172,33 +1196,28 @@ function PlaygroundInner() {
 
                 if (msg.role === 'user') {
                   return (
-                    <div key={idx} className="flex gap-4 max-w-3xl mx-auto justify-end">
-                      <div className="relative rounded-2xl p-[2px] overflow-hidden max-w-[80%] rounded-tr-sm shadow-sm">
-                        <div className="absolute inset-0 vibrant-rainbow-border animate-border-spin opacity-80" />
-                        <div className="relative bg-white rounded-[14px] p-4 z-10 flex flex-col">
-                          {msg.attachments && msg.attachments.length > 0 && (
-                            <div className="flex flex-wrap gap-2 mb-3">
-                              {msg.attachments.map((att, i) => (
-                                <div key={i} className="shrink-0 group">
-                                  {att.preview ? (
-                                    <img src={att.preview} alt={att.name} className="w-16 h-16 rounded-xl object-cover border border-slate-200 shadow-sm" />
-                                  ) : (
-                                    <div className="w-16 h-16 rounded-xl bg-slate-50 border border-slate-200 flex flex-col items-center justify-center">
-                                      <FileText className="w-4 h-4 text-slate-400" />
-                                      <span className="text-[8px] text-slate-400 mt-0.5 truncate w-14 text-center px-1" title={att.name}>{att.name}</span>
-                                    </div>
-                                  )}
-                                </div>
-                              ))}
-                            </div>
-                          )}
-                          <span className="text-sm leading-relaxed whitespace-pre-wrap block text-slate-800">
-                            {formatMessageContent(msg.content)}
-                          </span>
-                          <div className="text-[10px] text-slate-400 mt-2 text-right">
-                            {new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}
+                    <div key={idx} className="flex gap-3 max-w-3xl mx-auto justify-end items-start mt-4 mb-2">
+                      <div className="flex flex-col min-w-0 max-w-[85%] items-end">
+                        <span className="text-xs font-semibold text-slate-500 dark:text-slate-400 mb-2">You</span>
+                        {msg.attachments && msg.attachments.length > 0 && (
+                          <div className="flex flex-wrap gap-2 mb-3 justify-end">
+                            {msg.attachments.map((att, i) => (
+                              <div key={i} className="shrink-0 group">
+                                {att.preview ? (
+                                  <img src={att.preview} alt={att.name} className="w-16 h-16 rounded-xl object-cover border border-slate-200 dark:border-slate-700 shadow-sm" />
+                                ) : (
+                                  <div className="w-16 h-16 rounded-xl bg-slate-50 dark:bg-slate-800/50 border border-slate-200 dark:border-slate-700 flex flex-col items-center justify-center">
+                                    <FileText className="w-4 h-4 text-slate-400 dark:text-slate-500" />
+                                    <span className="text-[8px] text-slate-400 dark:text-slate-500 mt-0.5 truncate w-14 text-center px-1" title={att.name}>{att.name}</span>
+                                  </div>
+                                )}
+                              </div>
+                            ))}
                           </div>
-                        </div>
+                        )}
+                        <span className="text-sm leading-relaxed whitespace-pre-wrap block text-slate-800 dark:text-slate-200 text-right">
+                          {formatMessageContent(msg.content)}
+                        </span>
                       </div>
                     </div>
                   );
@@ -1224,12 +1243,12 @@ function PlaygroundInner() {
                     <div key={idx} className="flex gap-3 max-w-3xl mx-auto justify-start stream-in">
                       <div className="w-8 h-8 rounded-full flex items-center justify-center flex-shrink-0 mt-0.5 relative overflow-hidden p-[1.5px]">
                         <div className="absolute inset-0 vibrant-rainbow-border animate-border-spin opacity-90" />
-                        <div className="relative z-10 w-full h-full rounded-full bg-white flex items-center justify-center">
-                          <Bot className="w-4 h-4 text-slate-700" />
+                        <div className="relative z-10 w-full h-full rounded-full bg-white dark:bg-slate-900 flex items-center justify-center">
+                          <Bot className="w-4 h-4 text-slate-700 dark:text-slate-300" />
                         </div>
                       </div>
                       <div className="flex flex-col min-w-0 w-full">
-                        <span className="text-xs font-semibold text-slate-500 mb-1">Amadeus</span>
+                        <span className="text-xs font-semibold text-slate-500 dark:text-slate-400 mb-1">Amadeus</span>
 
                         {msg.unverifiedClaim && (
                           <span className="inline-flex items-center gap-1.5 self-start text-[11px] font-medium text-amber-700 bg-amber-50 border border-amber-200 px-2 py-1 rounded-lg mb-2">
@@ -1239,7 +1258,7 @@ function PlaygroundInner() {
                         )}
 
                         {!contentToRender && isAgentTyping && idx === messages.length - 1 ? (
-                          <div className="flex items-center gap-1 text-sm text-slate-400 px-1 py-2">
+                          <div className="flex items-center gap-1 text-sm text-slate-400 dark:text-slate-500 px-1 py-2">
                             <span className="w-1.5 h-1.5 rounded-full bg-slate-400 animate-bounce" />
                             <span className="w-1.5 h-1.5 rounded-full bg-slate-400 animate-bounce [animation-delay:0.15s]" />
                             <span className="w-1.5 h-1.5 rounded-full bg-slate-400 animate-bounce [animation-delay:0.3s]" />
@@ -1256,7 +1275,7 @@ function PlaygroundInner() {
                               <button
                                 key={si}
                                 onClick={() => { setFollowUpSuggestions([]); handleSend(s); }}
-                                className="text-xs text-slate-600 bg-white border border-slate-200 rounded-full px-3 py-1.5 hover:border-indigo-300 hover:text-indigo-600 hover:bg-indigo-50 transition-colors"
+                                className="text-xs text-slate-600 dark:text-slate-400 bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-700 rounded-full px-3 py-1.5 hover:border-cyan-300 hover:text-cyan-600 hover:bg-cyan-50 dark:bg-cyan-900/30 transition-colors"
                               >
                                 {s}
                               </button>
@@ -1290,7 +1309,7 @@ function PlaygroundInner() {
                              }}
                            />
                         )}
-                        <div className="text-[10px] text-slate-400 mt-2">
+                        <div className="text-[10px] text-slate-400 dark:text-slate-500 mt-2">
                           {new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}
                         </div>
                       </div>
@@ -1304,20 +1323,20 @@ function PlaygroundInner() {
           </div>
 
           {/* Input */}
-          <div className="p-6 bg-[#FAFAFA] border-t border-slate-200">
+          <div className="p-6 bg-[#FAFAFA] dark:bg-[var(--background)] border-t border-slate-200 dark:border-slate-700">
             {attachments.length > 0 && (
               <div className="max-w-3xl mx-auto mb-3 flex gap-2 overflow-x-auto pb-1">
                 {attachments.map((att, i) => (
                   <div key={i} className="relative shrink-0 group">
                     {att.preview ? (
-                      <img src={att.preview} alt={att.name} className="w-16 h-16 rounded-xl object-cover border-2 border-slate-200 shadow-sm" />
+                      <img src={att.preview} alt={att.name} className="w-16 h-16 rounded-xl object-cover border-2 border-slate-200 dark:border-slate-700 shadow-sm" />
                     ) : (
-                      <div className="w-16 h-16 rounded-xl bg-white border-2 border-slate-200 flex flex-col items-center justify-center">
-                        <FileText className="w-5 h-5 text-slate-400" />
-                        <span className="text-[8px] text-slate-400 mt-1 truncate w-14 text-center px-1" title={att.name}>{att.name}</span>
+                      <div className="w-16 h-16 rounded-xl bg-white dark:bg-slate-900 border-2 border-slate-200 dark:border-slate-700 flex flex-col items-center justify-center">
+                        <FileText className="w-5 h-5 text-slate-400 dark:text-slate-500" />
+                        <span className="text-[8px] text-slate-400 dark:text-slate-500 mt-1 truncate w-14 text-center px-1" title={att.name}>{att.name}</span>
                       </div>
                     )}
-                    <button onClick={() => removeAttachment(i)} className="absolute -top-1.5 -right-1.5 w-5 h-5 rounded-full bg-red-500 text-white flex items-center justify-center opacity-0 group-hover:opacity-100 transition-opacity shadow-sm z-10">
+                    <button onClick={() => removeAttachment(i)} className="absolute -top-1.5 -right-1.5 w-5 h-5 rounded-full bg-red-50 dark:bg-red-900/200 text-white flex items-center justify-center opacity-0 group-hover:opacity-100 transition-opacity shadow-sm z-10">
                       <X className="w-3 h-3" />
                     </button>
                   </div>
@@ -1325,12 +1344,12 @@ function PlaygroundInner() {
               </div>
             )}
             
-            <div className="max-w-3xl mx-auto relative flex items-end bg-white border border-slate-200 rounded-2xl focus-within:border-slate-400 focus-within:ring-2 focus-within:ring-slate-900/5 transition-all p-2 shadow-sm">
-              <input ref={fileInputRef} type="file" multiple accept="image/*,.pdf" className="hidden" onChange={handleFileSelect} />
+            <div className="max-w-3xl mx-auto relative flex items-end bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-700 rounded-2xl focus-within:border-slate-400 focus-within:ring-2 focus-within:ring-slate-900/5 transition-all p-2 shadow-sm">
+              <input ref={fileInputRef} type="file" multiple accept="image/*,.pdf,.txt" className="hidden" onChange={handleFileSelect} />
               <button
                 onClick={() => fileInputRef.current?.click()}
-                className="shrink-0 p-3 rounded-xl text-slate-400 hover:text-slate-600 hover:bg-slate-50 transition-colors mr-1"
-                title="Attach files (Image/PDF)"
+                className="shrink-0 p-3 rounded-xl text-slate-400 dark:text-slate-500 hover:text-slate-600 dark:text-slate-400 hover:bg-slate-50 dark:bg-slate-800/50 transition-colors mr-1"
+                title="Attach files (Image/PDF/TXT)"
               >
                 <Paperclip className="w-4 h-4" />
               </button>
@@ -1346,7 +1365,7 @@ function PlaygroundInner() {
                   }
                 }}
                 placeholder="Message the agent…"
-                className="flex-1 bg-transparent py-2 px-2 text-sm text-slate-900 focus:outline-none resize-none placeholder:text-slate-400 max-h-40"
+                className="flex-1 bg-transparent py-2 px-2 text-sm text-slate-900 dark:text-white focus:outline-none resize-none placeholder:text-slate-400 dark:text-slate-500 max-h-40"
               />
 
               <button
@@ -1359,7 +1378,7 @@ function PlaygroundInner() {
               </button>
             </div>
             <div className="text-center mt-3">
-              <span className="ui-label text-slate-400">
+              <span className="ui-label text-slate-400 dark:text-slate-500">
                 ⏎ send · shift+⏎ newline
               </span>
             </div>
@@ -1369,28 +1388,28 @@ function PlaygroundInner() {
 
           {isInspectOpen && selectedAgentObj && (
             <div className="fixed inset-0 z-50 flex items-center justify-center bg-slate-900/30 backdrop-blur-sm p-4">
-              <div className="bg-white border border-slate-200 rounded-2xl w-full max-w-2xl shadow-2xl flex flex-col max-h-[80vh] overflow-hidden">
-                <div className="flex items-center gap-2 px-6 py-4 border-b border-slate-100">
+              <div className="bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-700 rounded-2xl w-full max-w-2xl shadow-2xl flex flex-col max-h-[80vh] overflow-hidden">
+                <div className="flex items-center gap-2 px-6 py-4 border-b border-slate-100 dark:border-slate-800">
                   <span className="terminal-dot bg-red-400" />
                   <span className="terminal-dot bg-amber-400" />
                   <span className="terminal-dot bg-emerald-400" />
-                  <span className="text-sm font-semibold text-slate-900 ml-2 flex-1 truncate">Inspect Node: {selectedAgentObj.agent_name}</span>
-                  <button onClick={() => setIsInspectOpen(false)} className="p-1.5 text-slate-400 hover:text-slate-700 hover:bg-slate-100 rounded-lg transition-colors">
+                  <span className="text-sm font-semibold text-slate-900 dark:text-white ml-2 flex-1 truncate">Inspect Node: {selectedAgentObj.agent_name}</span>
+                  <button onClick={() => setIsInspectOpen(false)} className="p-1.5 text-slate-400 dark:text-slate-500 hover:text-slate-700 dark:hover:text-slate-300 hover:bg-slate-100 dark:bg-slate-800 rounded-lg transition-colors">
                     <X className="w-4 h-4" />
                   </button>
                 </div>
 
                 <div className="p-6 overflow-y-auto space-y-6">
                   <div>
-                    <h4 className="ui-label text-slate-400 mb-2">Agent Details</h4>
-                    <div className="grid grid-cols-2 gap-4 bg-slate-50 border border-slate-200 rounded-xl p-4 text-xs">
+                    <h4 className="ui-label text-slate-400 dark:text-slate-500 mb-2">Agent Details</h4>
+                    <div className="grid grid-cols-2 gap-4 bg-slate-50 dark:bg-slate-800/50 border border-slate-200 dark:border-slate-700 rounded-xl p-4 text-xs">
                       <div>
-                        <span className="ui-label text-slate-400 block">Agent ID</span>
-                        <span className="font-mono text-slate-700 font-medium break-all">{selectedAgentObj.agent_id}</span>
+                        <span className="ui-label text-slate-400 dark:text-slate-500 block">Agent ID</span>
+                        <span className="font-mono text-slate-700 dark:text-slate-300 font-medium break-all">{selectedAgentObj.agent_id}</span>
                       </div>
                       <div>
-                        <span className="ui-label text-slate-400 block">Status</span>
-                        <span className="text-slate-700 font-medium">
+                        <span className="ui-label text-slate-400 dark:text-slate-500 block">Status</span>
+                        <span className="text-slate-700 dark:text-slate-300 font-medium">
                           {selectedAgentObj.on_status ? '🟢 Online / Active' : '⚪ Offline'}
                         </span>
                       </div>
@@ -1398,23 +1417,23 @@ function PlaygroundInner() {
                   </div>
 
                   <div>
-                    <h4 className="ui-label text-slate-400 mb-2">System Personality Prompt</h4>
-                    <div className="bg-slate-50 border border-slate-200 rounded-xl p-3 text-sm text-slate-600 max-h-32 overflow-y-auto whitespace-pre-wrap leading-relaxed">
+                    <h4 className="ui-label text-slate-400 dark:text-slate-500 mb-2">System Personality Prompt</h4>
+                    <div className="bg-slate-50 dark:bg-slate-800/50 border border-slate-200 dark:border-slate-700 rounded-xl p-3 text-sm text-slate-600 dark:text-slate-400 max-h-32 overflow-y-auto whitespace-pre-wrap leading-relaxed">
                       {selectedAgentObj.agent_style || "No personality style configured."}
                     </div>
                   </div>
 
                   <div>
-                    <h4 className="ui-label text-slate-400 mb-2">Connected Model Context Protocols (MCP)</h4>
+                    <h4 className="ui-label text-slate-400 dark:text-slate-500 mb-2">Connected Model Context Protocols (MCP)</h4>
                     {connectedTools.length === 0 ? (
-                      <p className="text-xs text-slate-500 italic bg-slate-50 border border-dashed border-slate-200 rounded-xl p-4">No tools connected.</p>
+                      <p className="text-xs text-slate-500 dark:text-slate-400 italic bg-slate-50 dark:bg-slate-800/50 border border-dashed border-slate-200 dark:border-slate-700 rounded-xl p-4">No tools connected.</p>
                     ) : (
-                      <div className="divide-y divide-slate-100 border-y border-slate-100">
+                      <div className="divide-y divide-slate-100 border-y border-slate-100 dark:border-slate-800">
                         {connectedTools.map((tool: any) => (
                           <div key={tool.tool_id} className="py-4 space-y-3">
                             <div className="flex justify-between items-center">
-                              <span className="font-semibold text-sm text-slate-800 flex items-center gap-1.5">
-                                <span className="w-1.5 h-1.5 rounded-full bg-blue-500" />
+                              <span className="font-semibold text-sm text-slate-800 dark:text-slate-200 flex items-center gap-1.5">
+                                <span className="w-1.5 h-1.5 rounded-full bg-cyan-50 dark:bg-cyan-900/300" />
                                 {tool.name}
                               </span>
                               <span className={`badge text-[9px] px-2 py-0.5 rounded-full ${tool.on_status === 'Online' ? 'badge-green' : 'badge-slate'}`}>
@@ -1422,10 +1441,10 @@ function PlaygroundInner() {
                               </span>
                             </div>
                             {tool.description && (
-                              <p className="text-xs text-slate-500 leading-relaxed">{tool.description}</p>
+                              <p className="text-xs text-slate-500 dark:text-slate-400 leading-relaxed">{tool.description}</p>
                             )}
                             <div>
-                              <span className="ui-label text-slate-400 block mb-1">MCP Connection Schema</span>
+                              <span className="ui-label text-slate-400 dark:text-slate-500 block mb-1">MCP Connection Schema</span>
                               <pre className="bg-slate-900 text-slate-100 rounded-lg p-3.5 font-mono text-[11px] overflow-x-auto max-h-40 border border-slate-800">
                                 {JSON.stringify(tool.versions, null, 2)}
                               </pre>
@@ -1437,7 +1456,7 @@ function PlaygroundInner() {
                   </div>
                 </div>
 
-                <div className="px-6 py-4 border-t border-slate-100 flex justify-end bg-slate-50/50">
+                <div className="px-6 py-4 border-t border-slate-100 dark:border-slate-800 flex justify-end bg-slate-50 dark:bg-slate-800/50">
                   <button onClick={() => setIsInspectOpen(false)} className="btn-primary text-xs rounded-xl py-2.5 px-4">
                     Close Inspector
                   </button>
@@ -1458,7 +1477,7 @@ function PlaygroundInner() {
         </main>
         
         {/* Right Sidebar — UiPathLiveGraph */}
-        <aside className="flex-1 bg-white border-l border-slate-200 flex flex-col overflow-hidden shrink-0 z-10">
+        <aside className="flex-1 bg-white dark:bg-slate-900 border-l border-slate-200 dark:border-slate-700 flex flex-col overflow-hidden shrink-0 z-10">
           <UiPathLiveGraph sessionLabel={currentSessionId} agentId={selectedAgent} />
         </aside>
       </div>

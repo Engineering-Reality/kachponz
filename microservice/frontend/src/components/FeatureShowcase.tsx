@@ -9,11 +9,11 @@ const FEATURES = [
     id: "agent-creator",
     title: "Agent Architect",
     navLabel: "Agent Architect",
-    description: "Visually construct powerful AI agents with our intuitive natural language builder. Assemble tools, assign personas, and test in real-time.",
+    description: "Describe the agent you need in plain language, then edit the generated config directly — system prompt, tools, and loop recipe.",
     bullets: [
       "Attach any MCP-compatible tool — UiPath, Power Automate, custom APIs",
-      "Configure Loop Mode recipes per agent — deterministic multi-step execution",
-      "System prompt per agent — each agent gets its own behavior spec"
+      "Configure a Loop Mode recipe per agent for multi-step, self-correcting runs",
+      "Each agent has its own system prompt — behavior doesn't leak across agents"
     ],
     video: "https://www.w3schools.com/html/mov_bbb.mp4",
     icon: Wand2,
@@ -23,11 +23,11 @@ const FEATURES = [
     id: "tools",
     title: "Tools Registry",
     navLabel: "Tools Registry",
-    description: "A centralized hub to register capabilities. Connect internal APIs, external services, or legacy RPA bots securely via the Model Context Protocol (MCP).",
+    description: "Register the tools your agents can call — internal APIs, external services, or legacy RPA robots — connected over MCP (stdio or SSE).",
     bullets: [
-      "Unified MCP tool integration across disparate platforms",
-      "Secure API key management and role-based access",
-      "Dynamically discoverable endpoints for AI agents"
+      "Register MCP servers over stdio or SSE — from UiPath robots to internal REST APIs",
+      "Credentials stored server-side in the tool's DB record, never in process arguments",
+      "Restart a tool from the registry after updating its config or credentials"
     ],
     video: "https://www.w3schools.com/html/mov_bbb.mp4",
     icon: Wrench,
@@ -37,11 +37,9 @@ const FEATURES = [
     id: "playground",
     title: "Agent Flow Playground",
     navLabel: "Agent Flow Playground",
-    description: "Stream real-time agent reasoning over selected transactions. Watch MCP tool calls, state transitions, and telemetry flow through a secure control panel.",
+    description: "Chat with an agent live and watch each MCP tool call and transaction state change as it happens.",
     bullets: [
-      "Live reasoning streaming via Server-Sent Events (SSE)",
-      "Interactive tool execution with human-in-the-loop pauses",
-      "Full cryptographic audit logging of every decision step"
+      "Live reasoning streamed via Server-Sent Events (SSE)"
     ],
     video: "https://www.w3schools.com/html/mov_bbb.mp4",
     icon: Zap,
@@ -51,11 +49,9 @@ const FEATURES = [
     id: "agents",
     title: "Agent Gallery",
     navLabel: "Agent Gallery",
-    description: "Manage your workforce of intelligent agents. Monitor their performance, assign tasks, and track their interaction with legacy RPA systems.",
+    description: "Every agent in one place — edit its system prompt, attached tools, and loop recipe, or turn it off.",
     bullets: [
-      "Centralized agent lifecycle and version management",
-      "Performance, telemetry, and error rate tracking",
-      "Seamless exception routing to human analysts"
+      "Create, edit, or disable an agent without touching code"
     ],
     video: "https://www.w3schools.com/html/mov_bbb.mp4",
     icon: Bot,

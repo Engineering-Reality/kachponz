@@ -2,6 +2,7 @@ import { spawn, ChildProcess } from 'child_process';
 import net from 'node:net';
 import { statSync } from 'node:fs';
 import pg from 'pg';
+import nodemailer from 'nodemailer';
 import { config } from 'dotenv';
 import path from 'path';
 import { fileURLToPath } from 'url';
@@ -174,6 +175,90 @@ async function pollActiveJobTraces(): Promise<void> {
     }
   } catch (err) {
     console.error('⚙️  [\x1b[35mMCP AutoManager\x1b[0m] Error polling UiPath job traces:', err);
+  }
+}
+
+// ─── AML/CFT alert outbox email worker (apu.md Task 5) ─────────────────────
+// Third poller in this same daemon, alongside syncMcpServers/
+// pollActiveJobTraces — reuses the process/pg pool already running here
+// instead of spinning up a separate Node process (2GB RAM VPS constraint).
+
+let mailTransport: ReturnType<typeof nodemailer.createTransport> | null = null;
+
+function getMailTransport(): ReturnType<typeof nodemailer.createTransport> | null {
+  if (mailTransport) return mailTransport;
+  if (!process.env.SMTP_HOST) return null;
+  mailTransport = nodemailer.createTransport({
+    host: process.env.SMTP_HOST,
+    port: Number(process.env.SMTP_PORT || 587),
+    auth: process.env.SMTP_USER ? { user: process.env.SMTP_USER, pass: process.env.SMTP_PASS } : undefined,
+  });
+  return mailTransport;
+}
+
+async function sendAlertEmail(to: string, subject: string, text: string): Promise<void> {
+  const transport = getMailTransport();
+  if (!transport) {
+    throw new Error('SMTP_HOST belum dikonfigurasi — tidak bisa mengirim email alert');
+  }
+  await transport.sendMail({
+    from: process.env.SMTP_FROM || 'aml-alerts@amadeus.local',
+    to,
+    subject,
+    text,
+  });
+}
+
+async function pollAlertOutbox(): Promise<void> {
+  try {
+    const { rows } = await pool.query(`
+      SELECT * FROM alert_outbox
+      WHERE status = 'pending'
+      LIMIT 20
+    `);
+    if (rows.length === 0) return;
+
+    for (const row of rows) {
+      const payload = row.payload as any;
+      const verdict = payload?.verdict as string | undefined;
+      try {
+        if (verdict === 'clean') {
+          // User-confirmed (2026-07-17): clean verdicts are logged, not
+          // emailed — avoids notification fatigue for cleared transactions.
+          console.log(`⚙️  [\x1b[35mMCP AutoManager\x1b[0m] alert_outbox ${row.alert_id}: verdict=clean, logging only`);
+        } else if (verdict === 'hit') {
+          const to = process.env.COMPLIANCE_ALERT_EMAIL;
+          if (!to) throw new Error('COMPLIANCE_ALERT_EMAIL belum di-set');
+          const redFlags = Array.isArray(payload?.red_flags) ? payload.red_flags.join('; ') : '';
+          const matched = Array.isArray(payload?.matched_entities)
+            ? payload.matched_entities
+                .map((m: any) => `${m.party_role}: ${m.matched_name} (${m.kb_source})`)
+                .join('; ')
+            : '';
+          await sendAlertEmail(
+            to,
+            `[AML/CFT] HIT — transaksi ${row.transaction_ref}`,
+            `Red flags: ${redFlags}\nMatched entities: ${matched}\nReasoning: ${payload?.reasoning ?? ''}`,
+          );
+        } else if (verdict === 'needs_review') {
+          const to = process.env.OPS_ALERT_EMAIL;
+          if (!to) throw new Error('OPS_ALERT_EMAIL belum di-set');
+          await sendAlertEmail(
+            to,
+            `[AML/CFT] Needs review — transaksi ${row.transaction_ref}`,
+            `Reasoning: ${payload?.reasoning ?? ''}\nRisk score: ${payload?.risk_score ?? ''}`,
+          );
+        } else {
+          console.warn(`⚙️  [\x1b[35mMCP AutoManager\x1b[0m] alert_outbox ${row.alert_id}: verdict tidak dikenal "${verdict}", ditandai sent tanpa email`);
+        }
+        await pool.query(`UPDATE alert_outbox SET status = 'sent', sent_at = now() WHERE alert_id = $1`, [row.alert_id]);
+      } catch (e) {
+        console.warn(`⚙️  [\x1b[35mMCP AutoManager\x1b[0m] Gagal memproses alert_outbox ${row.alert_id}:`, e instanceof Error ? e.message : e);
+        await pool.query(`UPDATE alert_outbox SET status = 'failed' WHERE alert_id = $1`, [row.alert_id]).catch(() => {});
+      }
+    }
+  } catch (err) {
+    console.error('⚙️  [\x1b[35mMCP AutoManager\x1b[0m] Error polling alert_outbox:', err);
   }
 }
 
@@ -466,6 +551,10 @@ syncMcpServers(); // Initial check
 // Poll active UiPath job traces every 15 seconds
 setInterval(pollActiveJobTraces, 15000);
 pollActiveJobTraces(); // Initial check
+
+// Poll AML/CFT alert_outbox every 10 seconds
+setInterval(pollAlertOutbox, 10000);
+pollAlertOutbox(); // Initial check
 
 const AMADEUS_ASCII = `
 \x1b[38;5;51;49m ▄▄▄▄▄▄▄▄▄▄  \x1b[38;5;45;49m ▄▄▄▄▄▄ ▄▄▄▄▄\x1b[38;5;75;49m▄   ▄▄▄▄▄▄▄▄▄\x1b[38;5;111;49m▄  ▄▄▄▄▄▄▄  \x1b[38;5;201;49m    ▄▄▄▄▄▄▄▄▄\x1b[38;5;205;49m ▄▄▄▄▄  ▄▄▄▄▄\x1b[38;5;209;49m   ▄▄▄▄▄▄▄▄▄\x1b[38;5;214;49m▄\x1b[0m

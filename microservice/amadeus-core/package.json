@@ -41,12 +41,16 @@
     "fastify-type-provider-zod": "^4.0.2",
     "jose": "^6.2.3",
     "node-pg-migrate": "^8.0.4",
+    "nodemailer": "^9.0.3",
+    "pdf-parse": "^2.4.5",
     "pg": "^8.13.1",
     "pino": "^9.5.0",
     "zod": "^3.24.1"
   },
   "devDependencies": {
     "@types/node": "^22.10.2",
+    "@types/nodemailer": "^8.0.1",
+    "@types/pdf-parse": "^1.1.5",
     "@types/pg": "^8.11.10",
     "concurrently": "^10.0.3",
     "ts-node": "^10.9.2",

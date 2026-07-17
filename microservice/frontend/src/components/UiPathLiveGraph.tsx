@@ -28,15 +28,15 @@ const VerticalCustomNode = ({ data, isConnectable }: any) => {
   let labelColor = '';
   
   if (theme === 'blue') {
-     wrapperStyle = 'bg-blue-400 p-[1.5px] transition-all duration-300 group-hover:p-[2px] group-hover:shadow-[0_8px_20px_rgba(59,130,246,0.3)]';
-     nodeStyle = 'bg-blue-50';
-     titleColor = 'text-blue-600';
-     labelColor = 'text-slate-800';
+     wrapperStyle = 'bg-cyan-400 p-[1.5px] transition-all duration-300 group-hover:p-[2px] group-hover:shadow-[0_8px_20px_rgba(34,211,238,0.3)]';
+     nodeStyle = 'bg-cyan-50 dark:bg-cyan-950/40';
+     titleColor = 'text-cyan-600 dark:text-cyan-400';
+     labelColor = 'text-slate-800 dark:text-slate-200';
   } else if (theme === 'yellow') {
-     wrapperStyle = 'bg-amber-400 p-[1.5px] transition-all duration-300 group-hover:p-[2px] group-hover:shadow-[0_8px_20px_rgba(251,191,36,0.3)]';
-     nodeStyle = 'bg-amber-50';
-     titleColor = 'text-amber-700';
-     labelColor = 'text-slate-800';
+     wrapperStyle = 'bg-yellow-400 p-[1.5px] transition-all duration-300 group-hover:p-[2px] group-hover:shadow-[0_8px_20px_rgba(250,204,21,0.3)]';
+     nodeStyle = 'bg-yellow-50 dark:bg-yellow-950/40';
+     titleColor = 'text-yellow-700 dark:text-yellow-400';
+     labelColor = 'text-slate-800 dark:text-slate-200';
   } else {
     if (isActive) {
       wrapperStyle = 'vibrant-rainbow-border animate-border-spin p-[2px] shadow-[0_15px_35px_rgba(99,102,241,0.4)]';
@@ -45,9 +45,9 @@ const VerticalCustomNode = ({ data, isConnectable }: any) => {
       labelColor = 'text-white drop-shadow-md';
     } else {
       wrapperStyle = 'vibrant-rainbow-border p-[1.5px] transition-all duration-300 group-hover:p-[2px] group-hover:shadow-[0_8px_20px_rgba(99,102,241,0.2)]';
-      nodeStyle = 'bg-white';
-      titleColor = isFailed ? 'text-red-500' : 'text-slate-500';
-      labelColor = 'text-slate-700';
+      nodeStyle = 'bg-white dark:bg-slate-800';
+      titleColor = isFailed ? 'text-red-500' : 'text-slate-500 dark:text-slate-400';
+      labelColor = 'text-slate-700 dark:text-slate-300';
     }
   }
 
@@ -79,8 +79,8 @@ const VerticalCustomNode = ({ data, isConnectable }: any) => {
           </div>
           {isActive && (
             <div className="mt-3 flex items-center gap-2 bg-black/30 p-2 rounded-lg">
-               <div className="w-2 h-2 rounded-full bg-white animate-ping" />
-               <div className="w-2 h-2 rounded-full bg-white absolute" />
+               <div className="w-2 h-2 rounded-full bg-white dark:bg-slate-800 animate-ping" />
+               <div className="w-2 h-2 rounded-full bg-white dark:bg-slate-800 absolute" />
                <span className="text-[9px] text-white font-medium animate-pulse">Running...</span>
             </div>
           )}
@@ -387,11 +387,11 @@ export function UiPathLiveGraph({
       <div className="h-full flex flex-col">
         {errorBanner}
         <div className="flex-1 flex flex-col items-center justify-center p-8 text-center opacity-60">
-          <div className="w-16 h-16 rounded-full bg-slate-100 border-2 border-slate-200 border-dashed flex items-center justify-center mb-4">
+          <div className="w-16 h-16 rounded-full bg-slate-100 border-2 border-slate-200 dark:border-slate-700 border-dashed flex items-center justify-center mb-4">
             <Terminal className="w-6 h-6 text-slate-300" />
           </div>
-          <h3 className="text-sm font-semibold text-slate-700 mb-1">No Processes Found</h3>
-          <p className="text-xs text-slate-500 max-w-[200px]">
+          <h3 className="text-sm font-semibold text-slate-700 dark:text-slate-300 mb-1">No Processes Found</h3>
+          <p className="text-xs text-slate-500 dark:text-slate-400 max-w-[200px]">
             This agent doesn't have any UiPath processes available in its folder.
           </p>
         </div>
@@ -402,14 +402,14 @@ export function UiPathLiveGraph({
 
 
   return (
-    <div className="flex flex-col h-full bg-slate-50">
-      <div className="px-4 py-3 border-b border-slate-200 bg-white sticky top-0 z-10 flex justify-between items-center shrink-0 shadow-sm">
+    <div className="flex flex-col h-full bg-slate-50 dark:bg-slate-900">
+      <div className="px-4 py-3 border-b border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-800 sticky top-0 z-10 flex justify-between items-center shrink-0 shadow-sm">
         <div>
-          <h2 className="text-[11px] font-medium text-slate-800 flex items-center gap-2">
+          <h2 className="text-[11px] font-medium text-slate-800 dark:text-slate-200 flex items-center gap-2">
             <span className="w-1.5 h-1.5 rounded-full bg-indigo-500 animate-pulse" />
             Orchestrator Map
           </h2>
-          <p className="text-[10px] text-slate-500 mt-1 font-mono truncate max-w-[150px]">Processes: {allProcesses.length}</p>
+          <p className="text-[10px] text-slate-500 dark:text-slate-400 mt-1 font-mono truncate max-w-[150px]">Processes: {allProcesses.length}</p>
         </div>
       </div>
 
@@ -436,7 +436,7 @@ export function UiPathLiveGraph({
         `}} />
 
         {/* ReactFlow Canvas */}
-        <div className="h-[380px] shrink-0 border-b border-slate-200 bg-slate-50">
+        <div className="h-[380px] shrink-0 border-b border-slate-200 dark:border-slate-700 bg-slate-50 dark:bg-slate-900">
           <ReactFlow
             nodes={nodes}
             edges={edges}
@@ -458,17 +458,17 @@ export function UiPathLiveGraph({
             elementsSelectable={true}
           >
             <Background color="#cbd5e1" gap={16} size={1} />
-            <Controls className="bg-white border-slate-200 fill-slate-500 shadow-sm" showInteractive={false} />
+            <Controls className="bg-white dark:bg-slate-800 border-slate-200 dark:border-slate-700 fill-slate-500 shadow-sm" showInteractive={false} />
           </ReactFlow>
         </div>
 
         {/* Info Area below canvas */}
         <div className="flex-1 overflow-y-auto p-4 space-y-6">
           <div className="space-y-2">
-            <h3 className="text-[10px] font-medium text-slate-500 mb-3 px-1">
+            <h3 className="text-[10px] font-medium text-slate-500 dark:text-slate-400 mb-3 px-1">
                {selectedNode?.type === 'Agent' ? 'Agent Details' : selectedNode?.type === 'Queue' ? 'Queue Details' : 'Process Details'}
             </h3>
-            <div className="bg-white rounded-xl border border-slate-200 p-3 text-xs space-y-2 shadow-sm">
+            <div className="bg-white dark:bg-slate-800 rounded-xl border border-slate-200 dark:border-slate-700 p-3 text-xs space-y-2 shadow-sm">
                {selectedNode?.type === 'Agent' && (
                  <>
                    <div className="flex justify-between items-center border-b border-slate-50 pb-2">
@@ -487,7 +487,7 @@ export function UiPathLiveGraph({
                    <>
                      <div className="flex justify-between items-center border-b border-slate-50 pb-2">
                         <span className="text-slate-400">Name</span>
-                        <span className="font-semibold text-slate-700">{selectedNode.name}</span>
+                        <span className="font-semibold text-slate-700 dark:text-slate-300">{selectedNode.name}</span>
                      </div>
                      <div className="flex justify-between items-center pt-1">
                         <span className="text-slate-400">Pending Items</span>
@@ -503,15 +503,15 @@ export function UiPathLiveGraph({
                    <>
                      <div className="flex justify-between items-center border-b border-slate-50 pb-2">
                         <span className="text-slate-400">Name</span>
-                        <span className="font-semibold text-slate-700">{pName || '-'}</span>
+                        <span className="font-semibold text-slate-700 dark:text-slate-300">{pName || '-'}</span>
                      </div>
                      <div className="flex justify-between items-center border-b border-slate-50 pb-2">
                         <span className="text-slate-400">Latest Job ID</span>
-                        <span className="font-mono text-slate-600 truncate max-w-[120px] text-right">{selectedJob ? selectedJob.id : 'No history'}</span>
+                        <span className="font-mono text-slate-600 dark:text-slate-400 truncate max-w-[120px] text-right">{selectedJob ? selectedJob.id : 'No history'}</span>
                      </div>
                      <div className="flex justify-between items-center pt-1">
                         <span className="text-slate-400">State</span>
-                        <span className={`font-medium ${ selectedJob?.state === 'Successful' ? 'text-emerald-600' : selectedJob?.state === 'Faulted' ? 'text-red-600' : selectedJob?.state === 'Running' ? 'text-indigo-600' : 'text-slate-500' }`}>{selectedJob ? selectedJob.state : 'Idle'}</span>
+                        <span className={`font-medium ${ selectedJob?.state === 'Successful' ? 'text-emerald-600' : selectedJob?.state === 'Faulted' ? 'text-red-600' : selectedJob?.state === 'Running' ? 'text-indigo-600' : 'text-slate-500 dark:text-slate-400' }`}>{selectedJob ? selectedJob.state : 'Idle'}</span>
                      </div>
                    </>
                  );
@@ -520,7 +520,7 @@ export function UiPathLiveGraph({
           </div>
 
           <div className="space-y-2 pb-4">
-            <h3 className="text-[10px] font-medium text-slate-500 mb-3 px-1">
+            <h3 className="text-[10px] font-medium text-slate-500 dark:text-slate-400 mb-3 px-1">
                {selectedNode?.type === 'Agent' ? 'Agent MCP Logs' : selectedNode?.type === 'Queue' ? 'Queue Transactions Logs' : 'Execution Status & Logs'}
             </h3>
             <div className="bg-[#0f172a] rounded-xl p-3 shadow-inner font-mono text-[11px] leading-relaxed relative overflow-hidden min-h-[120px]">
@@ -552,11 +552,11 @@ export function UiPathLiveGraph({
                           {selectedJob.logs ? (
                             <div className="text-xs">{selectedJob.logs}</div>
                           ) : (
-                            <div className="text-slate-500 italic">No logs available.</div>
+                            <div className="text-slate-500 dark:text-slate-400 italic">No logs available.</div>
                           )}
                         </div>
                      ) : (
-                        <div className="text-slate-500 italic">No job execution history found for this process.</div>
+                        <div className="text-slate-500 dark:text-slate-400 italic">No job execution history found for this process.</div>
                      )}
                    </>
                  );

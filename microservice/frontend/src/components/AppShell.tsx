@@ -12,10 +12,12 @@ import {
   BookOpen,
   ArrowUpRight,
   LogOut,
+  Database,
 } from "lucide-react";
 import { GithubIcon, LinkedinIcon } from "@/components/Icons";
 import { AuroraThread } from "@/components/AuroraThread";
 import { MARKETING_CHROMELESS_ROUTES } from "@/lib/marketingNav";
+import { ThemeToggle } from "@/components/ThemeToggle";
 
 const NAV_SECTIONS = [
   {
@@ -26,6 +28,7 @@ const NAV_SECTIONS = [
       { href: "/tools", label: "Tools Registry", icon: Wrench },
       { href: "/agent-creator", label: "Agent Architect", icon: Wand2 },
       { href: "/playground", label: "Agent Flow Playground", icon: Zap },
+      { href: "/knowledge-base", label: "Knowledge Bases", icon: Database },
     ],
   },
   {
@@ -68,7 +71,7 @@ export function AppShell({ children }: { children: React.ReactNode }) {
   const current = ALL_ITEMS.find((n) => pathname === n.href || pathname.startsWith(n.href + "/"));
 
   return (
-    <div className="flex h-[100dvh] bg-[#f8f9fa] overflow-hidden">
+    <div className="flex h-[100dvh] bg-[#f8f9fa] dark:bg-[var(--background)] overflow-hidden">
       {/* Left Rail — enterprise dark console (Desktop) */}
       <aside className="hidden md:flex w-64 flex-shrink-0 bg-slate-950 text-slate-100 flex-col border-r border-white/10 shadow-[4px_0_24px_rgba(0,0,0,0.02)] z-20">
         {/* Logo */}
@@ -123,12 +126,12 @@ export function AppShell({ children }: { children: React.ReactNode }) {
       </aside>
 
       {/* Main Area */}
-      <main className="flex-1 flex flex-col overflow-hidden bg-[#FAFAFA] relative">
+      <main className="flex-1 flex flex-col overflow-hidden bg-[#FAFAFA] dark:bg-[var(--background)] relative">
         {/* Top Bar */}
-        <header className="relative h-16 bg-white/80 backdrop-blur-xl border-b border-slate-200/60 flex items-center justify-between px-4 md:px-8 flex-shrink-0 z-10 sticky top-0">
+        <header className="relative h-16 bg-white/80 dark:bg-slate-900/80 backdrop-blur-xl border-b border-slate-200/60 dark:border-white/10 flex items-center justify-between px-4 md:px-8 flex-shrink-0 z-10 sticky top-0">
           <div className="flex items-center gap-3">
             <div>
-              <h1 className="text-base font-semibold text-slate-800 leading-tight">
+              <h1 className="text-base font-semibold text-slate-800 dark:text-white leading-tight">
                 {current?.label || "Amadeus"}
               </h1>
               <p className="text-[11px] text-slate-400 font-medium leading-tight hidden md:block">{pathname}</p>
@@ -136,49 +139,50 @@ export function AppShell({ children }: { children: React.ReactNode }) {
           </div>
           <div className="flex items-center gap-4">
             <div className="hidden md:flex items-center gap-3 mr-2">
-              <a href="https://github.com" target="_blank" rel="noopener noreferrer" className="p-1.5 text-slate-400 hover:text-slate-800 transition-colors bg-white hover:bg-slate-50 border border-slate-200 rounded-full shadow-sm">
+              <a href="https://github.com" target="_blank" rel="noopener noreferrer" className="p-1.5 text-slate-400 hover:text-slate-800 dark:hover:text-white transition-colors bg-white dark:bg-slate-800 hover:bg-slate-50 dark:hover:bg-slate-700 border border-slate-200 dark:border-slate-700 rounded-full shadow-sm">
                 <GithubIcon className="w-4 h-4" />
               </a>
-              <a href="https://linkedin.com" target="_blank" rel="noopener noreferrer" className="p-1.5 text-slate-400 hover:text-[#0A66C2] transition-colors bg-white hover:bg-slate-50 border border-slate-200 rounded-full shadow-sm">
+              <a href="https://linkedin.com" target="_blank" rel="noopener noreferrer" className="p-1.5 text-slate-400 hover:text-[#0A66C2] dark:hover:text-blue-400 transition-colors bg-white dark:bg-slate-800 hover:bg-slate-50 dark:hover:bg-slate-700 border border-slate-200 dark:border-slate-700 rounded-full shadow-sm">
                 <LinkedinIcon className="w-4 h-4" />
               </a>
             </div>
-            <span className="hidden md:inline-flex items-center gap-2 text-xs font-medium text-slate-500 bg-slate-100 px-2.5 py-1 rounded-full">
+            <span className="hidden md:inline-flex items-center gap-2 text-xs font-medium text-slate-500 dark:text-slate-300 bg-slate-100 dark:bg-slate-800 px-2.5 py-1 rounded-full">
               <span className="w-2 h-2 rounded-full bg-emerald-500 shadow-[0_0_8px_rgba(16,185,129,0.4)]" />
               Operational
             </span>
+            <ThemeToggle />
             <a
               href="http://localhost:8080/docs"
               target="_blank"
               rel="noopener noreferrer"
-              className="hidden md:flex items-center gap-1.5 bg-white border border-slate-200 text-slate-600 text-xs font-medium py-1.5 px-3 rounded-full hover:bg-slate-50 hover:text-slate-900 transition-colors shadow-sm"
+              className="hidden md:flex items-center gap-1.5 bg-white dark:bg-slate-800 border border-slate-200 dark:border-slate-700 text-slate-600 dark:text-slate-300 text-xs font-medium py-1.5 px-3 rounded-full hover:bg-slate-50 dark:hover:bg-slate-700 hover:text-slate-900 dark:hover:text-white transition-colors shadow-sm"
             >
               API Docs <ArrowUpRight className="w-3 h-3" />
             </a>
             <div className="relative" ref={dropdownRef}>
               <button
                 onClick={() => setDropdownOpen(!dropdownOpen)}
-                className="flex items-center gap-2 bg-slate-900 border border-slate-900 text-white text-xs font-medium py-1.5 px-3 rounded-full hover:bg-slate-800 transition-colors shadow-sm ml-1"
+                className="flex items-center gap-2 bg-slate-900 dark:bg-white border border-slate-900 dark:border-white text-white dark:text-slate-900 text-xs font-medium py-1.5 px-3 rounded-full hover:bg-slate-800 dark:hover:bg-slate-100 transition-colors shadow-sm ml-1"
                 title="Account Menu"
               >
-                <div className="w-4 h-4 rounded-full bg-white/20 flex items-center justify-center text-[9px] font-medium text-white">
+                <div className="w-4 h-4 rounded-full bg-white/20 dark:bg-slate-900/10 flex items-center justify-center text-[9px] font-medium text-white dark:text-slate-900">
                   A
                 </div>
                 <span className="hidden md:inline">Account</span>
               </button>
               
               {dropdownOpen && (
-                <div className="absolute right-0 mt-2 w-48 bg-white rounded-xl border border-slate-200 shadow-xl overflow-hidden z-50">
+                <div className="absolute right-0 mt-2 w-48 bg-white dark:bg-slate-800 rounded-xl border border-slate-200 dark:border-slate-700 shadow-xl overflow-hidden z-50">
                   <div className="py-2">
                     <div className="px-4 py-2 mb-1">
-                      <p className="text-xs font-semibold text-slate-800">Admin User</p>
+                      <p className="text-xs font-semibold text-slate-800 dark:text-white">Admin User</p>
                       <p className="text-[10px] text-slate-500">amadeus.a2a/1</p>
                     </div>
                     <div className="h-px bg-slate-100 mb-1"></div>
                     <Link 
                       href="/login" 
                       onClick={() => setDropdownOpen(false)}
-                      className="block px-4 py-2 text-xs font-medium text-slate-600 hover:bg-slate-50 hover:text-pink-600 transition-colors"
+                      className="block px-4 py-2 text-xs font-medium text-slate-600 dark:text-slate-300 hover:bg-slate-50 dark:hover:bg-slate-700 hover:text-fuchsia-600 dark:hover:text-fuchsia-400 transition-colors"
                     >
                       Sign in
                     </Link>
@@ -207,17 +211,17 @@ export function AppShell({ children }: { children: React.ReactNode }) {
         </div>
         
         {/* Mobile Bottom Navigation */}
-        <nav className="md:hidden fixed bottom-0 left-0 right-0 bg-white/90 backdrop-blur-xl border-t border-slate-200/60 flex items-center justify-around px-2 py-2 pb-safe z-50 shadow-[0_-4px_24px_rgba(0,0,0,0.04)]">
+        <nav className="md:hidden fixed bottom-0 left-0 right-0 bg-white/90 dark:bg-slate-900/90 backdrop-blur-xl border-t border-slate-200/60 dark:border-white/10 flex items-center justify-around px-2 py-2 pb-safe z-50 shadow-[0_-4px_24px_rgba(0,0,0,0.04)]">
           {ALL_ITEMS.slice(0, 5).map(({ href, label, icon: Icon }) => {
             const isActive = pathname === href || pathname.startsWith(href + "/");
             return (
               <Link
                 key={href}
                 href={href}
-                className={`flex flex-col items-center justify-center w-16 h-12 gap-1 rounded-xl transition-all ${ isActive ? "text-blue-600" : "text-slate-400 hover:text-slate-600" }`}
+                className={`flex flex-col items-center justify-center w-16 h-12 gap-1 rounded-xl transition-all ${ isActive ? "text-cyan-600 dark:text-cyan-400" : "text-slate-400 hover:text-slate-600 dark:hover:text-slate-200" }`}
               >
-                <div className={`relative p-1.5 rounded-full ${isActive ? 'bg-blue-50' : ''}`}>
-                  <Icon className={`w-5 h-5 ${isActive ? "text-blue-600" : ""}`} />
+                <div className={`relative p-1.5 rounded-full ${isActive ? 'bg-cyan-50 dark:bg-cyan-900/30' : ''}`}>
+                  <Icon className={`w-5 h-5 ${isActive ? "text-cyan-600 dark:text-cyan-400" : ""}`} />
                 </div>
                 <span className="text-[9px] font-medium tracking-wide">{label}</span>
               </Link>

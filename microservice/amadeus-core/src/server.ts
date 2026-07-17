@@ -11,6 +11,7 @@ import { registerToolsRoutes } from './routes/tools.js';
 import { registerAgentsRoutes } from './routes/agents.js';
 import { registerAuthRoutes } from './routes/auth.js';
 import { registerFeatureSharingRoutes } from './routes/featureSharing.js';
+import { registerKnowledgeBaseRoutes } from './routes/knowledgeBase.js';
 import { DomainError } from './types/domain.js';
 import { closePool } from './db/pool.js';
 import fastifySwagger from '@fastify/swagger';
@@ -158,6 +159,7 @@ export async function buildServer() {
   await registerToolsRoutes(app as any, {});
   await registerAgentsRoutes(app as any, {});
   await registerFeatureSharingRoutes(app as any, {});
+  await registerKnowledgeBaseRoutes(app as any, {});
   // Login manusia (admin dashboard) — hanya aktif bila OAUTH2_JWT_SECRET
   // di-set, karena itulah yang menandatangani token; sama gaya feature-flag
   // dengan ENABLE_TRANSACTION_ROUTES di atas.

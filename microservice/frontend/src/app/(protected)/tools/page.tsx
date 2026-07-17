@@ -87,7 +87,7 @@ export default function ToolsPage() {
 
   const getDynamicIcon = (name: string, isActive: boolean) => {
     const n = name.toLowerCase();
-    const className = `w-6 h-6 ${isActive ? "text-orange-600" : "text-slate-400"}`;
+    const className = `w-6 h-6 ${isActive ? "text-yellow-600" : "text-slate-400 dark:text-slate-500"}`;
     if (n.includes("uipath")) return <img src="/uipath.svg" alt="UiPath" className={className} />;
     if (n.includes("github")) return <GitBranch className={className} />;
     if (n.includes("pad") || n.includes("power automate")) return <Zap className={className} />;
@@ -530,17 +530,17 @@ export default function ToolsPage() {
       <McpManagerBanner />
 
       {/* Page Header */}
-      <div className="page-header border-b border-slate-100 pb-6 mb-6">
+      <div className="page-header border-b border-slate-100 dark:border-slate-800 pb-6 mb-6">
         <div>
-          <p className="ui-label text-slate-400 mb-2">MCP Infrastructure</p>
-          <h1 className="section-head text-3xl text-slate-900 mb-1">Tools Registry</h1>
-          <p className="text-sm text-slate-500">
+          <p className="ui-label text-slate-400 dark:text-slate-500 mb-2">MCP Infrastructure</p>
+          <h1 className="section-head text-3xl text-slate-900 dark:text-white mb-1">Tools Registry</h1>
+          <p className="text-sm text-slate-500 dark:text-slate-400">
             {tools.length} MCP server{tools.length !== 1 ? "s" : ""} registered ·{" "}
             {tools.filter(t => !t.on_status?.toLowerCase().includes("offline")).length} active &amp; running
           </p>
         </div>
         <div className="flex items-center gap-3">
-          <button onClick={fetchTools} className="btn-secondary text-xs py-2.5 px-4 rounded-xl shadow-sm bg-white hover:bg-slate-50 transition-all">
+          <button onClick={fetchTools} className="btn-secondary text-xs py-2.5 px-4 rounded-xl shadow-sm bg-white dark:bg-slate-900 hover:bg-slate-50 dark:bg-slate-800/50 transition-all">
             <RefreshCw className="w-3.5 h-3.5" /> Refresh
           </button>
           <button onClick={openCreateModal} className="btn-primary text-xs py-2.5 px-4 rounded-xl shadow-md bg-slate-900 text-white hover:bg-slate-800 transition-all flex items-center gap-1.5">
@@ -551,13 +551,13 @@ export default function ToolsPage() {
 
       {/* Integrations Grid */}
       <div className="mb-8">
-        <h2 className="ui-label text-slate-400 mb-3 flex items-center gap-1.5"><LinkIcon className="w-3.5 h-3.5 text-blue-500" /> Connect Integrations</h2>
+        <h2 className="ui-label text-slate-400 dark:text-slate-500 mb-3 flex items-center gap-1.5"><LinkIcon className="w-3.5 h-3.5 text-cyan-500" /> Connect Integrations</h2>
         <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
           {[
             { 
               label: "Login with UiPath", 
               desc: "Trigger RPA settlement robot queues", 
-              color: "border-orange-200 hover:border-orange-300 bg-orange-50/20 text-orange-700", 
+              color: "border-yellow-200 hover:border-yellow-300 bg-yellow-50/20 text-yellow-700", 
               logo: (
                 <svg className="w-5 h-5 mb-2" viewBox="0 0 32 32" fill="none" xmlns="http://www.w3.org/2000/svg">
                   <path d="M5 13V24C5 26.2091 6.79086 28 9 28H19V19H12C10.3431 19 9 17.6569 9 16V13H5Z" fill="#FA4616" />
@@ -570,14 +570,14 @@ export default function ToolsPage() {
             { 
               label: "Connect Amadeus Core", 
               desc: "Verify LC steps & append transitions", 
-              color: "border-indigo-200 hover:border-indigo-300 bg-indigo-50/20 text-indigo-700", 
+              color: "border-cyan-200 dark:border-cyan-500/30 hover:border-cyan-300 bg-cyan-50 dark:bg-cyan-900/30/20 text-cyan-700 dark:text-cyan-400", 
               logo: <img src="/amadeus.svg" alt="Amadeus" className="w-5 h-5 mb-2" />,
               provider: "amadeus" as const
             },
             { 
               label: "Login with Power Automate", 
               desc: "Trigger desktop automation flows", 
-              color: "border-blue-200 hover:border-blue-300 bg-blue-50/20 text-blue-700", 
+              color: "border-cyan-200 dark:border-cyan-500/30 hover:border-cyan-300 bg-cyan-50 dark:bg-cyan-900/30/20 text-cyan-700 dark:text-cyan-400", 
               logo: (
                 <svg className="w-5 h-5 mb-2" viewBox="0 0 32 32" fill="none" xmlns="http://www.w3.org/2000/svg">
                   <path d="M11 2L2 11L11 20L20 11L11 2Z" fill="#0078D4" />
@@ -602,19 +602,19 @@ export default function ToolsPage() {
 
       {/* Toolbar: Search and Filters */}
       {!loading && !error && tools.length > 0 && (
-        <div className="flex flex-col md:flex-row gap-4 justify-between items-center mb-8 bg-white border border-slate-100 p-4 rounded-2xl shadow-sm">
+        <div className="flex flex-col md:flex-row gap-4 justify-between items-center mb-8 bg-white dark:bg-slate-900 border border-slate-100 dark:border-slate-800 p-4 rounded-2xl shadow-sm">
           <div className="relative w-full md:w-80">
             <input
               type="text"
               placeholder="Search MCP servers..."
               value={searchQuery}
               onChange={e => setSearchQuery(e.target.value)}
-              className="w-full pl-9 pr-4 py-2 border border-slate-200 rounded-xl text-sm focus:outline-none focus:ring-2 focus:ring-slate-500/20 focus:border-slate-500"
+              className="w-full pl-9 pr-4 py-2 border border-slate-200 dark:border-slate-700 rounded-xl text-sm focus:outline-none focus:ring-2 focus:ring-slate-500/20 focus:border-slate-500"
             />
-            <Server className="w-4 h-4 text-slate-400 absolute left-3 top-3" />
+            <Server className="w-4 h-4 text-slate-400 dark:text-slate-500 absolute left-3 top-3" />
           </div>
           <div className="flex items-center gap-2 w-full md:w-auto overflow-x-auto pb-1 md:pb-0">
-            <span className="ui-label text-slate-400 mr-2 flex-shrink-0">Transport</span>
+            <span className="ui-label text-slate-400 dark:text-slate-500 mr-2 flex-shrink-0">Transport</span>
             {[
               { id: "all", label: "All Methods" },
               { id: "sse", label: "SSE (HTTP)" },
@@ -623,7 +623,7 @@ export default function ToolsPage() {
               <button
                 key={tab.id}
                 onClick={() => setMethodFilter(tab.id)}
-                className={`text-xs font-semibold px-3 py-1.5 rounded-lg border transition-all ${methodFilter === tab.id ? "bg-slate-900 border-slate-950 text-white shadow-sm" : "bg-white border-slate-200 text-slate-500 hover:text-slate-700 hover:bg-slate-50" }`}
+                className={`text-xs font-semibold px-3 py-1.5 rounded-lg border transition-all ${methodFilter === tab.id ? "bg-slate-900 border-slate-950 text-white shadow-sm" : "bg-white dark:bg-slate-900 border-slate-200 dark:border-slate-700 text-slate-500 dark:text-slate-400 hover:text-slate-700 dark:hover:text-slate-300 hover:bg-slate-50 dark:bg-slate-800/50" }`}
               >
                 {tab.label}
               </button>
@@ -636,15 +636,15 @@ export default function ToolsPage() {
       {loading ? (
         <div className="flex flex-col items-center justify-center py-24">
           <RainbowRibbonLoader />
-          <p className="mt-4 text-xs font-mono text-slate-400">Loading Smithery Registry…</p>
+          <p className="mt-4 text-xs font-mono text-slate-400 dark:text-slate-500">Loading Smithery Registry…</p>
         </div>
       ) : error ? (
-        <div className="rounded-xl border border-red-100 bg-red-50 p-6 text-sm text-red-700">
+        <div className="rounded-xl border border-red-100 dark:border-red-500/30 bg-red-50 dark:bg-red-900/20 p-6 text-sm text-red-700">
           <p className="font-semibold mb-1">Connection Error</p>
           <p className="text-red-500 text-xs font-mono">{error}</p>
         </div>
       ) : tools.length === 0 ? (
-        <div className="flex flex-col items-center justify-center py-24 text-slate-400">
+        <div className="flex flex-col items-center justify-center py-24 text-slate-400 dark:text-slate-500">
           <Server className="w-10 h-10 mb-3 opacity-30 animate-pulse" />
           <p className="text-sm font-medium">No MCP servers registered yet.</p>
           <button onClick={openCreateModal} className="mt-4 btn-primary text-xs py-2 px-4">
@@ -652,7 +652,7 @@ export default function ToolsPage() {
           </button>
         </div>
       ) : filteredTools.length === 0 ? (
-        <div className="flex flex-col items-center justify-center py-24 text-slate-400 bg-white border border-slate-100 rounded-2xl">
+        <div className="flex flex-col items-center justify-center py-24 text-slate-400 dark:text-slate-500 bg-white dark:bg-slate-900 border border-slate-100 dark:border-slate-800 rounded-2xl">
           <Server className="w-8 h-8 mb-2 opacity-30" />
           <p className="text-sm font-medium">No servers match your filters.</p>
         </div>
@@ -668,11 +668,11 @@ export default function ToolsPage() {
             return (
               <div
                 key={tool.tool_id}
-                className="bg-white border border-slate-200 rounded-2xl p-6 card-hover group relative flex flex-col hover:border-slate-300 hover:shadow-xl hover:shadow-slate-500/5 transition-all duration-300"
+                className="bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-700 rounded-2xl p-6 card-hover group relative flex flex-col hover:border-slate-300 hover:shadow-xl hover:shadow-slate-500/5 transition-all duration-300"
               >
                 {/* Actions */}
                 <div className="absolute top-4 right-4 flex gap-1 transition-opacity z-10 opacity-100">
-                  <button onClick={() => toggleStar(tool.tool_id)} title="Favorite" className="p-1.5 bg-white border border-slate-200 text-slate-400 hover:text-amber-500 hover:border-amber-200 hover:bg-amber-50 rounded-lg shadow-sm transition-all">
+                  <button onClick={() => toggleStar(tool.tool_id)} title="Favorite" className="p-1.5 bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-700 text-slate-400 dark:text-slate-500 hover:text-amber-500 hover:border-amber-200 hover:bg-amber-50 rounded-lg shadow-sm transition-all">
                     <Star className={`w-3.5 h-3.5 ${starredTools.includes(tool.tool_id) ? "fill-amber-400 text-amber-500" : ""}`} />
                   </button>
                   {isActive && (
@@ -680,41 +680,41 @@ export default function ToolsPage() {
                       onClick={() => restartTool(tool.tool_id)}
                       disabled={restartingId === tool.tool_id}
                       title="Restart"
-                      className="p-1.5 bg-white border border-slate-200 text-slate-400 hover:text-blue-600 hover:border-blue-200 hover:bg-blue-50 rounded-lg shadow-sm transition-all disabled:opacity-40"
+                      className="p-1.5 bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-700 text-slate-400 dark:text-slate-500 hover:text-cyan-600 hover:border-cyan-200 dark:border-cyan-500/30 hover:bg-cyan-50 dark:bg-cyan-900/30 rounded-lg shadow-sm transition-all disabled:opacity-40"
                     >
                       <RefreshCw className={`w-3.5 h-3.5 ${restartingId === tool.tool_id ? "animate-spin" : ""}`} />
                     </button>
                   )}
-                  <button onClick={() => handleDuplicate(tool)} title="Duplicate" className="p-1.5 bg-white border border-slate-200 text-slate-400 hover:text-indigo-600 hover:border-indigo-200 hover:bg-indigo-50 rounded-lg shadow-sm transition-all">
+                  <button onClick={() => handleDuplicate(tool)} title="Duplicate" className="p-1.5 bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-700 text-slate-400 dark:text-slate-500 hover:text-cyan-600 hover:border-cyan-200 dark:border-cyan-500/30 hover:bg-cyan-50 dark:bg-cyan-900/30 rounded-lg shadow-sm transition-all">
                     <Files className="w-3.5 h-3.5" />
                   </button>
-                  <button onClick={() => openEditModal(tool)} title="Edit" className="p-1.5 bg-white border border-slate-200 text-slate-400 hover:text-slate-700 hover:border-slate-300 rounded-lg shadow-sm transition-all">
+                  <button onClick={() => openEditModal(tool)} title="Edit" className="p-1.5 bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-700 text-slate-400 dark:text-slate-500 hover:text-slate-700 dark:hover:text-slate-300 hover:border-slate-300 rounded-lg shadow-sm transition-all">
                     <Edit2 className="w-3.5 h-3.5" />
                   </button>
-                  <button onClick={() => confirmDelete(tool)} title="Delete" className="p-1.5 bg-white border border-slate-200 text-slate-400 hover:text-red-600 hover:border-red-200 hover:bg-red-50 rounded-lg shadow-sm transition-all">
+                  <button onClick={() => confirmDelete(tool)} title="Delete" className="p-1.5 bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-700 text-slate-400 dark:text-slate-500 hover:text-red-600 hover:border-red-200 dark:border-red-500/30 hover:bg-red-50 dark:bg-red-900/20 rounded-lg shadow-sm transition-all">
                     <Trash2 className="w-3.5 h-3.5" />
                   </button>
                 </div>
 
                 {/* Header */}
                 <div className="flex items-start gap-4 mb-4 pr-16">
-                  <div className={`w-12 h-12 rounded-2xl ${isActive ? "bg-orange-50 border border-orange-100 text-orange-600" : "bg-slate-50 border border-slate-100 text-slate-400"} flex items-center justify-center flex-shrink-0 shadow-sm`}>
+                  <div className={`w-12 h-12 rounded-2xl ${isActive ? "bg-yellow-50 border border-yellow-100 text-yellow-600" : "bg-slate-50 dark:bg-slate-800/50 border border-slate-100 dark:border-slate-800 text-slate-400 dark:text-slate-500"} flex items-center justify-center flex-shrink-0 shadow-sm`}>
                     {getDynamicIcon(tool.name, isActive)}
                   </div>
                   <div>
-                    <h3 className="font-semibold text-slate-900 text-base leading-snug">{tool.name}</h3>
+                    <h3 className="font-semibold text-slate-900 dark:text-white text-base leading-snug">{tool.name}</h3>
                     <div className="flex items-center gap-2 mt-1">
                       <span className={`badge text-[9px] px-2 py-0.5 rounded-full ${isActive ? "badge-green" : "badge-slate"}`}>
                         <span className={`w-1.5 h-1.5 rounded-full mr-1 inline-block ${isActive ? "bg-green-500 animate-pulse" : "bg-slate-400"}`} />
                         {isActive ? "Active" : "Offline"}
                       </span>
-                      <span className="text-[10px] font-mono text-slate-400">Transport: <span className="font-medium text-slate-600">{method}</span></span>
+                      <span className="text-[10px] font-mono text-slate-400 dark:text-slate-500">Transport: <span className="font-medium text-slate-600 dark:text-slate-400">{method}</span></span>
                     </div>
                   </div>
                 </div>
 
                 {/* Description */}
-                <p className="text-sm text-slate-600 mb-4 leading-relaxed line-clamp-2">
+                <p className="text-sm text-slate-600 dark:text-slate-400 mb-4 leading-relaxed line-clamp-2">
                   {tool.description || "No description provided."}
                 </p>
 
@@ -724,11 +724,11 @@ export default function ToolsPage() {
                   {/* CLI Command */}
                   {argsDisplay && (
                     <div className="space-y-1">
-                      <div className="flex justify-between items-center ui-label text-slate-400">
+                      <div className="flex justify-between items-center ui-label text-slate-400 dark:text-slate-500">
                         <span className="flex items-center gap-1"><Terminal className="w-3 h-3" /> Command Line Args</span>
                         <button
                           onClick={() => copyToClipboard(argsDisplay, `${tool.tool_id}-args`)}
-                          className="flex items-center gap-1 text-slate-400 hover:text-slate-600 transition-colors"
+                          className="flex items-center gap-1 text-slate-400 dark:text-slate-500 hover:text-slate-600 dark:text-slate-400 transition-colors"
                         >
                           {copiedId === `${tool.tool_id}-args` ? (
                             <>
@@ -754,11 +754,11 @@ export default function ToolsPage() {
 
                   {/* JSON Config Box */}
                   <div className="space-y-1">
-                    <div className="flex justify-between items-center ui-label text-slate-400">
+                    <div className="flex justify-between items-center ui-label text-slate-400 dark:text-slate-500">
                       <span>Claude Desktop Configuration</span>
                       <button
                         onClick={() => copyToClipboard(jsonSnippet, `${tool.tool_id}-json`)}
-                        className="flex items-center gap-1 text-slate-400 hover:text-slate-600 transition-colors"
+                        className="flex items-center gap-1 text-slate-400 dark:text-slate-500 hover:text-slate-600 dark:text-slate-400 transition-colors"
                       >
                         {copiedId === `${tool.tool_id}-json` ? (
                           <>
@@ -779,26 +779,26 @@ export default function ToolsPage() {
                   </div>
 
                   {/* Live port / Connection parameters */}
-                  <div className="grid grid-cols-2 gap-2 pt-2 border-t border-slate-100 text-xs font-mono">
-                    <div className="flex justify-between border-r border-slate-100 pr-2">
-                      <span className="text-slate-400">Live Port</span>
+                  <div className="grid grid-cols-2 gap-2 pt-2 border-t border-slate-100 dark:border-slate-800 text-xs font-mono">
+                    <div className="flex justify-between border-r border-slate-100 dark:border-slate-800 pr-2">
+                      <span className="text-slate-400 dark:text-slate-500">Live Port</span>
                       {method === "sse" ? (
                         liveStatus?.status === "running" && liveStatus.port ? (
                           <span className="text-green-700 font-semibold flex items-center gap-1">
                             <span className="w-1.5 h-1.5 rounded-full bg-green-500 animate-pulse" /> :{liveStatus.port}
                           </span>
                         ) : (
-                          <span className="text-slate-400 font-semibold flex items-center gap-1">
+                          <span className="text-slate-400 dark:text-slate-500 font-semibold flex items-center gap-1">
                             <span className="w-1.5 h-1.5 rounded-full bg-slate-300" /> stopped
                           </span>
                         )
                       ) : (
-                        <span className="text-slate-400 font-semibold">n/a (stdio)</span>
+                        <span className="text-slate-400 dark:text-slate-500 font-semibold">n/a (stdio)</span>
                       )}
                     </div>
                     <div className="flex justify-between pl-2">
-                      <span className="text-slate-400">Node ID</span>
-                      <span className="text-slate-700 font-semibold">{tool.tool_id?.substring(0, 8)}</span>
+                      <span className="text-slate-400 dark:text-slate-500">Node ID</span>
+                      <span className="text-slate-700 dark:text-slate-300 font-semibold">{tool.tool_id?.substring(0, 8)}</span>
                     </div>
                   </div>
 
@@ -812,23 +812,23 @@ export default function ToolsPage() {
       {/* Modal */}
       {isModalOpen && (
         <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/25 backdrop-blur-sm p-4 animate-in fade-in duration-200">
-          <div className="bg-white border border-slate-200 rounded-2xl w-full max-w-lg shadow-2xl flex flex-col max-h-[90vh]">
-            <div className="flex justify-between items-center px-6 py-4 border-b border-slate-100">
-              <h2 className="font-semibold text-slate-900 text-lg">
+          <div className="bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-700 rounded-2xl w-full max-w-lg shadow-2xl flex flex-col max-h-[90vh]">
+            <div className="flex justify-between items-center px-6 py-4 border-b border-slate-100 dark:border-slate-800">
+              <h2 className="font-semibold text-slate-900 dark:text-white text-lg">
                 {modalMode === "create" ? "Register MCP Server" : "Edit MCP Server"}
               </h2>
-              <button onClick={() => setIsModalOpen(false)} className="p-1.5 text-slate-400 hover:text-slate-700 hover:bg-slate-100 rounded-lg">
+              <button onClick={() => setIsModalOpen(false)} className="p-1.5 text-slate-400 dark:text-slate-500 hover:text-slate-700 dark:hover:text-slate-300 hover:bg-slate-100 dark:bg-slate-800 rounded-lg">
                 <X className="w-4 h-4" />
               </button>
             </div>
             <div className="p-6 overflow-y-auto flex-1 space-y-4">
               <div>
                 <label className="form-label">Server Name</label>
-                <input required value={formData.name} onChange={e => setFormData({ ...formData, name: e.target.value })} className="form-input rounded-xl border-slate-200" placeholder="e.g. amadeus-mcp" />
+                <input required value={formData.name} onChange={e => setFormData({ ...formData, name: e.target.value })} className="form-input rounded-xl border-slate-200 dark:border-slate-700" placeholder="e.g. amadeus-mcp" />
               </div>
               <div>
                 <label className="form-label">Description / Capabilities</label>
-                <textarea value={formData.description} onChange={e => setFormData({ ...formData, description: e.target.value })} className="form-input rounded-xl border-slate-200 h-20 resize-none" placeholder="What tools and operations does this server expose..." />
+                <textarea value={formData.description} onChange={e => setFormData({ ...formData, description: e.target.value })} className="form-input rounded-xl border-slate-200 dark:border-slate-700 h-20 resize-none" placeholder="What tools and operations does this server expose..." />
               </div>
               <div className="grid grid-cols-2 gap-4">
                 <div>
@@ -859,7 +859,7 @@ export default function ToolsPage() {
               {formData.method === "sse" && (
                 <div>
                   <label className="form-label">Live Port</label>
-                  <div className="form-input rounded-xl border-slate-200 bg-slate-50 text-slate-400 flex items-center gap-2 cursor-not-allowed">
+                  <div className="form-input rounded-xl border-slate-200 dark:border-slate-700 bg-slate-50 dark:bg-slate-800/50 text-slate-400 dark:text-slate-500 flex items-center gap-2 cursor-not-allowed">
                     {(() => {
                       const live = currentTool ? mcpStatus[currentTool.tool_id] : undefined;
                       if (live?.status === "running" && live.port) {
@@ -870,13 +870,13 @@ export default function ToolsPage() {
                   </div>
                 </div>
               )}
-              <div className="bg-slate-50 border border-dashed border-slate-200 rounded-xl p-3 space-y-2">
-                <label className="form-label">Have a full command line instead? <span className="normal-case font-normal text-slate-400">(e.g. copied from docs or an old tool)</span></label>
+              <div className="bg-slate-50 dark:bg-slate-800/50 border border-dashed border-slate-200 dark:border-slate-700 rounded-xl p-3 space-y-2">
+                <label className="form-label">Have a full command line instead? <span className="normal-case font-normal text-slate-400 dark:text-slate-500">(e.g. copied from docs or an old tool)</span></label>
                 <div className="flex gap-2">
                   <input
                     value={pasteCommand}
                     onChange={e => setPasteCommand(e.target.value)}
-                    className="form-input rounded-lg border-slate-200 font-mono text-xs flex-1"
+                    className="form-input rounded-lg border-slate-200 dark:border-slate-700 font-mono text-xs flex-1"
                     placeholder={`node /path/to/index.js '{"key":"value"}' --stdio`}
                   />
                   <button
@@ -888,23 +888,23 @@ export default function ToolsPage() {
                     Split into fields
                   </button>
                 </div>
-                <p className="text-[10px] text-slate-400">Paste here, click Split, then review the Command/Args below before saving — this never runs automatically, it just fills in the fields.</p>
+                <p className="text-[10px] text-slate-400 dark:text-slate-500">Paste here, click Split, then review the Command/Args below before saving — this never runs automatically, it just fills in the fields.</p>
               </div>
               <div>
                 <label className="form-label">Command (executable)</label>
-                <input value={formData.command} onChange={e => setFormData({ ...formData, command: e.target.value })} className="form-input rounded-xl border-slate-200" placeholder="e.g. node" />
+                <input value={formData.command} onChange={e => setFormData({ ...formData, command: e.target.value })} className="form-input rounded-xl border-slate-200 dark:border-slate-700" placeholder="e.g. node" />
               </div>
               <div>
-                <label className="form-label">Args <span className="normal-case font-normal text-slate-400">(one per line — each is passed as a separate argv entry, no shell parsing)</span></label>
+                <label className="form-label">Args <span className="normal-case font-normal text-slate-400 dark:text-slate-500">(one per line — each is passed as a separate argv entry, no shell parsing)</span></label>
                 <textarea
                   value={formData.argsText}
                   onChange={e => setFormData({ ...formData, argsText: e.target.value })}
-                  className="form-input rounded-xl border-slate-200 h-24 resize-none font-mono text-xs"
+                  className="form-input rounded-xl border-slate-200 dark:border-slate-700 h-24 resize-none font-mono text-xs"
                   placeholder={"/absolute/path/to/build/index.js\n--stdio"}
                 />
               </div>
               <div>
-                <label className="form-label">Env <span className="normal-case font-normal text-slate-400">(one KEY=value per line)</span></label>
+                <label className="form-label">Env <span className="normal-case font-normal text-slate-400 dark:text-slate-500">(one KEY=value per line)</span></label>
                 {/* UiPath credential sub-form */}
                 {(formData.argsText.includes('uipath-mcp') || formData.argsText.includes('uipath')) && (
                   <div className="space-y-2 border rounded-xl p-4 bg-amber-50/50 mb-3">
@@ -943,12 +943,12 @@ export default function ToolsPage() {
                 <textarea
                   value={formData.envText}
                   onChange={e => setFormData({ ...formData, envText: e.target.value })}
-                  className="form-input rounded-xl border-slate-200 h-16 resize-none font-mono text-xs"
+                  className="form-input rounded-xl border-slate-200 dark:border-slate-700 h-16 resize-none font-mono text-xs"
                   placeholder={"UIPATH_ORG=anakindia\nUIPATH_TENANT=DefaultTenant\nUIPATH_CLIENT_ID=..."}
                 />
               </div>
             </div>
-            <div className="px-6 py-4 border-t border-slate-100 flex justify-end gap-3 bg-slate-50/50 rounded-b-2xl">
+            <div className="px-6 py-4 border-t border-slate-100 dark:border-slate-800 flex justify-end gap-3 bg-slate-50 dark:bg-slate-800/50 rounded-b-2xl">
               <button onClick={() => setIsModalOpen(false)} className="btn-secondary text-sm rounded-xl">Cancel</button>
               <button onClick={handleSave} className="btn-primary text-sm rounded-xl bg-slate-900 text-white hover:bg-slate-800">
                 {modalMode === "create" ? "Register Server" : "Save Changes"} <ChevronRight className="w-4 h-4" />
@@ -960,14 +960,14 @@ export default function ToolsPage() {
       {/* Auth Modal */}
       {isAuthModalOpen && (
         <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/25 backdrop-blur-sm p-4 animate-in fade-in duration-200">
-          <div className="bg-white border border-slate-200 rounded-2xl w-full max-w-md shadow-2xl flex flex-col">
-            <div className="flex justify-between items-center px-6 py-4 border-b border-slate-100">
-              <h2 className="font-semibold text-slate-900 text-lg flex items-center gap-2">
-                {authProvider === "uipath" && <span className="text-orange-600">Connect to UiPath</span>}
-                {authProvider === "pad" && <span className="text-blue-600">Connect to Power Automate</span>}
-                {authProvider === "amadeus" && <span className="text-indigo-600">Connect Amadeus Core</span>}
+          <div className="bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-700 rounded-2xl w-full max-w-md shadow-2xl flex flex-col">
+            <div className="flex justify-between items-center px-6 py-4 border-b border-slate-100 dark:border-slate-800">
+              <h2 className="font-semibold text-slate-900 dark:text-white text-lg flex items-center gap-2">
+                {authProvider === "uipath" && <span className="text-yellow-600">Connect to UiPath</span>}
+                {authProvider === "pad" && <span className="text-cyan-600">Connect to Power Automate</span>}
+                {authProvider === "amadeus" && <span className="text-cyan-600">Connect Amadeus Core</span>}
               </h2>
-              <button type="button" onClick={() => setIsAuthModalOpen(false)} className="p-1.5 text-slate-400 hover:text-slate-700 hover:bg-slate-100 rounded-lg">
+              <button type="button" onClick={() => setIsAuthModalOpen(false)} className="p-1.5 text-slate-400 dark:text-slate-500 hover:text-slate-700 dark:hover:text-slate-300 hover:bg-slate-100 dark:bg-slate-800 rounded-lg">
                 <X className="w-4 h-4" />
               </button>
             </div>
@@ -976,7 +976,7 @@ export default function ToolsPage() {
               <div className="p-6 space-y-4">
                 {/* Inline error banner — replaces browser alert() */}
                 {authConnectError && (
-                  <div className="flex items-start gap-2.5 bg-red-50 border border-red-200 rounded-xl p-3 text-sm">
+                  <div className="flex items-start gap-2.5 bg-red-50 dark:bg-red-900/20 border border-red-200 dark:border-red-500/30 rounded-xl p-3 text-sm">
                     <XCircle className="w-4 h-4 text-red-500 mt-0.5 shrink-0" />
                     <div>
                       <p className="font-semibold text-red-700">Connection failed</p>
@@ -986,16 +986,16 @@ export default function ToolsPage() {
                 )}
                 {authProvider === "uipath" ? (
                   <>
-                    <div className="bg-slate-50 p-3 rounded-xl border border-slate-100 text-xs text-slate-500">
+                    <div className="bg-slate-50 dark:bg-slate-800/50 p-3 rounded-xl border border-slate-100 dark:border-slate-800 text-xs text-slate-500 dark:text-slate-400">
                       Enter your UiPath External Application credentials. Credentials are stored as environment variables — never exposed in process listings.
                     </div>
-                    <div className="bg-indigo-50/50 p-3.5 rounded-xl border border-indigo-100 space-y-2">
-                      <label className="form-label text-indigo-900 mb-0">Auto-Fill from URL <span className="normal-case font-normal text-indigo-600/70">(Optional)</span></label>
-                      <p className="text-[10px] text-indigo-500 mb-2">Paste your Orchestrator folder URL to automatically extract Org, Tenant, and Folder ID.</p>
+                    <div className="bg-cyan-50 dark:bg-cyan-900/30/50 p-3.5 rounded-xl border border-cyan-100 space-y-2">
+                      <label className="form-label text-cyan-900 mb-0">Auto-Fill from URL <span className="normal-case font-normal text-cyan-600/70">(Optional)</span></label>
+                      <p className="text-[10px] text-cyan-500 mb-2">Paste your Orchestrator folder URL to automatically extract Org, Tenant, and Folder ID.</p>
                       <input 
                         type="url"
                         onChange={(e) => handleUiPathUrlParse(e.target.value)}
-                        className="form-input rounded-xl border-indigo-200 bg-white placeholder-indigo-300 focus:ring-indigo-500 focus:border-indigo-500 w-full" 
+                        className="form-input rounded-xl border-cyan-200 dark:border-cyan-500/30 bg-white dark:bg-slate-900 placeholder-cyan-300 focus:ring-cyan-500 focus:border-cyan-500 w-full" 
                         placeholder="https://cloud.uipath.com/org/tenant/orchestrator_/?fid=XXXXX" 
                       />
                     </div>
@@ -1010,60 +1010,60 @@ export default function ToolsPage() {
                             key={opt.value}
                             type="button"
                             onClick={() => setAuthFormData({ ...authFormData, transportMethod: opt.value })}
-                            className={`flex-1 flex flex-col items-center gap-0.5 py-2.5 px-3 rounded-xl border text-xs font-semibold transition-all ${ authFormData.transportMethod === opt.value ? "bg-slate-900 border-slate-900 text-white shadow-md" : "bg-white border-slate-200 text-slate-500 hover:border-slate-300 hover:text-slate-700" }`}
+                            className={`flex-1 flex flex-col items-center gap-0.5 py-2.5 px-3 rounded-xl border text-xs font-semibold transition-all ${ authFormData.transportMethod === opt.value ? "bg-slate-900 border-slate-900 text-white shadow-md" : "bg-white dark:bg-slate-900 border-slate-200 dark:border-slate-700 text-slate-500 dark:text-slate-400 hover:border-slate-300 hover:text-slate-700 dark:hover:text-slate-300" }`}
                           >
                             <span className="text-base">{opt.icon}</span>
                             <span>{opt.label}</span>
-                            <span className={`font-normal text-[10px] ${authFormData.transportMethod === opt.value ? "text-slate-300" : "text-slate-400"}`}>{opt.desc}</span>
+                            <span className={`font-normal text-[10px] ${authFormData.transportMethod === opt.value ? "text-slate-300" : "text-slate-400 dark:text-slate-500"}`}>{opt.desc}</span>
                           </button>
                         ))}
                       </div>
                       {authFormData.transportMethod === "stdio" ? (
-                        <p className="text-[10px] text-slate-400 mt-1.5">
-                          <span className="font-semibold text-slate-600">STDIO</span> — Spawned on-demand saat agent dipanggil. Tidak butuh port. Cocok untuk UiPath, stateless tools.
+                        <p className="text-[10px] text-slate-400 dark:text-slate-500 mt-1.5">
+                          <span className="font-semibold text-slate-600 dark:text-slate-400">STDIO</span> — Spawned on-demand saat agent dipanggil. Tidak butuh port. Cocok untuk UiPath, stateless tools.
                         </p>
                       ) : (
-                        <p className="text-[10px] text-orange-600 mt-1.5">
+                        <p className="text-[10px] text-yellow-600 mt-1.5">
                           <span className="font-semibold">SSE</span> — Dijalankan sebagai HTTP server permanen oleh McpAutoManager. Akan muncul di status panel dengan live port. Cocok jika butuh warm-up cepat atau state persistent.
                         </p>
                       )}
                     </div>
                     <div>
-                      <label className="form-label">Connection Name <span className="normal-case font-normal text-slate-400">(how it appears in the registry)</span></label>
+                      <label className="form-label">Connection Name <span className="normal-case font-normal text-slate-400 dark:text-slate-500">(how it appears in the registry)</span></label>
                       <input
                         value={authFormData.connectionName}
                         onChange={e => { setAuthFormData({ ...authFormData, connectionName: e.target.value }); setAuthConnectError(null); }}
-                        className="form-input rounded-xl border-slate-200"
+                        className="form-input rounded-xl border-slate-200 dark:border-slate-700"
                         placeholder="e.g. UiPath Queue, UiPath RPA Prod"
                       />
                     </div>
                     <div className="grid grid-cols-2 gap-3">
                       <div>
                         <label className="form-label">Organization</label>
-                        <input required value={authFormData.org} onChange={e => setAuthFormData({ ...authFormData, org: e.target.value })} className="form-input rounded-xl border-slate-200" placeholder="e.g. maestffaiddh" />
+                        <input required value={authFormData.org} onChange={e => setAuthFormData({ ...authFormData, org: e.target.value })} className="form-input rounded-xl border-slate-200 dark:border-slate-700" placeholder="e.g. maestffaiddh" />
                       </div>
                       <div>
                         <label className="form-label">Tenant</label>
-                        <input required value={authFormData.tenant} onChange={e => setAuthFormData({ ...authFormData, tenant: e.target.value })} className="form-input rounded-xl border-slate-200" placeholder="e.g. DefaultTenant" />
+                        <input required value={authFormData.tenant} onChange={e => setAuthFormData({ ...authFormData, tenant: e.target.value })} className="form-input rounded-xl border-slate-200 dark:border-slate-700" placeholder="e.g. DefaultTenant" />
                       </div>
                     </div>
                     <div>
                       <label className="form-label">Client ID (App ID)</label>
-                      <input required value={authFormData.clientId} onChange={e => { setAuthFormData({ ...authFormData, clientId: e.target.value }); setAuthConnectError(null); }} className="form-input rounded-xl border-slate-200" placeholder="e.g. 0b7fd08e-3614-4687-bacc-5f2446049e6b" />
+                      <input required value={authFormData.clientId} onChange={e => { setAuthFormData({ ...authFormData, clientId: e.target.value }); setAuthConnectError(null); }} className="form-input rounded-xl border-slate-200 dark:border-slate-700" placeholder="e.g. 0b7fd08e-3614-4687-bacc-5f2446049e6b" />
                     </div>
                     <div>
                       <label className="form-label">Client Secret</label>
-                      <input required type="password" value={authFormData.clientSecret} onChange={e => { setAuthFormData({ ...authFormData, clientSecret: e.target.value }); setAuthConnectError(null); }} className="form-input rounded-xl border-slate-200" placeholder="••••••••••••••••" />
+                      <input required type="password" value={authFormData.clientSecret} onChange={e => { setAuthFormData({ ...authFormData, clientSecret: e.target.value }); setAuthConnectError(null); }} className="form-input rounded-xl border-slate-200 dark:border-slate-700" placeholder="••••••••••••••••" />
                     </div>
                     <div>
                       <label className="form-label">Folder ID</label>
                       <div className="flex gap-2">
-                        <input required value={authFormData.folderId} onChange={e => setAuthFormData({ ...authFormData, folderId: e.target.value })} className="form-input rounded-xl border-slate-200 flex-1" placeholder="e.g. 6500192" />
+                        <input required value={authFormData.folderId} onChange={e => setAuthFormData({ ...authFormData, folderId: e.target.value })} className="form-input rounded-xl border-slate-200 dark:border-slate-700 flex-1" placeholder="e.g. 6500192" />
                         <button
                           type="button"
                           onClick={testListFolders}
                           disabled={isTestingFolders || !authFormData.clientId || !authFormData.clientSecret || !authFormData.org || !authFormData.tenant}
-                          className="btn-secondary text-xs px-3 rounded-xl bg-white border border-slate-200 hover:bg-slate-50 disabled:opacity-50 disabled:cursor-not-allowed whitespace-nowrap"
+                          className="btn-secondary text-xs px-3 rounded-xl bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-700 hover:bg-slate-50 dark:bg-slate-800/50 disabled:opacity-50 disabled:cursor-not-allowed whitespace-nowrap"
                         >
                           {isTestingFolders ? <Loader2 className="w-3.5 h-3.5 animate-spin" /> : "Test & List Folders"}
                         </button>
@@ -1072,16 +1072,16 @@ export default function ToolsPage() {
                         <p className="text-xs text-red-600 mt-1.5">{folderTestError}</p>
                       )}
                       {folderOptions.length > 0 && (
-                        <div className="mt-2 max-h-32 overflow-y-auto border border-slate-200 rounded-lg divide-y divide-slate-100">
+                        <div className="mt-2 max-h-32 overflow-y-auto border border-slate-200 dark:border-slate-700 rounded-lg divide-y divide-slate-100">
                           {folderOptions.map((f) => (
                             <button
                               type="button"
                               key={f.id}
                               onClick={() => setAuthFormData({ ...authFormData, folderId: f.id })}
-                              className={`w-full text-left px-3 py-2 text-xs hover:bg-slate-50 flex justify-between items-center ${authFormData.folderId === f.id ? "bg-blue-50 text-blue-700 font-medium" : "text-slate-600"}`}
+                              className={`w-full text-left px-3 py-2 text-xs hover:bg-slate-50 dark:bg-slate-800/50 flex justify-between items-center ${authFormData.folderId === f.id ? "bg-cyan-50 dark:bg-cyan-900/30 text-cyan-700 dark:text-cyan-400 font-medium" : "text-slate-600 dark:text-slate-400"}`}
                             >
                               <span className="truncate">{f.fullyQualifiedName}</span>
-                              <span className="font-mono text-[10px] text-slate-400 ml-2 shrink-0">{f.id}</span>
+                              <span className="font-mono text-[10px] text-slate-400 dark:text-slate-500 ml-2 shrink-0">{f.id}</span>
                             </button>
                           ))}
                         </div>
@@ -1089,13 +1089,13 @@ export default function ToolsPage() {
                     </div>
                   </>
                 ) : (
-                  <div className="bg-slate-50 p-4 rounded-xl border border-slate-100 text-sm text-slate-500 text-center py-8">
+                  <div className="bg-slate-50 dark:bg-slate-800/50 p-4 rounded-xl border border-slate-100 dark:border-slate-800 text-sm text-slate-500 dark:text-slate-400 text-center py-8">
                     Standard connection initialization.<br/>Click Connect to proceed.
                   </div>
                 )}
               </div>
               
-              <div className="px-6 py-4 border-t border-slate-100 flex justify-end gap-3 bg-slate-50/50 rounded-b-2xl">
+              <div className="px-6 py-4 border-t border-slate-100 dark:border-slate-800 flex justify-end gap-3 bg-slate-50 dark:bg-slate-800/50 rounded-b-2xl">
                 <button type="button" onClick={() => setIsAuthModalOpen(false)} className="btn-secondary text-sm rounded-xl">Cancel</button>
                 <button type="submit" disabled={isAuthenticating} className="btn-primary text-sm rounded-xl bg-slate-900 text-white hover:bg-slate-800 disabled:opacity-70 disabled:cursor-wait">
                   {isAuthenticating ? (
@@ -1113,19 +1113,19 @@ export default function ToolsPage() {
       {/* Delete Modal */}
       {deleteModalOpen && toolToDelete && (
         <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/25 backdrop-blur-sm p-4 animate-in fade-in duration-200">
-          <div className="bg-white border border-slate-200 rounded-2xl w-full max-w-sm shadow-2xl flex flex-col">
+          <div className="bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-700 rounded-2xl w-full max-w-sm shadow-2xl flex flex-col">
             <div className="p-6">
               <div className="w-12 h-12 rounded-full bg-red-100 flex items-center justify-center mx-auto mb-4 text-red-600">
                 <Trash2 className="w-6 h-6" />
               </div>
-              <h3 className="text-lg font-medium text-slate-900 text-center mb-2">Delete MCP Server?</h3>
-              <p className="text-sm text-slate-500 text-center mb-6">
-                Are you sure you want to delete <span className="font-medium text-slate-700">{toolToDelete.name}</span>? This action cannot be undone.
+              <h3 className="text-lg font-medium text-slate-900 dark:text-white text-center mb-2">Delete MCP Server?</h3>
+              <p className="text-sm text-slate-500 dark:text-slate-400 text-center mb-6">
+                Are you sure you want to delete <span className="font-medium text-slate-700 dark:text-slate-300">{toolToDelete.name}</span>? This action cannot be undone.
               </p>
               <div className="flex gap-3">
                 <button 
                   onClick={() => { setDeleteModalOpen(false); setToolToDelete(null); }} 
-                  className="flex-1 px-4 py-2 bg-slate-100 hover:bg-slate-200 text-slate-700 rounded-xl font-medium transition-colors"
+                  className="flex-1 px-4 py-2 bg-slate-100 dark:bg-slate-800 hover:bg-slate-200 text-slate-700 dark:text-slate-300 rounded-xl font-medium transition-colors"
                 >
                   Cancel
                 </button>

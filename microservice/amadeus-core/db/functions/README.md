@@ -5,3 +5,4 @@
 - `fn_release_mcp_runtime(p_tool_ids)` → all updated `mcp_runtime_state` rows. Called from `scripts/mcpAutoManager.ts` `markStopped()`.
 - `fn_upsert_uipath_job_trace(p_agent_id, p_tool_id, p_session_label, p_job_id, p_job_key, p_release_key, p_process_name, p_folder_id, p_queue_name, p_state, p_info)` → full `uipath_job_trace` row (upsert on `job_id`). Called from `src/orchestrator/engine.ts` `loadMcpTools()` tool-call hook and `scripts/mcpAutoManager.ts` `pollActiveJobTraces()`.
 - `rerank_documents(query_embedding, top_k)` → `(file_id, content, similarity)` rows ordered by cosine distance (pgvector `<=>`). Called from `src/orchestrator/executors/ragClient.ts` `retrievalWithRerank()`.
+- `fn_set_agent_knowledge_bases(p_agent_id, p_kb_ids)` → all `agent_knowledge_bases` rows for the agent after replacing the set. Called from `src/routes/agents.ts` (create/update) and `src/routes/knowledgeBase.ts`.

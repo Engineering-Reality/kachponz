@@ -23,6 +23,7 @@ import { resolveCorsOrigin } from "../config/cors.js";
 import { jsonSchemaToZod } from "./jsonSchemaToZod.js";
 import { callFn } from "../db/rpc.js";
 import { env } from "../config/env.js";
+import { searchKnowledgeBase, getAgentKnowledgeBases } from "./executors/kbClient.js";
 
 const mcpHost = loadPortRange().host;
 
@@ -569,6 +570,40 @@ async function loadMcpTools(
   return { tools: langchainTools, clients, report, needsNamespacing };
 }
 
+/**
+ * Builds the search_knowledge_base tool for an agent (apu.md Task 3b), if
+ * it has any knowledge_base attached via agent_knowledge_bases. Returns null
+ * when the agent has none — the tool must not appear for agents that were
+ * never given a KB, otherwise the LLM would call it and always get "no KB
+ * attached" instead of just not seeing the tool at all.
+ */
+async function loadKnowledgeBaseTool(agentId: string): Promise<DynamicStructuredTool | null> {
+  const kbs = await getAgentKnowledgeBases(agentId);
+  if (kbs.length === 0) return null;
+
+  const kbList = kbs.map((kb) => `${kb.kb_id} (${kb.name})`).join(', ');
+
+  return new DynamicStructuredTool({
+    name: "search_knowledge_base",
+    description:
+      `Search this agent's attached knowledge base(s) for relevant reference entries ` +
+      `(e.g. SDN/sanctions list, high-risk country list, sanctioned bank list). ` +
+      `Call this once per party name detected in the transaction message before giving a verdict. ` +
+      `Available kb_id values: ${kbList}.`,
+    schema: z.object({
+      query: z.string().describe("The party name or term to look up in the knowledge base"),
+      kb_id: z.string().describe("Which attached knowledge base to search"),
+    }),
+    func: async ({ query: searchQuery, kb_id }: { query: string; kb_id: string }) => {
+      const results = await searchKnowledgeBase(kb_id, searchQuery);
+      if (results.length === 0) return `No matches found in knowledge base ${kb_id} for "${searchQuery}".`;
+      return results
+        .map((r) => `[${r.filename}] (relevance ${r.rank.toFixed(3)}) ${r.snippet}`)
+        .join('\n\n');
+    },
+  });
+}
+
 export type UipathContextSummary = {
   toolId: string;
   toolName: string;
@@ -848,7 +883,7 @@ export async function runAgenticStep(
   mode: InvocationMode = 'playground',
   sessionLabel?: string,
   runtime: 'cloud' | 'on_prem' = 'cloud',
-): Promise<A2AResult & { mcpHealth?: McpServerHealth[] }> {
+): Promise<A2AResult & { mcpHealth?: McpServerHealth[]; agentOutput?: unknown }> {
   let txId: string;
   let step: string;
 
@@ -919,6 +954,9 @@ export async function runAgenticStep(
       { report },
     );
   }
+
+  const kbTool = await loadKnowledgeBaseTool(agentConfig.agent_id);
+  if (kbTool) tools.push(kbTool);
 
   try {
     const inputMessages = messagesHistory && messagesHistory.length > 0
@@ -992,6 +1030,11 @@ export async function runAgenticStep(
         nextActorHint: null,
         idempotentReplay: false,
         mcpHealth: report,
+        // Non-streaming playground callers (e.g. POST /agents/:id/screen)
+        // otherwise have no way to read the agent's answer — the streaming
+        // path (runAgenticStepStream) writes deltas straight to the SSE
+        // response instead, so this field is only meaningful here.
+        agentOutput: finalMessage.content,
       };
     }
 
@@ -1144,6 +1187,9 @@ export async function runAgenticStepStream(
     writeJsonError(424, 'NO_TOOLS_AVAILABLE', "None of the agent's registered MCP servers are reachable", { report });
     return;
   }
+
+  const kbToolStream = await loadKnowledgeBaseTool(agentConfig.agent_id);
+  if (kbToolStream) tools.push(kbToolStream);
 
   // Only now do we commit to opening the SSE stream.
   reply.raw.setHeader('Content-Type', 'text/event-stream');

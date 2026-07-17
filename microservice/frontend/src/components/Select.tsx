@@ -16,7 +16,7 @@ export interface SelectOption {
 }
 
 const TRIGGER_BASE =
-  "w-full flex items-center gap-2 bg-white border border-slate-200 text-slate-900 rounded-lg px-3 py-2.5 text-sm outline-none transition-all hover:border-slate-300 focus:border-slate-400 focus:ring-2 focus:ring-slate-900/5 disabled:opacity-50 disabled:cursor-not-allowed";
+  "w-full flex items-center gap-2 bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-700 text-slate-900 dark:text-slate-200 dark:text-slate-200 rounded-lg px-3 py-2.5 text-sm outline-none transition-all hover:border-slate-300 focus:border-slate-400 focus:ring-2 focus:ring-slate-900/5 disabled:opacity-50 disabled:cursor-not-allowed";
 
 interface Pos {
   left: number;
@@ -120,11 +120,11 @@ export function Select({
         onClick={() => setOpen((o) => !o)}
         className={`${TRIGGER_BASE} justify-between ${triggerClassName}`}
       >
-        <span className={`truncate ${selected ? "text-slate-900" : "text-slate-400"}`}>
+        <span className={`truncate ${selected ? "text-slate-900 dark:text-slate-200" : "text-slate-400 dark:text-slate-500"}`}>
           {selected ? selected.label : placeholder}
         </span>
         <ChevronDown
-          className={`w-4 h-4 text-slate-400 flex-shrink-0 transition-transform ${open ? "rotate-180" : ""}`}
+          className={`w-4 h-4 text-slate-400 dark:text-slate-500 flex-shrink-0 transition-transform ${open ? "rotate-180" : ""}`}
         />
       </button>
 
@@ -133,10 +133,10 @@ export function Select({
           <div
             ref={menuRef}
             style={menuStyle(pos)}
-            className="z-[100] bg-white border border-slate-200 rounded-lg shadow-xl py-1 max-h-64 overflow-y-auto stream-in"
+            className="z-[100] bg-white dark:bg-slate-800 border border-slate-200 dark:border-slate-700 rounded-lg shadow-xl py-1 max-h-64 overflow-y-auto stream-in"
           >
             {options.length === 0 && (
-              <div className="px-3 py-2 text-xs text-slate-400">No options available</div>
+              <div className="px-3 py-2 text-xs text-slate-400 dark:text-slate-500">No options available</div>
             )}
             {options.map((o) => {
               const isSel = o.value === value;
@@ -148,13 +148,13 @@ export function Select({
                     onChange(o.value);
                     setOpen(false);
                   }}
-                  className={`w-full flex items-center justify-between gap-2 px-3 py-2 text-sm text-left transition-colors ${ isSel ? "bg-slate-50 text-slate-900 font-medium" : "text-slate-600 hover:bg-slate-50" }`}
+                  className={`w-full flex items-center justify-between gap-2 px-3 py-2 text-sm text-left transition-colors ${ isSel ? "bg-slate-50 dark:bg-slate-700 text-slate-900 dark:text-slate-200 dark:text-white font-medium" : "text-slate-600 dark:text-slate-300 hover:bg-slate-50 dark:hover:bg-slate-700" }`}
                 >
                   <span className="min-w-0 flex flex-col">
                     <span className="truncate">{o.label}</span>
-                    {o.hint && <span className="text-[11px] text-slate-400 truncate">{o.hint}</span>}
+                    {o.hint && <span className="text-[11px] text-slate-400 dark:text-slate-500 truncate">{o.hint}</span>}
                   </span>
-                  {isSel && <Check className="w-4 h-4 text-slate-900 flex-shrink-0" />}
+                  {isSel && <Check className="w-4 h-4 text-slate-900 dark:text-slate-200 flex-shrink-0" />}
                 </button>
               );
             })}
@@ -208,13 +208,13 @@ export function MultiSelect({
         className={`${TRIGGER_BASE} justify-between min-h-[2.75rem] ${triggerClassName}`}
       >
         {selectedOptions.length === 0 ? (
-          <span className="text-slate-400 truncate">{placeholder}</span>
+          <span className="text-slate-400 dark:text-slate-500 truncate">{placeholder}</span>
         ) : (
           <span className="flex flex-wrap gap-1 min-w-0 py-0.5">
             {selectedOptions.map((o) => (
               <span
                 key={o.value}
-                className="inline-flex items-center gap-1 bg-slate-100 border border-slate-200 text-slate-700 rounded-md pl-2 pr-1 py-0.5 text-xs max-w-[10rem]"
+                className="inline-flex items-center gap-1 bg-slate-100 dark:bg-slate-700 border border-slate-200 dark:border-slate-600 text-slate-700 dark:text-slate-200 rounded-md pl-2 pr-1 py-0.5 text-xs max-w-[10rem]"
               >
                 <span className="truncate">{o.label}</span>
                 <span
@@ -224,7 +224,7 @@ export function MultiSelect({
                     e.stopPropagation();
                     toggle(o.value);
                   }}
-                  className="text-slate-400 hover:text-slate-700"
+                  className="text-slate-400 dark:text-slate-500 hover:text-slate-700"
                 >
                   <X className="w-3 h-3" />
                 </span>
@@ -233,7 +233,7 @@ export function MultiSelect({
           </span>
         )}
         <ChevronDown
-          className={`w-4 h-4 text-slate-400 flex-shrink-0 transition-transform ${open ? "rotate-180" : ""}`}
+          className={`w-4 h-4 text-slate-400 dark:text-slate-500 flex-shrink-0 transition-transform ${open ? "rotate-180" : ""}`}
         />
       </button>
 
@@ -242,10 +242,10 @@ export function MultiSelect({
           <div
             ref={menuRef}
             style={menuStyle(pos)}
-            className="z-[100] bg-white border border-slate-200 rounded-lg shadow-xl py-1 max-h-64 overflow-y-auto stream-in"
+            className="z-[100] bg-white dark:bg-slate-800 border border-slate-200 dark:border-slate-700 rounded-lg shadow-xl py-1 max-h-64 overflow-y-auto stream-in"
           >
             {options.length === 0 && (
-              <div className="px-3 py-2 text-xs text-slate-400">No options available</div>
+              <div className="px-3 py-2 text-xs text-slate-400 dark:text-slate-500">No options available</div>
             )}
             {options.map((o) => {
               const isSel = values.includes(o.value);
@@ -254,16 +254,16 @@ export function MultiSelect({
                   key={o.value}
                   type="button"
                   onClick={() => toggle(o.value)}
-                  className={`w-full flex items-center gap-2.5 px-3 py-2 text-sm text-left transition-colors ${ isSel ? "bg-slate-50 text-slate-900" : "text-slate-600 hover:bg-slate-50" }`}
+                  className={`w-full flex items-center gap-2.5 px-3 py-2 text-sm text-left transition-colors ${ isSel ? "bg-slate-50 dark:bg-slate-700 text-slate-900 dark:text-slate-200 dark:text-white" : "text-slate-600 dark:text-slate-300 hover:bg-slate-50 dark:hover:bg-slate-700" }`}
                 >
                   <span
-                    className={`w-4 h-4 rounded flex items-center justify-center flex-shrink-0 border ${ isSel ? "vibrant-rainbow-bg border-transparent" : "border-slate-300 bg-white" }`}
+                    className={`w-4 h-4 rounded flex items-center justify-center flex-shrink-0 border ${ isSel ? "vibrant-rainbow-bg border-transparent" : "border-slate-300 dark:border-slate-600 bg-white dark:bg-slate-800" }`}
                   >
                     {isSel && <Check className="w-3 h-3 text-white" />}
                   </span>
                   <span className="min-w-0 flex flex-col">
                     <span className="truncate">{o.label}</span>
-                    {o.hint && <span className="text-[11px] text-slate-400 truncate">{o.hint}</span>}
+                    {o.hint && <span className="text-[11px] text-slate-400 dark:text-slate-500 truncate">{o.hint}</span>}
                   </span>
                 </button>
               );

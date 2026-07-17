@@ -6,6 +6,8 @@ import { DomainError } from '../types/domain.js';
 import { authenticateRobot } from '../middleware/auth.js';
 import { ChatOpenAI } from '@langchain/openai';
 import { HumanMessage, SystemMessage } from '@langchain/core/messages';
+import { randomUUID } from 'node:crypto';
+import { runAgenticStep } from '../orchestrator/engine.js';
 
 export const registerAgentsRoutes: FastifyPluginAsync = async (rootApp: FastifyInstance) => {
   await rootApp.register(async (app) => {
@@ -22,11 +24,34 @@ export const registerAgentsRoutes: FastifyPluginAsync = async (rootApp: FastifyI
     on_status: z.boolean().default(true),
     tools: z.array(z.string()).default([]),
     share_editor_with: z.array(z.string()).default([]),
+    // Not a column on `agents` — backed by the agent_knowledge_bases junction
+    // table (fn_set_agent_knowledge_bases). Populated on read, written via RPC.
+    knowledge_base_ids: z.array(z.string()).default([]),
     created_at: z.string().or(z.date()).optional(),
   });
 
   const agentCreateSchema = agentSchema.omit({ agent_id: true, user_id: true, company_id: true, created_at: true });
   const agentUpdateSchema = agentSchema.omit({ agent_id: true, user_id: true, company_id: true, created_at: true }).partial();
+
+  // AML/CFT screening verdict (apu.md Task 4) — output contract the agent's
+  // system prompt is instructed to follow exactly. Validated here so a
+  // malformed/non-JSON LLM response fails loud instead of silently landing
+  // a garbage row in alert_outbox.
+  const AmlVerdictSchema = z.object({
+    transaction_id: z.string(),
+    message_format: z.enum(['MT103', 'MT202', 'pacs.008']),
+    verdict: z.enum(['hit', 'clean', 'needs_review']),
+    risk_score: z.number().min(0).max(100),
+    matched_entities: z.array(z.object({
+      party_role: z.string(),
+      matched_name: z.string(),
+      kb_source: z.string(),
+      match_confidence: z.number().min(0).max(1),
+    })),
+    red_flags: z.array(z.string()),
+    reasoning: z.string(),
+    recommended_action: z.enum(['escalate_to_compliance', 'auto_clear', 'manual_review']),
+  });
 
   // GET /agents
   app.get(
@@ -43,7 +68,19 @@ export const registerAgentsRoutes: FastifyPluginAsync = async (rootApp: FastifyI
         'SELECT * FROM agents WHERE company_id = $1 ORDER BY agent_name ASC',
         [request.auth!.companyId],
       );
-      return reply.code(200).send(res.rows);
+      const agentIds = res.rows.map((r: any) => r.agent_id);
+      const kbMap: Record<string, string[]> = {};
+      if (agentIds.length > 0) {
+        const kbRes = await query<{ agent_id: string; kb_id: string }>(
+          'SELECT agent_id, kb_id FROM agent_knowledge_bases WHERE agent_id = ANY($1::uuid[])',
+          [agentIds],
+        );
+        for (const row of kbRes.rows) {
+          (kbMap[row.agent_id] ??= []).push(row.kb_id);
+        }
+      }
+      const agentsWithKb = res.rows.map((r: any) => ({ ...r, knowledge_base_ids: kbMap[r.agent_id] ?? [] }));
+      return reply.code(200).send(agentsWithKb);
     }
   );
 
@@ -67,7 +104,11 @@ export const registerAgentsRoutes: FastifyPluginAsync = async (rootApp: FastifyI
       if (res.rows.length === 0) {
         throw new DomainError('NOT_FOUND', 'Agent tidak ditemukan', 404);
       }
-      return reply.code(200).send(res.rows[0]);
+      const kbRes = await query<{ kb_id: string }>(
+        'SELECT kb_id FROM agent_knowledge_bases WHERE agent_id = $1',
+        [id],
+      );
+      return reply.code(200).send({ ...res.rows[0], knowledge_base_ids: kbRes.rows.map((r) => r.kb_id) });
     }
   );
 
@@ -98,7 +139,15 @@ export const registerAgentsRoutes: FastifyPluginAsync = async (rootApp: FastifyI
           request.auth!.companyId,
         ]
       );
-      return reply.code(201).send(res.rows[0]);
+      const agent = res.rows[0];
+      if (!agent) {
+        throw new DomainError('INTERNAL_ERROR', 'Gagal membuat agent', 500);
+      }
+      const kbIds = body.knowledge_base_ids ?? [];
+      if (kbIds.length > 0) {
+        await callFn('fn_set_agent_knowledge_bases', [agent.agent_id, kbIds]);
+      }
+      return reply.code(201).send({ ...agent, knowledge_base_ids: kbIds });
     }
   );
 
@@ -150,7 +199,19 @@ export const registerAgentsRoutes: FastifyPluginAsync = async (rootApp: FastifyI
       if (res.rows.length === 0) {
         throw new DomainError('NOT_FOUND', 'Agent tidak ditemukan', 404);
       }
-      return reply.code(200).send(res.rows[0]);
+
+      let kbIds: string[];
+      if (body.knowledge_base_ids !== undefined) {
+        await callFn('fn_set_agent_knowledge_bases', [id, body.knowledge_base_ids]);
+        kbIds = body.knowledge_base_ids;
+      } else {
+        const kbRes = await query<{ kb_id: string }>(
+          'SELECT kb_id FROM agent_knowledge_bases WHERE agent_id = $1',
+          [id],
+        );
+        kbIds = kbRes.rows.map((r) => r.kb_id);
+      }
+      return reply.code(200).send({ ...res.rows[0], knowledge_base_ids: kbIds });
     }
   );
 
@@ -258,6 +319,77 @@ Respond with ONLY a valid JSON object, no markdown, no explanation.`;
         reasoning: parsed.reasoning ?? '',
         available_tools: availableTools,
       });
+    }
+  );
+
+  // POST /agents/:id/screen — run an AML/CFT screening agent against one
+  // transaction message (apu.md Task 5). Runs the agent (mode='playground',
+  // so no coupling to the unrelated LC/SKBDN transactions state machine),
+  // validates the JSON verdict against AmlVerdictSchema, and inserts it into
+  // alert_outbox (status='pending') for the email worker in
+  // scripts/mcpAutoManager.ts to pick up — never emails synchronously from
+  // this request handler.
+  app.post(
+    '/agents/:id/screen',
+    {
+      schema: {
+        params: z.object({ id: z.string().uuid() }),
+        body: z.object({
+          message: z.string().min(1),
+          runtime: z.enum(['cloud', 'on_prem']).optional().default('cloud'),
+        }),
+        response: { 200: AmlVerdictSchema },
+      },
+    },
+    async (request, reply) => {
+      const { id } = request.params as { id: string };
+      const { message, runtime } = request.body as { message: string; runtime: 'cloud' | 'on_prem' };
+
+      const owned = await query('SELECT 1 FROM agents WHERE agent_id = $1 AND company_id = $2', [
+        id,
+        request.auth!.companyId,
+      ]);
+      if (owned.rows.length === 0) {
+        throw new DomainError('NOT_FOUND', 'Agent tidak ditemukan', 404);
+      }
+
+      const result = await runAgenticStep(
+        request.auth!,
+        undefined,
+        randomUUID(),
+        message,
+        undefined,
+        id,
+        'playground',
+        undefined,
+        runtime,
+      );
+
+      const rawOutput = result.agentOutput;
+      const text = typeof rawOutput === 'string' ? rawOutput : JSON.stringify(rawOutput);
+      const clean = text.replace(/^```(?:json)?\n?|\n?```$/g, '').trim();
+
+      let parsedJson: unknown;
+      try {
+        parsedJson = JSON.parse(clean);
+      } catch {
+        throw new DomainError('LLM_PARSE_ERROR', 'Agent tidak mengembalikan JSON yang valid', 502);
+      }
+
+      const verdictParse = AmlVerdictSchema.safeParse(parsedJson);
+      if (!verdictParse.success) {
+        throw new DomainError('LLM_PARSE_ERROR', 'Verdict agent tidak sesuai schema yang diharapkan', 502, {
+          issues: verdictParse.error.issues,
+        });
+      }
+      const verdict = verdictParse.data;
+
+      await query(
+        `INSERT INTO alert_outbox (transaction_ref, payload, status) VALUES ($1, $2, 'pending')`,
+        [verdict.transaction_id, JSON.stringify(verdict)],
+      );
+
+      return reply.code(200).send(verdict);
     }
   );
 
