@@ -97,7 +97,7 @@ export default function MarkdownViewer({ content }: { content: string }) {
             }
             
             return (
-              <code {...rest} className="text-[#e83e8c] bg-slate-100/80 px-1.5 py-0.5 rounded text-[0.9em] font-mono border border-slate-200 break-words">
+              <code {...rest} className="text-[#e83e8c] dark:text-pink-400 bg-slate-100/80 dark:bg-slate-800/80 px-1.5 py-0.5 rounded text-[0.9em] font-mono border border-slate-200 dark:border-slate-700 break-words">
                 {children}
               </code>
             )

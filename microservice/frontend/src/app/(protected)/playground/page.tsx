@@ -140,6 +140,7 @@ function PlaygroundInner() {
   const [attachments, setAttachments] = useState<Attachment[]>([]);
   const fileInputRef = useRef<HTMLInputElement>(null);
   const [isSidebarOpen, setIsSidebarOpen] = useState(true);
+  const [isRightSidebarOpen, setIsRightSidebarOpen] = useState(true);
   const [runtimeMode, setRuntimeMode] = useState<'cloud' | 'on_prem'>('cloud');
 
   // Typing indicator — true from the moment a message is sent until the
@@ -457,12 +458,16 @@ function PlaygroundInner() {
       // update session
       if (currentSessionId) {
         setSessions(s => {
-          // Title stays the "Chat <date>" placeholder for now — Part D
-          // swaps in the real LLM-generated summary once the first
-          // assistant response completes, instead of truncating this
-          // first message client-side.
+          const newTitle = wasFirstTurn && currentInputDisplay 
+            ? (currentInputDisplay.length > 30 ? currentInputDisplay.substring(0, 30) + '...' : currentInputDisplay)
+            : undefined;
+          
           const updated = s.map(session =>
-            session.id === currentSessionId ? { ...session, messages: newMsgs } : session
+            session.id === currentSessionId ? { 
+              ...session, 
+              messages: newMsgs,
+              title: newTitle || session.title
+            } : session
           );
           localStorage.setItem('agent-sessions', JSON.stringify(updated));
           return updated;
@@ -827,7 +832,7 @@ function PlaygroundInner() {
                   <div key={session.id} className="relative group px-1">
                     <button
                       onClick={() => switchSession(session.id)}
-                      className={`w-full text-left px-3 py-2 rounded-xl text-[13px] transition-colors flex items-center gap-2 pr-8 ${currentSessionId === session.id ? 'bg-slate-200 dark:bg-slate-700/50 text-slate-900 dark:text-white font-medium' : 'text-slate-600 dark:text-slate-400 hover:bg-slate-200 dark:bg-slate-700/30'}`}
+                      className={`w-full text-left px-3 py-1.5 rounded-lg text-[13px] transition-colors flex items-center gap-2 pr-8 ${currentSessionId === session.id ? 'bg-indigo-50/50 dark:bg-slate-800/80 text-indigo-700 dark:text-slate-200 font-medium' : 'text-slate-600 dark:text-slate-400 hover:bg-slate-100 dark:hover:bg-slate-800/50'}`}
                     >
                       <div className="flex-1 min-w-0 truncate" title={session.title}>
                         {session.title}
@@ -857,7 +862,7 @@ function PlaygroundInner() {
           {/* Chat Header / Amadeus Console Top Bar */}
           <div className="border-b border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-900 flex flex-col sticky top-0 z-20 w-full shrink-0 shadow-sm">
             {/* Top Row: Title & Basic Info */}
-            <div className="h-10 flex items-center justify-between px-6 border-b border-slate-100 dark:border-slate-800 bg-slate-50 dark:bg-slate-800/50/80 backdrop-blur">
+            <div className="h-10 flex items-center justify-between px-6 border-b border-slate-100 dark:border-slate-800 bg-slate-50 dark:bg-slate-800/80 backdrop-blur">
               <div className="flex items-center gap-3">
                 <button
                   onClick={() => setIsSidebarOpen(!isSidebarOpen)}
@@ -871,8 +876,11 @@ function PlaygroundInner() {
                 {selectedAgentObj && (
                   <span className="ui-label text-slate-500 dark:text-slate-400 truncate max-w-[150px]">{selectedAgentObj.agent_name}</span>
                 )}
-                <button onClick={clearChat} className="p-1.5 text-slate-400 dark:text-slate-500 hover:text-red-500 transition-colors rounded-lg hover:bg-red-50 dark:bg-red-900/20" title="Clear Chat">
+                <button onClick={clearChat} className="p-1.5 text-slate-400 dark:text-slate-500 hover:text-red-500 transition-colors rounded-lg hover:bg-red-50 dark:hover:bg-red-900/20" title="Clear Chat">
                   <Trash2 className="w-3.5 h-3.5" />
+                </button>
+                <button onClick={() => setIsRightSidebarOpen(!isRightSidebarOpen)} className={`p-1.5 transition-colors rounded-lg ${isRightSidebarOpen ? 'text-indigo-500 bg-indigo-50 dark:bg-indigo-900/30 dark:text-indigo-400' : 'text-slate-400 dark:text-slate-500 hover:text-slate-700 dark:hover:text-slate-300 hover:bg-slate-100 dark:hover:bg-slate-800'}`} title="Toggle A2A Orchestrator Sidebar">
+                  <Cpu className="w-4 h-4" />
                 </button>
               </div>
             </div>
@@ -899,8 +907,8 @@ function PlaygroundInner() {
                     }}
                     placeholder={agents.length === 0 ? "Loading agents..." : "Select an agent"}
                     options={agents.map((agent) => ({ value: agent.agent_id, label: agent.agent_name }))}
-                    className="relative z-10 !py-1 text-xs bg-white dark:bg-slate-900"
-                    triggerClassName="rounded-[5px] border-transparent"
+                    className="relative z-10 !py-1 text-xs !bg-transparent"
+                    triggerClassName="rounded-[5px] border-transparent !bg-slate-900/90 dark:!bg-slate-900/90 text-white backdrop-blur-sm"
                   />
                 </div>
                 <button
@@ -938,8 +946,8 @@ function PlaygroundInner() {
                       { value: 'cloud', label: 'Qwen DashScope (Cloud)' },
                       { value: 'on_prem', label: 'Netra Qwen (On-Prem)' }
                     ]}
-                    className="relative z-10 !py-1 text-xs bg-white dark:bg-slate-900"
-                    triggerClassName="rounded-[5px] border-transparent"
+                    className="relative z-10 !py-1 text-xs !bg-transparent"
+                    triggerClassName="rounded-[5px] border-transparent !bg-slate-900/90 dark:!bg-slate-900/90 text-white backdrop-blur-sm"
                   />
                 </div>
               </div>
@@ -1477,7 +1485,7 @@ function PlaygroundInner() {
         </main>
         
         {/* Right Sidebar — UiPathLiveGraph */}
-        <aside className="flex-1 bg-white dark:bg-slate-900 border-l border-slate-200 dark:border-slate-700 flex flex-col overflow-hidden shrink-0 z-10">
+        <aside className={`bg-white dark:bg-slate-900 border-l border-slate-200 dark:border-slate-700 flex flex-col overflow-hidden shrink-0 z-10 transition-all duration-300 ${isRightSidebarOpen ? 'flex-1 min-w-[400px]' : 'w-0 border-l-0 min-w-0'}`}>
           <UiPathLiveGraph sessionLabel={currentSessionId} agentId={selectedAgent} />
         </aside>
       </div>
