@@ -8,6 +8,7 @@ import {
   Upload, X, FileText, Image as ImageIcon, File as FileIcon,
 } from "lucide-react";
 import { ShareModal } from "@/components/ShareModal";
+import MarkdownViewer from "@/components/MarkdownViewer";
 
 interface Message {
   role: "bot" | "user";
@@ -472,8 +473,8 @@ export default function AgentCreator() {
                           </div>
                         </div>
                       )}
-                      <div className={`px-4 py-3 rounded-2xl max-w-[80%] text-sm leading-relaxed shadow-sm ${msg.role === "user" ? "bg-slate-900 dark:bg-white text-white dark:text-slate-900 rounded-tr-sm" : "bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-700 text-slate-800 dark:text-slate-200 rounded-tl-sm"}`}>
-                        {msg.content}
+                      <div className={`px-4 py-3 rounded-2xl max-w-full text-sm leading-relaxed shadow-sm ${msg.role === "user" ? "bg-slate-900 dark:bg-white text-white dark:text-slate-900 rounded-tr-sm" : "bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-700 text-slate-800 dark:text-slate-200 rounded-tl-sm w-full"}`}>
+                        <MarkdownViewer content={msg.content} />
                       </div>
                     </div>
                   ))}

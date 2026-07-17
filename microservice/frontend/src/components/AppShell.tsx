@@ -134,7 +134,7 @@ export function AppShell({ children }: { children: React.ReactNode }) {
               <h1 className="text-base font-semibold text-slate-800 dark:text-white leading-tight">
                 {current?.label || "Amadeus"}
               </h1>
-              <p className="text-[11px] text-slate-400 font-medium leading-tight hidden md:block">{pathname}</p>
+              <p className="text-[11px] text-slate-400 font-medium leading-tight hidden md:block">Amadeus Platform</p>
             </div>
           </div>
           <div className="flex items-center gap-4">
