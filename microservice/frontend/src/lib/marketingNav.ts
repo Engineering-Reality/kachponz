@@ -13,6 +13,7 @@ export const MARKETING_NAV_LINKS: MarketingNavLink[] = [
   { href: "/company", label: "Company" },
   { href: "/blog", label: "Blog" },
   { href: "/pricing", label: "Pricing" },
+  { href: "/partners", label: "Partners" },
 ];
 
 // Routes that should render with the floating marketing nav instead of the

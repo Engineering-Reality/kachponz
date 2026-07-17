@@ -10,13 +10,13 @@ export function ParticleGlowText({ text, className = "" }: { text: string; class
     const newParticles = Array.from({ length: 15 }).map((_, i) => {
       const angle = Math.random() * Math.PI * 2;
       const distance = Math.random() * 50 + 20; // 20px to 70px outward
-      const tx = Math.cos(angle) * distance;
-      const ty = Math.sin(angle) * distance;
+      const x = Math.cos(angle) * distance;
+      const y = Math.sin(angle) * distance;
 
       return {
         id: i,
-        tx,
-        ty,
+        x,
+        y,
         size: Math.random() * 3 + 1.5, // 1.5px to 4.5px
         delay: Math.random() * 2,
         duration: Math.random() * 1.5 + 1.5, // 1.5s to 3s
@@ -49,8 +49,8 @@ export function ParticleGlowText({ text, className = "" }: { text: string; class
               top: '50%',
               width: `${p.size}px`,
               height: `${p.size}px`,
-              '--tx': `${p.tx}px`,
-              '--ty': `${p.ty}px`,
+              '--tx': `${p.x}px`,
+              '--ty': `${p.y}px`,
               animation: `emit-particle ${p.duration}s ease-out infinite`,
               animationDelay: `${p.delay}s`,
             } as React.CSSProperties}
