@@ -14,20 +14,11 @@ import { HumanMessage } from '@langchain/core/messages';
 import { env } from '../../config/env.js';
 
 export async function extractTextFromImage(buffer: Buffer, mimeType: string): Promise<string> {
-  const runtime = env.NETRA_MODE;
-  const apiKey = runtime === 'on_prem'
-    ? (process.env.NETRA_API_KEY || '')
-    : env.NETRA_API_KEY;
-  const baseURL = runtime === 'on_prem'
-    ? 'https://api.netraruntime.com/v1'
-    : env.NETRA_BASE_URL;
-  const modelName = runtime === 'on_prem' ? env.NETRA_VL_MODEL : env.NETRA_VL_MODEL;
-
   const llm = new ChatOpenAI({
-    modelName,
+    modelName: env.NETRA_VL_MODEL,
     temperature: 0,
-    apiKey,
-    configuration: { baseURL },
+    apiKey: env.NETRA_API_KEY ?? '',
+    configuration: { baseURL: env.NETRA_BASE_URL },
   });
 
   const base64 = buffer.toString('base64');

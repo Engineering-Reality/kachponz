@@ -978,13 +978,10 @@ export async function runAgenticStep(
           ? (runtime === 'on_prem' ? env.NETRA_VL_MODEL : env.NETRA_VL_MODEL) 
           : (runtime === 'on_prem' ? env.NETRA_LLM_MODEL : (process.env.NETRA_LLM_MODEL || env.NETRA_LLM_MODEL)));
 
-    const apiKey = runtime === 'on_prem' 
-      ? (process.env.NETRA_API_KEY || env.NETRA_API_KEY || "")
-      : env.NETRA_API_KEY;
-      
-    const baseURL = runtime === 'on_prem' 
-      ? "https://api.netraruntime.com/v1"
-      : env.NETRA_BASE_URL;
+    // cloud = Netra Cloud API (NETRA_BASE_URL + NETRA_API_KEY from .env)
+    // on_prem = internal Ollama/vLLM (NETRA_BASE_URL should point to local endpoint)
+    const apiKey = env.NETRA_API_KEY ?? '';
+    const baseURL = env.NETRA_BASE_URL;
 
     // 4. Instantiate LangGraph createReactAgent In-Memory
     const llm = new ChatOpenAI({
@@ -1226,13 +1223,10 @@ export async function runAgenticStepStream(
           ? (runtime === 'on_prem' ? env.NETRA_VL_MODEL : env.NETRA_VL_MODEL) 
           : (runtime === 'on_prem' ? env.NETRA_LLM_MODEL : (process.env.NETRA_LLM_MODEL || env.NETRA_LLM_MODEL)));
 
-    const apiKey = runtime === 'on_prem' 
-      ? (process.env.NETRA_API_KEY || env.NETRA_API_KEY || "")
-      : env.NETRA_API_KEY;
-      
-    const baseURL = runtime === 'on_prem' 
-      ? "https://api.netraruntime.com/v1"
-      : env.NETRA_BASE_URL;
+    // cloud = Netra Cloud API (NETRA_BASE_URL + NETRA_API_KEY from .env)
+    // on_prem = internal Ollama/vLLM (NETRA_BASE_URL should point to local endpoint)
+    const apiKey = env.NETRA_API_KEY ?? '';
+    const baseURL = env.NETRA_BASE_URL;
 
     const modelInitStart = Date.now();
     const llm = new ChatOpenAI({
