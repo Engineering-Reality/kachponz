@@ -908,7 +908,7 @@ function PlaygroundInner() {
                     placeholder={agents.length === 0 ? "Loading agents..." : "Select an agent"}
                     options={agents.map((agent) => ({ value: agent.agent_id, label: agent.agent_name }))}
                     className="relative z-10 !py-1 text-xs !bg-transparent"
-                    triggerClassName="rounded-[5px] border-transparent !bg-slate-900/90 dark:!bg-slate-900/90 text-white backdrop-blur-sm"
+                    triggerClassName="rounded-[5px] border-transparent !bg-white/90 dark:!bg-slate-900/90 text-slate-800 dark:text-white backdrop-blur-sm shadow-sm"
                   />
                 </div>
                 <button
