@@ -9,7 +9,7 @@
  * make the title flicker mid-conversation).
  */
 
-import { qwenChat } from './qwenClient.js';
+import { netraChat } from './netraClient.js';
 import { env } from '../../config/env.js';
 
 export interface ChatTitleMessage {
@@ -28,8 +28,8 @@ export async function suggestChatTitle(messages: ChatTitleMessage[]): Promise<st
     .map((m) => `${m.role}: ${m.content}`)
     .join('\n');
 
-  const result = await qwenChat({
-    model: env.QWEN_LLM_MODEL,
+  const result = await netraChat({
+    model: env.NETRA_LLM_MODEL,
     messages: [
       { role: 'system', content: CHAT_TITLE_SYSTEM },
       { role: 'user', content: transcript },

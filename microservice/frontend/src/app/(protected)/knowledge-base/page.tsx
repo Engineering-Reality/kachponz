@@ -1,24 +1,80 @@
 "use client";
 
-import { useState, useEffect } from "react";
+import { useState, useEffect, useRef } from "react";
 import { 
   Database, Plus, Search, FileText, Trash2, 
-  Settings, Loader2, ArrowRight, BookOpen, FileUp 
+  Settings, Loader2, ArrowRight, BookOpen, FileUp, UploadCloud 
 } from "lucide-react";
 
 export default function KnowledgeBasePage() {
   const [knowledgeBases, setKnowledgeBases] = useState<any[]>([]);
+  const [agents, setAgents] = useState<any[]>([]);
   const [loading, setLoading] = useState(true);
   const [searchQuery, setSearchQuery] = useState("");
+  const [uploadingKbId, setUploadingKbId] = useState<string | null>(null);
+  
+  const fileInputRef = useRef<HTMLInputElement>(null);
+  const [targetKbId, setTargetKbId] = useState<string | null>(null);
 
   useEffect(() => {
-    // Simulate fetching
-    const timer = setTimeout(() => {
-      setKnowledgeBases([]);
-      setLoading(false);
-    }, 800);
-    return () => clearTimeout(timer);
+    async function fetchData() {
+      try {
+        const [kbRes, agentRes] = await Promise.all([
+          fetch("/api/knowledge-bases"),
+          fetch("/api/agents")
+        ]);
+        if (kbRes.ok && agentRes.ok) {
+          setKnowledgeBases(await kbRes.json());
+          setAgents(await agentRes.json());
+        }
+      } catch (e) {
+        console.error("Failed to load knowledge bases", e);
+      } finally {
+        setLoading(false);
+      }
+    }
+    fetchData();
   }, []);
+
+  const handleUploadClick = (kbId: string) => {
+    setTargetKbId(kbId);
+    if (fileInputRef.current) {
+      fileInputRef.current.value = ""; // reset
+      fileInputRef.current.click();
+    }
+  };
+
+  const handleFileChange = async (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    if (!file || !targetKbId) return;
+
+    setUploadingKbId(targetKbId);
+    
+    try {
+      const formData = new FormData();
+      formData.append("file", file);
+      
+      const res = await fetch(`/api/knowledge-bases/${targetKbId}/documents`, {
+        method: "POST",
+        body: formData,
+      });
+      
+      if (!res.ok) {
+        const errorData = await res.json().catch(() => ({}));
+        throw new Error(errorData.message || "Failed to upload file");
+      }
+      
+      // File uploaded successfully, we could show a toast here.
+      alert(`Berhasil mengunggah dokumen: ${file.name}`);
+      
+    } catch (err: any) {
+      console.error(err);
+      alert(`Gagal mengunggah dokumen: ${err.message}`);
+    } finally {
+      setUploadingKbId(null);
+      setTargetKbId(null);
+    }
+  };
 
   return (
     <div className="p-8 max-w-6xl mx-auto">
@@ -38,6 +94,14 @@ export default function KnowledgeBasePage() {
           </button>
         </div>
       </div>
+      
+      <input 
+        type="file" 
+        className="hidden" 
+        ref={fileInputRef} 
+        onChange={handleFileChange} 
+        accept=".pdf,.png,.jpg,.jpeg,.txt,.csv,.xlsx,.xls,.docx,.doc" 
+      />
 
       {/* Main Content */}
       {loading ? (
@@ -45,8 +109,64 @@ export default function KnowledgeBasePage() {
           <Loader2 className="w-8 h-8 animate-spin text-emerald-500" />
         </div>
       ) : knowledgeBases.length > 0 ? (
-        <div className="grid grid-cols-1 gap-4">
-          {/* List items will go here in the future */}
+        <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+          {knowledgeBases.map((kb) => {
+            const linkedAgents = agents.filter(a => a.knowledge_base_ids?.includes(kb.kb_id));
+            
+            return (
+              <div key={kb.kb_id} className="bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-700 rounded-2xl p-6 shadow-sm hover:shadow-md transition-shadow group">
+                <div className="flex items-start justify-between">
+                  <div className="flex gap-4">
+                    <div className="w-12 h-12 bg-emerald-50 dark:bg-emerald-900/20 text-emerald-600 rounded-2xl flex items-center justify-center flex-shrink-0">
+                      <Database className="w-6 h-6" />
+                    </div>
+                    <div>
+                      <h3 className="font-semibold text-slate-900 dark:text-white text-base leading-snug">{kb.name}</h3>
+                      {kb.description && (
+                        <p className="text-sm text-slate-600 dark:text-slate-400 mt-1 line-clamp-2">{kb.description}</p>
+                      )}
+                    </div>
+                  </div>
+                  <div className="flex gap-1 opacity-0 group-hover:opacity-100 transition-opacity">
+                    <button 
+                      title="Upload Document"
+                      onClick={() => handleUploadClick(kb.kb_id)}
+                      disabled={uploadingKbId === kb.kb_id}
+                      className="p-1.5 text-slate-400 hover:text-emerald-500 disabled:opacity-50"
+                    >
+                      {uploadingKbId === kb.kb_id ? (
+                        <Loader2 className="w-4 h-4 animate-spin" />
+                      ) : (
+                        <UploadCloud className="w-4 h-4" />
+                      )}
+                    </button>
+                    <button className="p-1.5 text-slate-400 hover:text-slate-600 dark:hover:text-slate-300">
+                      <Settings className="w-4 h-4" />
+                    </button>
+                    <button className="p-1.5 text-slate-400 hover:text-red-500">
+                      <Trash2 className="w-4 h-4" />
+                    </button>
+                  </div>
+                </div>
+
+                {/* Linked Agents Section */}
+                <div className="mt-6 pt-5 border-t border-slate-100 dark:border-slate-800">
+                  <h4 className="text-[10px] font-semibold text-slate-500 dark:text-slate-400 uppercase tracking-wider mb-3">Linked Agents</h4>
+                  {linkedAgents.length > 0 ? (
+                    <div className="flex flex-wrap gap-2">
+                      {linkedAgents.map(agent => (
+                        <span key={agent.agent_id} className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-md text-xs font-medium bg-slate-50 dark:bg-slate-800 text-slate-700 dark:text-slate-300 border border-slate-200 dark:border-slate-700">
+                          {agent.agent_name}
+                        </span>
+                      ))}
+                    </div>
+                  ) : (
+                    <p className="text-xs text-slate-400 dark:text-slate-500 italic">No agents are currently using this knowledge base.</p>
+                  )}
+                </div>
+              </div>
+            );
+          })}
         </div>
       ) : (
         /* Empty State */

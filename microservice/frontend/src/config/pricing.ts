@@ -64,7 +64,7 @@ export const PRICING_DATA = {
       tagline: "We help you connect Amadeus to your actual systems — not just hand you a dashboard.",
       price: {
         type: "usage",
-        description: "Qwen Token Usage + 30% Amadeus Markup",
+        description: "Netra Token Usage + 30% Amadeus Markup",
         idr: "Custom",
         usd: "Custom"
       },

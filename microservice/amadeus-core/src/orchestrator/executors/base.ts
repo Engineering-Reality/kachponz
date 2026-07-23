@@ -2,7 +2,7 @@
  * Executor abstraction — meta-orchestrator layer di atas Agent lama.
  *
  * Tujuan: satu kontrak untuk 3 jenis executor yang bisa menyelesaikan step:
- *   - kind='llm'    → agent LLM/VLM in-process (Qwen VL untuk scan LC, dll)
+ *   - kind='llm'    → agent LLM/VLM in-process (Netra VL untuk scan LC, dll)
  *   - kind='uipath' → UiPath robot dispatch via UiPath Orchestrator Jobs API
  *   - kind='pad'    → Power Automate Desktop dispatch via HTTP trigger flow
  *

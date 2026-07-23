@@ -975,16 +975,16 @@ export async function runAgenticStep(
     const resolvedModel = agentConfig.model && agentConfig.model !== "gpt-4o"
       ? agentConfig.model
       : (requiresVision 
-          ? (runtime === 'on_prem' ? 'Qwen VLM' : "qwen-vl-max") 
-          : (runtime === 'on_prem' ? 'qwen3.6-35b' : (process.env.QWEN_LLM_MODEL || "qwen3.6-35b")));
+          ? (runtime === 'on_prem' ? env.NETRA_VL_MODEL : env.NETRA_VL_MODEL) 
+          : (runtime === 'on_prem' ? env.NETRA_LLM_MODEL : (process.env.NETRA_LLM_MODEL || env.NETRA_LLM_MODEL)));
 
     const apiKey = runtime === 'on_prem' 
-      ? (process.env.NETRA_API_KEY || "sk_live_ys3wmhiNoA4OfJVE_6sjj7OA_UZoSNO22sTOTCHBxp3fuqHTIMEShmEBojnk")
-      : process.env.QWEN_API_KEY;
+      ? (process.env.NETRA_API_KEY || env.NETRA_API_KEY || "")
+      : env.NETRA_API_KEY;
       
     const baseURL = runtime === 'on_prem' 
       ? "https://api.netraruntime.com/v1"
-      : process.env.QWEN_BASE_URL;
+      : env.NETRA_BASE_URL;
 
     // 4. Instantiate LangGraph createReactAgent In-Memory
     const llm = new ChatOpenAI({
@@ -1223,16 +1223,16 @@ export async function runAgenticStepStream(
     const resolvedModel = agentConfig.model && agentConfig.model !== "gpt-4o"
       ? agentConfig.model
       : (requiresVision 
-          ? (runtime === 'on_prem' ? 'Qwen VLM' : "qwen-vl-max") 
-          : (runtime === 'on_prem' ? 'qwen3.6-35b' : (process.env.QWEN_LLM_MODEL || "qwen3.6-35b")));
+          ? (runtime === 'on_prem' ? env.NETRA_VL_MODEL : env.NETRA_VL_MODEL) 
+          : (runtime === 'on_prem' ? env.NETRA_LLM_MODEL : (process.env.NETRA_LLM_MODEL || env.NETRA_LLM_MODEL)));
 
     const apiKey = runtime === 'on_prem' 
-      ? (process.env.NETRA_API_KEY || "sk_live_ys3wmhiNoA4OfJVE_6sjj7OA_UZoSNO22sTOTCHBxp3fuqHTIMEShmEBojnk")
-      : process.env.QWEN_API_KEY;
+      ? (process.env.NETRA_API_KEY || env.NETRA_API_KEY || "")
+      : env.NETRA_API_KEY;
       
     const baseURL = runtime === 'on_prem' 
       ? "https://api.netraruntime.com/v1"
-      : process.env.QWEN_BASE_URL;
+      : env.NETRA_BASE_URL;
 
     const modelInitStart = Date.now();
     const llm = new ChatOpenAI({

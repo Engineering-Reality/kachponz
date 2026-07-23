@@ -13,7 +13,7 @@
  * Strategi biaya (usulan awal — sesuaikan setelah diskusi tim):
  *   - submitted             : Contact Point (manusia via portal) — TIDAK ada executor otomatis
  *   - distributed_to_analyst: PAD (murah — cukup baca queue TSC & assign)
- *   - doc_examined          : Qwen VL (LLM — paling murah, agentic AI)
+ *   - doc_examined          : Netra VL (LLM — paling murah, agentic AI)
  *   - ee_ntf_created        : PAD (form filling di EE — pola CRUD sederhana)
  *   - ee_ntf_approved       : manusia (checker) — TIDAK ada executor otomatis
  *   - mt_converted          : UiPath (integrasi EE + MT converter legacy)
@@ -23,7 +23,7 @@
  */
 
 import { executorRegistry } from './base.js';
-import { qwenDocExamExecutor } from './qwenDocExamExecutor.js';
+import { netraDocExamExecutor } from './qwenDocExamExecutor.js';
 import { makeUipathExecutor } from './uipathExecutor.js';
 import { makePadExecutor } from './padExecutor.js';
 
@@ -35,7 +35,7 @@ export function registerDefaultExecutors(): void {
   registered = true;
 
   // ── LLM / Agentic AI ──────────────────────────────────────────────────
-  executorRegistry.register(qwenDocExamExecutor);
+  executorRegistry.register(netraDocExamExecutor);
 
   // ── PAD (murah) ───────────────────────────────────────────────────────
   executorRegistry.register(

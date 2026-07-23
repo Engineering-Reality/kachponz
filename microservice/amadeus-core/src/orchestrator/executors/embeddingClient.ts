@@ -1,8 +1,8 @@
 /**
- * Klien embedding untuk RAG — DashScope `text-embedding-v3`.
+ * Klien embedding untuk RAG — Netra `text-embedding-v3`.
  *
  * ============================================================================
- * ⚠️  CATATAN COMPLIANCE (sama seperti qwenClient.ts, WAJIB DIBACA)
+ * ⚠️  CATATAN COMPLIANCE (sama seperti netraClient.ts, WAJIB DIBACA)
  * ============================================================================
  *
  * Netra Runtime (api.netraruntime.com, on_prem mode) TIDAK menyediakan
@@ -12,19 +12,19 @@
  * menolak dengan "this model only supports /v1/chat/completions". Tidak ada
  * jalur on-prem untuk embeddings saat ini.
  *
- * Fallback yang dipakai di sini — DashScope `text-embedding-v3` — dikonfirmasi
+ * Fallback yang dipakai di sini — Netra Cloud `text-embedding-v3` — dikonfirmasi
  * ke Jandy (2026-07-15) sebagai pilihan cloud/dev-prototyping SAJA, dengan
- * compliance concern PERSIS SAMA seperti QWEN_MODE=cloud di qwenClient.ts
+ * compliance concern PERSIS SAMA seperti NETRA_MODE=cloud di netraClient.ts
  * (POJK 11/2022, POJK 4/2023, SWIFT CSP, kebijakan CISO Mandiri — lihat
- * komentar lengkap di sana). Reuse QWEN_MODE/QWEN_BASE_URL/QWEN_API_KEY
- * karena DashScope compatible-mode melayani /chat/completions DAN
+ * komentar lengkap di sana). Reuse NETRA_MODE/NETRA_BASE_URL/NETRA_API_KEY
+ * karena Netra Cloud melayani /chat/completions DAN
  * /embeddings dari base URL + key yang sama.
  *
  * SEBELUM production dengan data nasabah asli: perlu model embedding
- * open-weight yang di-deploy on-prem (mis. Qwen3-Embedding via
+ * open-weight yang di-deploy on-prem (mis. model embedding via
  * Ollama/vLLM) sebelum RAG bisa dipakai dengan dokumen LC nasabah sungguhan.
  * Sampai saat itu, endpoint ini HANYA untuk dev/prototyping dengan data
- * sintetis, sama seperti qwenChat() mode cloud.
+ * sintetis, sama seperti netraChat() mode cloud.
  * ============================================================================
  */
 
@@ -51,30 +51,30 @@ export async function embedText(text: string): Promise<number[]> {
   return vector;
 }
 
-/** Batch embed — DashScope's /embeddings endpoint accepts an array input. */
+/** Batch embed — Netra Cloud's /embeddings endpoint accepts an array input. */
 export async function embedTexts(texts: string[]): Promise<number[][]> {
-  if (!env.QWEN_BASE_URL) {
-    throw new EmbeddingApiError(500, 'QWEN_BASE_URL belum dikonfigurasi');
+  if (!env.NETRA_BASE_URL) {
+    throw new EmbeddingApiError(500, 'NETRA_BASE_URL belum dikonfigurasi');
   }
-  if (env.QWEN_MODE === 'cloud' && !env.QWEN_API_KEY) {
-    throw new EmbeddingApiError(500, 'QWEN_API_KEY wajib untuk mode cloud');
+  if (env.NETRA_MODE === 'cloud' && !env.NETRA_API_KEY) {
+    throw new EmbeddingApiError(500, 'NETRA_API_KEY wajib untuk mode cloud');
   }
-  if (env.QWEN_MODE === 'on_prem') {
+  if (env.NETRA_MODE === 'on_prem') {
     throw new EmbeddingApiError(
       501,
       'Tidak ada endpoint embeddings on-prem saat ini (Netra Runtime hanya chat completions) — ' +
-        'deploy model embedding open-weight dulu sebelum switch QWEN_MODE=on_prem untuk RAG.',
+        'deploy model embedding open-weight dulu sebelum switch NETRA_MODE=on_prem untuk RAG.',
     );
   }
 
   const headers: Record<string, string> = { 'Content-Type': 'application/json' };
-  if (env.QWEN_API_KEY) {
-    headers.Authorization = `Bearer ${env.QWEN_API_KEY}`;
+  if (env.NETRA_API_KEY) {
+    headers.Authorization = `Bearer ${env.NETRA_API_KEY}`;
   }
 
-  const url = `${env.QWEN_BASE_URL.replace(/\/$/, '')}/embeddings`;
+  const url = `${env.NETRA_BASE_URL.replace(/\/$/, '')}/embeddings`;
   const controller = new AbortController();
-  const timer = setTimeout(() => controller.abort(), env.QWEN_TIMEOUT_MS);
+  const timer = setTimeout(() => controller.abort(), env.NETRA_TIMEOUT_MS);
 
   let res: Response;
   try {

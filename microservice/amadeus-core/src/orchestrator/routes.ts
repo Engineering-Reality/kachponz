@@ -32,7 +32,7 @@ try {
 } catch {
   /* sudah terdaftar (hot reload) */
 }
-// Daftarkan executor bawaan (Qwen, UiPath, PAD) sekali saat modul dimuat.
+// Daftarkan executor bawaan (Netra, UiPath, PAD) sekali saat modul dimuat.
 registerDefaultExecutors();
 
 const SAFE_SLUG = z.string().min(1).max(64).regex(/^[a-z0-9_]+$/);
@@ -138,7 +138,7 @@ const RecipeDefSchema = z.object({
 }).strict();
 
 // Prompt #14 — Magic Pen Autofill / Chat Recommendation / Real Chat
-// Summaries. All three are lightweight qwenChat() text calls, no new
+// Summaries. All three are lightweight netraChat() text calls, no new
 // Python/torch/VLM involvement.
 const AutofillSuggestSchema = z.object({
   fieldName: z.string().min(1).max(100),

@@ -282,11 +282,11 @@ Respond with ONLY a valid JSON object, no markdown, no explanation.`;
 
       const apiKey = runtime === 'on_prem'
         ? (process.env.NETRA_API_KEY || '')
-        : process.env.QWEN_API_KEY;
+        : process.env.NETRA_API_KEY;
       const baseURL = runtime === 'on_prem'
         ? 'https://api.netraruntime.com/v1'
-        : process.env.QWEN_BASE_URL;
-      const modelName = runtime === 'on_prem' ? 'qwen3.6-35b' : (process.env.QWEN_LLM_MODEL || 'qwen3.6-35b');
+        : process.env.NETRA_BASE_URL;
+      const modelName = runtime === 'on_prem' ? 'qwen3.6-35b' : (process.env.NETRA_LLM_MODEL || 'qwen3.6-35b');
 
       const llm = new ChatOpenAI({
         modelName,

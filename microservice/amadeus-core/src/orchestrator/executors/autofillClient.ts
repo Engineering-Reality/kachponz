@@ -5,12 +5,12 @@
  * Ports the prompt SHAPE from legacy Python `tool_autofill.py` /
  * `agent_field_autofill.py` (field name + context + existing-value
  * continuation + field definition) — NOT their HOW (local VLM /
- * `custom_vlm_model.py`). This goes through the same `qwenChat()` (Netra
+ * `custom_vlm_model.py`). This goes through the same `netraChat()` (Netra
  * Runtime) client every other text-in/text-out LLM call in this codebase
  * uses; no vision input, no torch/transformers dependency.
  */
 
-import { qwenChat } from './qwenClient.js';
+import { netraChat } from './netraClient.js';
 import { env } from '../../config/env.js';
 
 export interface AutofillRequest {
@@ -52,8 +52,8 @@ function buildAutofillPrompt(req: AutofillRequest): string {
 
 export async function suggestFieldValue(req: AutofillRequest): Promise<string> {
   const prompt = buildAutofillPrompt(req);
-  const result = await qwenChat({
-    model: env.QWEN_LLM_MODEL,
+  const result = await netraChat({
+    model: env.NETRA_LLM_MODEL,
     messages: [
       { role: 'system', content: AUTOFILL_SYSTEM },
       { role: 'user', content: prompt },

@@ -943,8 +943,8 @@ function PlaygroundInner() {
                     value={runtimeMode}
                     onChange={(val: any) => setRuntimeMode(val)}
                     options={[
-                      { value: 'cloud', label: 'Qwen DashScope (Cloud)' },
-                      { value: 'on_prem', label: 'Netra Qwen (On-Prem)' }
+                      { value: 'cloud', label: 'Netra (Cloud)' },
+                      { value: 'on_prem', label: 'Netra (On-Prem)' }
                     ]}
                     className="relative z-10 !py-1 text-xs !bg-transparent"
                     triggerClassName="rounded-[5px] border-transparent !bg-slate-900/90 dark:!bg-slate-900/90 text-white backdrop-blur-sm"

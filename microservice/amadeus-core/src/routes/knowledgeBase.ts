@@ -5,6 +5,8 @@ import { DomainError } from '../types/domain.js';
 import { authenticateRobot } from '../middleware/auth.js';
 import { extractTextFromImage } from '../orchestrator/executors/visionExtract.js';
 import { PDFParse } from 'pdf-parse';
+import * as xlsx from 'xlsx';
+import mammoth from 'mammoth';
 
 const knowledgeBaseSchema = z.object({
   kb_id: z.string().uuid(),
@@ -20,7 +22,7 @@ const kbDocumentSchema = z.object({
   doc_id: z.string().uuid(),
   kb_id: z.string().uuid(),
   filename: z.string(),
-  file_type: z.enum(['pdf', 'image', 'txt']),
+  file_type: z.enum(['pdf', 'image', 'txt', 'excel', 'word']),
   status: z.enum(['processing', 'ready', 'failed']),
   uploaded_at: z.string().or(z.date()).optional(),
 });
@@ -32,18 +34,25 @@ const kbDetailSchema = knowledgeBaseSchema.extend({
 /** Infers file_type from mimetype, falling back to the filename extension
  * for browsers that send a generic mimetype (e.g. text/plain vs
  * application/octet-stream for .txt). Returns null when unsupported. */
-function detectFileType(mimetype: string, filename: string): 'pdf' | 'image' | 'txt' | null {
+function detectFileType(mimetype: string, filename: string): 'pdf' | 'image' | 'txt' | 'excel' | 'word' | null {
   if (mimetype === 'application/pdf') return 'pdf';
   if (mimetype.startsWith('image/')) return 'image';
   if (mimetype === 'text/plain') return 'txt';
+  
   const ext = filename.toLowerCase().split('.').pop();
   if (ext === 'pdf') return 'pdf';
   if (ext === 'txt') return 'txt';
   if (ext && ['png', 'jpg', 'jpeg', 'gif', 'webp'].includes(ext)) return 'image';
+  if (ext && ['xls', 'xlsx', 'csv'].includes(ext)) return 'excel';
+  if (ext && ['doc', 'docx'].includes(ext)) return 'word';
+  
+  if (mimetype.includes('excel') || mimetype.includes('spreadsheet')) return 'excel';
+  if (mimetype.includes('word') || mimetype.includes('document')) return 'word';
+  
   return null;
 }
 
-async function extractRawText(buffer: Buffer, fileType: 'pdf' | 'image' | 'txt', mimetype: string): Promise<string> {
+async function extractRawText(buffer: Buffer, fileType: 'pdf' | 'image' | 'txt' | 'excel' | 'word', mimetype: string): Promise<string> {
   if (fileType === 'txt') return buffer.toString('utf8');
   if (fileType === 'pdf') {
     const parser = new PDFParse({ data: buffer });
@@ -53,6 +62,21 @@ async function extractRawText(buffer: Buffer, fileType: 'pdf' | 'image' | 'txt',
     } finally {
       await parser.destroy();
     }
+  }
+  if (fileType === 'excel') {
+    const workbook = xlsx.read(buffer, { type: 'buffer' });
+    let text = '';
+    for (const sheetName of workbook.SheetNames) {
+      const worksheet = workbook.Sheets[sheetName];
+      if (worksheet) {
+        text += xlsx.utils.sheet_to_txt(worksheet) + '\n\n';
+      }
+    }
+    return text.trim();
+  }
+  if (fileType === 'word') {
+    const result = await mammoth.extractRawText({ buffer });
+    return result.value.trim();
   }
   return extractTextFromImage(buffer, mimetype);
 }

@@ -58,31 +58,31 @@ const EnvSchema = z.object({
   // Skew toleransi timestamp signature (detik) — anti-replay window.
   SIGNATURE_MAX_SKEW_SEC: z.coerce.number().int().positive().default(300),
 
-  // Endpoint LLM Air-gapped (mis. Qwen via Ollama/vLLM)
+  // Endpoint LLM Air-gapped (mis. model via Ollama/vLLM)
   // Opsional. Jika kosong, agent akan menggunakan fallback deterministik.
   AGENT_LLM_URL: z.string().url().optional(),
 
   // OAUTH2 JWT Secret (Untuk verifikasi token Bearer stateless)
   OAUTH2_JWT_SECRET: z.string().min(16).optional(),
 
-  // ─── Qwen (LLM/VLM) ─────────────────────────────────────────────────
-  // Mode: 'cloud' = DashScope Alibaba (⚠️ dev/demo saja, lihat qwenClient.ts).
+  // ─── Netra (LLM/VLM) ─────────────────────────────────────────────────
+  // Mode: 'cloud' = Netra Cloud API (⚠️ dev/demo saja, lihat netraClient.ts).
   //       'on_prem' = Ollama/vLLM internal (untuk production nasabah).
-  QWEN_MODE: z.enum(['cloud', 'on_prem']).default('cloud'),
-  QWEN_BASE_URL: z
+  NETRA_MODE: z.enum(['cloud', 'on_prem']).default('cloud'),
+  NETRA_BASE_URL: z
     .string()
     .url()
-    .default('https://dashscope.aliyuncs.com/compatible-mode/v1'),
-  QWEN_API_KEY: z.string().min(1).optional(),
-  QWEN_VL_MODEL: z.string().default('qwen-vl-max'),
-  QWEN_LLM_MODEL: z.string().default('qwen-plus'),
-  QWEN_TIMEOUT_MS: z.coerce.number().int().positive().default(60_000),
+    .default('https://api.netraruntime.com/v1'),
+  NETRA_API_KEY: z.string().min(1).optional(),
+  NETRA_VL_MODEL: z.string().default('Qwen VLM'),
+  NETRA_LLM_MODEL: z.string().default('qwen3.6-35b'),
+  NETRA_TIMEOUT_MS: z.coerce.number().int().positive().default(60_000),
 
   // ─── Embeddings (RAG) ───────────────────────────────────────────────
-  // Reuses QWEN_MODE/QWEN_BASE_URL/QWEN_API_KEY — DashScope serves both
+  // Reuses NETRA_MODE/NETRA_BASE_URL/NETRA_API_KEY — Netra Cloud serves both
   // /chat/completions and /embeddings under the same compatible-mode base
   // URL and key, so this isn't a separate cloud account, just a different
-  // model + path. Same compliance caveat as QWEN_MODE=cloud applies (see
+  // model + path. Same compliance caveat as NETRA_MODE=cloud applies (see
   // embeddingClient.ts): dev/prototyping only until an on-prem embedding
   // model is deployed. EMBEDDING_DIM must match the `vector(N)` column in
   // migrations/1795000000000_add_rag.ts if this model is ever changed.

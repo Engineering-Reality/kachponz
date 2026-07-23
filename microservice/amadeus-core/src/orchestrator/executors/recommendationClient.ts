@@ -2,7 +2,7 @@
  * Chat Recommendation — 2-4 short follow-up suggestions shown as tappable
  * chips after an assistant turn. Ports the prompt wording/shape from legacy
  * Python `others/prompts/recommendation_prompts.py` almost as-is, translated
- * to a TS prompt string and called via `qwenChat()` (Netra Runtime) instead
+ * to a TS prompt string and called via `netraChat()` (Netra Runtime) instead
  * of the old langchain ChatOpenAI wrapper.
  *
  * Recommendations are a nice-to-have: on any failure (network, non-JSON
@@ -10,7 +10,7 @@
  * it must never block or break the actual chat flow.
  */
 
-import { qwenChat } from './qwenClient.js';
+import { netraChat } from './netraClient.js';
 import { env } from '../../config/env.js';
 
 export interface ConversationTailMessage {
@@ -49,8 +49,8 @@ Provide recommendations that are:
 export async function suggestFollowUps(conversationTail: ConversationTailMessage[]): Promise<string[]> {
   const prompt = buildRecommendationPrompt(conversationTail);
   try {
-    const result = await qwenChat({
-      model: env.QWEN_LLM_MODEL,
+    const result = await netraChat({
+      model: env.NETRA_LLM_MODEL,
       messages: [
         { role: 'system', content: RECOMMENDATION_SYSTEM },
         { role: 'user', content: prompt },

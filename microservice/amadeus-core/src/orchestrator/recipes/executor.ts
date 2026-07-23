@@ -340,10 +340,10 @@ async function classifyFault(detail: string): Promise<'retry' | 'abort'> {
   if (KNOWN_RETRYABLE.some((k) => lower.includes(k))) return 'retry'; // no LLM call needed for known patterns
 
   const llm = new ChatOpenAI({
-    modelName: env.QWEN_LLM_MODEL || 'qwen-max',
+    modelName: env.NETRA_LLM_MODEL || 'qwen3.6-35b',
     temperature: 0,
-    apiKey: env.QWEN_API_KEY,
-    configuration: { baseURL: env.QWEN_BASE_URL },
+    apiKey: env.NETRA_API_KEY,
+    configuration: { baseURL: env.NETRA_BASE_URL },
   });
 
   // A single, narrow, stateless call — it gets a short string in, returns one
