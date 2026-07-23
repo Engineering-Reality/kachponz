@@ -523,17 +523,17 @@ export function UiPathLiveGraph({
             <h3 className="text-[10px] font-medium text-slate-500 dark:text-slate-400 mb-3 px-1">
                {selectedNode?.type === 'Agent' ? 'Agent MCP Logs' : selectedNode?.type === 'Queue' ? 'Queue Transactions Logs' : 'Execution Status & Logs'}
             </h3>
-            <div className="bg-[#0f172a] rounded-xl p-3 shadow-inner font-mono text-[11px] leading-relaxed relative overflow-hidden min-h-[120px]">
+            <div className="bg-slate-100 dark:bg-[#0f172a] border border-slate-200 dark:border-transparent rounded-xl p-3 shadow-inner font-mono text-[11px] leading-relaxed relative overflow-hidden min-h-[120px]">
                {selectedNode?.type === 'Agent' && (() => {
                  let agentLogsText = '';
                  if (contextData?.tools) {
                    contextData.tools.forEach((t: any) => { if (t.agentLogs) agentLogsText += t.agentLogs + '\n'; });
                  }
-                 return <div className="text-blue-300 whitespace-pre-wrap">{agentLogsText || 'No logs available.'}</div>;
+                 return <div className="text-blue-600 dark:text-blue-300 whitespace-pre-wrap">{agentLogsText || 'No logs available.'}</div>;
                })()}
                {selectedNode?.type === 'Queue' && (() => {
                  const qData = allQueues.find(q => q.name === selectedNode.name);
-                 return <div className="text-amber-300 whitespace-pre-wrap text-xs">{qData?.logs || 'No logs available.'}</div>;
+                 return <div className="text-amber-600 dark:text-amber-300 whitespace-pre-wrap text-xs">{qData?.logs || 'No logs available.'}</div>;
                })()}
                {(!selectedNode || selectedNode.type === 'Process') && (() => {
                  const pName = selectedNode?.name || allProcesses[0];
@@ -544,8 +544,8 @@ export function UiPathLiveGraph({
                        <div className="absolute top-0 left-0 w-full h-[2px] bg-gradient-to-r from-transparent via-blue-500 to-transparent animate-pulse" />
                      )}
                      {selectedJob ? (
-                        <div className={`${selectedJob.state === 'Faulted' ? 'text-red-400' : 'text-emerald-400'} whitespace-pre-wrap`}>
-                          <div className="text-slate-400 mb-2 border-b border-slate-700/50 pb-2">
+                        <div className={`${selectedJob.state === 'Faulted' ? 'text-red-600 dark:text-red-400' : 'text-emerald-700 dark:text-emerald-400'} whitespace-pre-wrap`}>
+                          <div className="text-slate-500 dark:text-slate-400 mb-2 border-b border-slate-300 dark:border-slate-700/50 pb-2">
                             Process started at: {selectedJob.createdAt} <br/>
                             Status: {selectedJob.state}
                           </div>
