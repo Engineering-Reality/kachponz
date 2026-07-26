@@ -280,11 +280,10 @@ ${toolList}
 
 Respond with ONLY a valid JSON object, no markdown, no explanation.`;
 
-      // Always use the configured NETRA_BASE_URL + NETRA_API_KEY from .env.
-      // NETRA_BASE_URL points to cloud in cloud mode, on-prem in on_prem mode.
-      const apiKey = process.env.NETRA_API_KEY || '';
-      const baseURL = process.env.NETRA_BASE_URL || 'https://api.netraruntime.com/v1';
-      const modelName = process.env.NETRA_LLM_MODEL || 'qwen3.6-35b';
+      // Always use the configured DASHSCOPE_BASE_URL + DASHSCOPE_API_KEY from .env.
+      const apiKey = process.env.DASHSCOPE_API_KEY || '';
+      const baseURL = process.env.DASHSCOPE_BASE_URL || 'https://dashscope-intl.aliyuncs.com/compatible-mode/v1';
+      const modelName = process.env.DASHSCOPE_LLM_MODEL || 'qwen-plus';
 
       const llm = new ChatOpenAI({
         modelName,

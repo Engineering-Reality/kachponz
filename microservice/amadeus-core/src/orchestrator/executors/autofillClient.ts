@@ -2,15 +2,10 @@
  * Magic Pen Autofill — suggests a value for a single Agent Creator form
  * field, given whatever other fields are already filled in as context.
  *
- * Ports the prompt SHAPE from legacy Python `tool_autofill.py` /
- * `agent_field_autofill.py` (field name + context + existing-value
- * continuation + field definition) — NOT their HOW (local VLM /
- * `custom_vlm_model.py`). This goes through the same `netraChat()` (Netra
- * Runtime) client every other text-in/text-out LLM call in this codebase
- * uses; no vision input, no torch/transformers dependency.
+ * Uses dashscopeChat() for text-in/text-out LLM calls.
  */
 
-import { netraChat } from './netraClient.js';
+import { dashscopeChat } from './dashscopeClient.js';
 import { env } from '../../config/env.js';
 
 export interface AutofillRequest {
@@ -52,8 +47,8 @@ function buildAutofillPrompt(req: AutofillRequest): string {
 
 export async function suggestFieldValue(req: AutofillRequest): Promise<string> {
   const prompt = buildAutofillPrompt(req);
-  const result = await netraChat({
-    model: env.NETRA_LLM_MODEL,
+  const result = await dashscopeChat({
+    model: env.DASHSCOPE_LLM_MODEL,
     messages: [
       { role: 'system', content: AUTOFILL_SYSTEM },
       { role: 'user', content: prompt },

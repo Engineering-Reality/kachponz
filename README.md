@@ -186,28 +186,28 @@ flowchart TD
         CR_DRC <-->|TCP 5432| DB_DRC
     end
 
-    subgraph NetraCloud [Netra Private AI Cloud: Localized LLM Inference — HGX H100 Reference]
+    subgraph DashScopeCloud [DashScope: Alibaba Cloud Model Studio — Qwen Multimodal API]
         direction TB
         subgraph EdgeLayer [Edge + Router Layer]
-            NetraAPI[☁️ OpenAI-Compatible API]
+            DashScopeAPI[☁️ OpenAI-Compatible API]
             KVRouter[🚦 KV-Aware Router - Prefix Affinity]
-            Fixed[⚠️ No Planner / Autoscaler - Fixed 16-GPU Capacity]
-            NetraAPI --> KVRouter
+            Fixed[⚠️ Managed Cloud Capacity]
+            DashScopeAPI --> KVRouter
         end
 
         subgraph DisaggregatedInference [Disaggregated Inference Architecture]
             direction LR
-            subgraph Node0 [Node 0 - HGX H100 8-GPU]
-                PrefillP[⚡ Prefill GPUs - group P G0-G3]
-                DecodeD1[💭 Decode GPUs - group D#1 G4-G7]
+            subgraph Node0 [Node 0 - GPU Cluster]
+                PrefillP[⚡ Prefill GPUs]
+                DecodeD1[💭 Decode GPUs]
                 NVLink0((🔗 NVLink All-to-All))
                 PrefillP <--> NVLink0
                 DecodeD1 <--> NVLink0
             end
 
-            subgraph Node1 [Node 1 - HGX H100 8-GPU, all-decode]
-                DecodeD2[💭 Decode GPUs - group D#2 G8-G11]
-                DecodeD3[💭 Decode GPUs - group D#3 G12-G15]
+            subgraph Node1 [Node 1 - GPU Cluster]
+                DecodeD2[💭 Decode GPUs]
+                DecodeD3[💭 Decode GPUs]
                 NVLink1((🔗 NVLink All-to-All))
                 DecodeD2 <--> NVLink1
                 DecodeD3 <--> NVLink1
@@ -250,9 +250,9 @@ flowchart TD
     CR_DRC <-->|Port 389| LDAP
     CR_DRC <-->|Port 587| SMTP
 
-    %% Amadeus to Netra LLM Connection
-    CR_DC <-->|HTTPS REST: Invokes Qwen Model| NetraAPI
-    CR_DRC <-->|HTTPS REST: Invokes Qwen Model| NetraAPI
+    %% Amadeus to DashScope LLM Connection
+    CR_DC <-->|HTTPS REST: Invokes Qwen Model| DashScopeAPI
+    CR_DRC <-->|HTTPS REST: Invokes Qwen Model| DashScopeAPI
 
     %% Agents to Internal Tools
     Runner_DC --> ManagedSystems
@@ -283,11 +283,11 @@ flowchart TD
 
 *All B300 figures are the vendor reference architecture's own projections, not
 independently measured. H100 figures are intentionally left blank rather than
-extrapolated — run the actual Netra Runtime benchmark suite on the H100 cluster
+extrapolated — run the actual benchmark suite on the cluster
 once it's provisioned, and fill this table with measured numbers before using it
 in any external-facing benchmarking material.*
 
-**Software / Kernel Stack (both deployments):** Netra Inference Core (SGLang-based
+**Software / Kernel Stack (both deployments):** DashScope Inference Core (SGLang-based
 serving engine) — Full-Attention (DenseFA), GDN Linear-Attention (DeltaScan),
 Quantized GEMM (QGEMM-FP4 on B300 / QGEMM-FP8 on H100), MoE Expert-Parallel routing,
 and a Speculative Decoder (SpecVerify kernel, draft-and-verify at 4–7 tok/step). This

@@ -1,12 +1,8 @@
 /**
  * Image text extraction for knowledge-base document ingestion (apu.md
- * Task 2). No OCR library exists anywhere in this repo (checked before
- * adding a dependency, per apu.md's instruction) — reuses the vision-capable
- * chat model already wired up for playground image attachments
- * (env.NETRA_VL_MODEL / Netra Runtime's on-prem VLM, same
- * ChatOpenAI-over-baseURL branch as engine.ts's runAgenticStep) instead of
- * adding tesseract.js or similar. This also means image ingestion, unlike
- * embedding, stays on-prem-capable when NETRA_MODE=on_prem.
+ * Task 2). No OCR library exists anywhere in this repo — reuses the
+ * vision-capable chat model already wired up for playground image
+ * attachments (env.DASHSCOPE_VL_MODEL via DashScope API).
  */
 
 import { ChatOpenAI } from '@langchain/openai';
@@ -15,10 +11,10 @@ import { env } from '../../config/env.js';
 
 export async function extractTextFromImage(buffer: Buffer, mimeType: string): Promise<string> {
   const llm = new ChatOpenAI({
-    modelName: env.NETRA_VL_MODEL,
+    modelName: env.DASHSCOPE_VL_MODEL,
     temperature: 0,
-    apiKey: env.NETRA_API_KEY ?? '',
-    configuration: { baseURL: env.NETRA_BASE_URL },
+    apiKey: env.DASHSCOPE_API_KEY ?? '',
+    configuration: { baseURL: env.DASHSCOPE_BASE_URL },
   });
 
   const base64 = buffer.toString('base64');

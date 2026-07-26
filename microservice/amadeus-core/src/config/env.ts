@@ -65,26 +65,23 @@ const EnvSchema = z.object({
   // OAUTH2 JWT Secret (Untuk verifikasi token Bearer stateless)
   OAUTH2_JWT_SECRET: z.string().min(16).optional(),
 
-  // ─── Netra (LLM/VLM) ─────────────────────────────────────────────────
-  // Mode: 'cloud' = Netra Cloud API (⚠️ dev/demo saja, lihat netraClient.ts).
-  //       'on_prem' = Ollama/vLLM internal (untuk production nasabah).
-  NETRA_MODE: z.enum(['cloud', 'on_prem']).default('cloud'),
-  NETRA_BASE_URL: z
+  // ─── DashScope (LLM/VLM) — Alibaba Cloud Model Studio ─────────────────
+  // OpenAI-compatible endpoint: https://dashscope-intl.aliyuncs.com/compatible-mode/v1
+  // VL model: qwen-vl-max (multimodal — vision + text)
+  // LLM model: qwen-plus (text-only, cost-efficient)
+  DASHSCOPE_BASE_URL: z
     .string()
     .url()
-    .default('https://api.netraruntime.com/v1'),
-  NETRA_API_KEY: z.string().min(1).optional(),
-  NETRA_VL_MODEL: z.string().default('Qwen VLM'),
-  NETRA_LLM_MODEL: z.string().default('qwen3.6-35b'),
-  NETRA_TIMEOUT_MS: z.coerce.number().int().positive().default(60_000),
+    .default('https://dashscope-intl.aliyuncs.com/compatible-mode/v1'),
+  DASHSCOPE_API_KEY: z.string().optional(),
+  DASHSCOPE_VL_MODEL: z.string().default('qwen-vl-max'),
+  DASHSCOPE_LLM_MODEL: z.string().default('qwen-plus'),
+  DASHSCOPE_TIMEOUT_MS: z.coerce.number().int().positive().default(60_000),
 
   // ─── Embeddings (RAG) ───────────────────────────────────────────────
-  // Reuses NETRA_MODE/NETRA_BASE_URL/NETRA_API_KEY — Netra Cloud serves both
+  // Reuses DASHSCOPE_BASE_URL/DASHSCOPE_API_KEY — DashScope serves both
   // /chat/completions and /embeddings under the same compatible-mode base
-  // URL and key, so this isn't a separate cloud account, just a different
-  // model + path. Same compliance caveat as NETRA_MODE=cloud applies (see
-  // embeddingClient.ts): dev/prototyping only until an on-prem embedding
-  // model is deployed. EMBEDDING_DIM must match the `vector(N)` column in
+  // URL and key. EMBEDDING_DIM must match the `vector(N)` column in
   // migrations/1795000000000_add_rag.ts if this model is ever changed.
   EMBEDDING_MODEL: z.string().default('text-embedding-v3'),
   EMBEDDING_DIM: z.coerce.number().int().positive().default(1024),

@@ -974,14 +974,11 @@ export async function runAgenticStep(
 
     const resolvedModel = agentConfig.model && agentConfig.model !== "gpt-4o"
       ? agentConfig.model
-      : (requiresVision 
-          ? (runtime === 'on_prem' ? env.NETRA_VL_MODEL : env.NETRA_VL_MODEL) 
-          : (runtime === 'on_prem' ? env.NETRA_LLM_MODEL : (process.env.NETRA_LLM_MODEL || env.NETRA_LLM_MODEL)));
+      : (requiresVision ? env.DASHSCOPE_VL_MODEL : env.DASHSCOPE_LLM_MODEL);
 
-    // cloud = Netra Cloud API (NETRA_BASE_URL + NETRA_API_KEY from .env)
-    // on_prem = internal Ollama/vLLM (NETRA_BASE_URL should point to local endpoint)
-    const apiKey = env.NETRA_API_KEY ?? '';
-    const baseURL = env.NETRA_BASE_URL;
+    // DashScope API (DASHSCOPE_BASE_URL + DASHSCOPE_API_KEY from .env)
+    const apiKey = env.DASHSCOPE_API_KEY ?? '';
+    const baseURL = env.DASHSCOPE_BASE_URL;
 
     // 4. Instantiate LangGraph createReactAgent In-Memory
     const llm = new ChatOpenAI({
@@ -1219,14 +1216,11 @@ export async function runAgenticStepStream(
 
     const resolvedModel = agentConfig.model && agentConfig.model !== "gpt-4o"
       ? agentConfig.model
-      : (requiresVision 
-          ? (runtime === 'on_prem' ? env.NETRA_VL_MODEL : env.NETRA_VL_MODEL) 
-          : (runtime === 'on_prem' ? env.NETRA_LLM_MODEL : (process.env.NETRA_LLM_MODEL || env.NETRA_LLM_MODEL)));
+      : (requiresVision ? env.DASHSCOPE_VL_MODEL : env.DASHSCOPE_LLM_MODEL);
 
-    // cloud = Netra Cloud API (NETRA_BASE_URL + NETRA_API_KEY from .env)
-    // on_prem = internal Ollama/vLLM (NETRA_BASE_URL should point to local endpoint)
-    const apiKey = env.NETRA_API_KEY ?? '';
-    const baseURL = env.NETRA_BASE_URL;
+    // DashScope API (DASHSCOPE_BASE_URL + DASHSCOPE_API_KEY from .env)
+    const apiKey = env.DASHSCOPE_API_KEY ?? '';
+    const baseURL = env.DASHSCOPE_BASE_URL;
 
     const modelInitStart = Date.now();
     const llm = new ChatOpenAI({

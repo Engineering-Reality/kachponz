@@ -1,31 +1,8 @@
 /**
- * Klien embedding untuk RAG — Netra `text-embedding-v3`.
+ * Klien embedding untuk RAG — DashScope `text-embedding-v3`.
  *
- * ============================================================================
- * ⚠️  CATATAN COMPLIANCE (sama seperti netraClient.ts, WAJIB DIBACA)
- * ============================================================================
- *
- * Netra Runtime (api.netraruntime.com, on_prem mode) TIDAK menyediakan
- * endpoint embeddings — dicek langsung ke API live-nya (2026-07-15):
- * `GET /v1/models` hanya mengembalikan 3 model chat (Qwen VLM,
- * gemma-4-26b-a4b, qwen3.6-35b), dan `POST /v1/embeddings` ke ketiganya
- * menolak dengan "this model only supports /v1/chat/completions". Tidak ada
- * jalur on-prem untuk embeddings saat ini.
- *
- * Fallback yang dipakai di sini — Netra Cloud `text-embedding-v3` — dikonfirmasi
- * ke Jandy (2026-07-15) sebagai pilihan cloud/dev-prototyping SAJA, dengan
- * compliance concern PERSIS SAMA seperti NETRA_MODE=cloud di netraClient.ts
- * (POJK 11/2022, POJK 4/2023, SWIFT CSP, kebijakan CISO Mandiri — lihat
- * komentar lengkap di sana). Reuse NETRA_MODE/NETRA_BASE_URL/NETRA_API_KEY
- * karena Netra Cloud melayani /chat/completions DAN
- * /embeddings dari base URL + key yang sama.
- *
- * SEBELUM production dengan data nasabah asli: perlu model embedding
- * open-weight yang di-deploy on-prem (mis. model embedding via
- * Ollama/vLLM) sebelum RAG bisa dipakai dengan dokumen LC nasabah sungguhan.
- * Sampai saat itu, endpoint ini HANYA untuk dev/prototyping dengan data
- * sintetis, sama seperti netraChat() mode cloud.
- * ============================================================================
+ * Reuses DASHSCOPE_BASE_URL/DASHSCOPE_API_KEY — DashScope serves both
+ * /chat/completions and /embeddings under the same compatible-mode base URL.
  */
 
 import { env } from '../../config/env.js';
@@ -51,30 +28,23 @@ export async function embedText(text: string): Promise<number[]> {
   return vector;
 }
 
-/** Batch embed — Netra Cloud's /embeddings endpoint accepts an array input. */
+/** Batch embed — DashScope /embeddings endpoint accepts an array input. */
 export async function embedTexts(texts: string[]): Promise<number[][]> {
-  if (!env.NETRA_BASE_URL) {
-    throw new EmbeddingApiError(500, 'NETRA_BASE_URL belum dikonfigurasi');
+  if (!env.DASHSCOPE_BASE_URL) {
+    throw new EmbeddingApiError(500, 'DASHSCOPE_BASE_URL belum dikonfigurasi');
   }
-  if (env.NETRA_MODE === 'cloud' && !env.NETRA_API_KEY) {
-    throw new EmbeddingApiError(500, 'NETRA_API_KEY wajib untuk mode cloud');
-  }
-  if (env.NETRA_MODE === 'on_prem') {
-    throw new EmbeddingApiError(
-      501,
-      'Tidak ada endpoint embeddings on-prem saat ini (Netra Runtime hanya chat completions) — ' +
-        'deploy model embedding open-weight dulu sebelum switch NETRA_MODE=on_prem untuk RAG.',
-    );
+  if (!env.DASHSCOPE_API_KEY) {
+    throw new EmbeddingApiError(500, 'DASHSCOPE_API_KEY wajib di-set');
   }
 
-  const headers: Record<string, string> = { 'Content-Type': 'application/json' };
-  if (env.NETRA_API_KEY) {
-    headers.Authorization = `Bearer ${env.NETRA_API_KEY}`;
-  }
+  const headers: Record<string, string> = {
+    'Content-Type': 'application/json',
+    Authorization: `Bearer ${env.DASHSCOPE_API_KEY}`,
+  };
 
-  const url = `${env.NETRA_BASE_URL.replace(/\/$/, '')}/embeddings`;
+  const url = `${env.DASHSCOPE_BASE_URL.replace(/\/$/, '')}/embeddings`;
   const controller = new AbortController();
-  const timer = setTimeout(() => controller.abort(), env.NETRA_TIMEOUT_MS);
+  const timer = setTimeout(() => controller.abort(), env.DASHSCOPE_TIMEOUT_MS);
 
   let res: Response;
   try {

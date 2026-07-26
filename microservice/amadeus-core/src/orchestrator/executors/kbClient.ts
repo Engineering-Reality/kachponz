@@ -1,12 +1,7 @@
 /**
  * AML/CFT knowledge base retrieval (apu.md Task 3b) — deliberately NOT
  * vector/embedding-based like ragClient.ts's retrievalWithRerank(). The only
- * working embedding path in this repo is Netra Cloud (embeddingClient.ts),
- * which is dev/prototyping-only per the compliance caveat there; sending real
- * counterparty names extracted from live transaction messages to a cloud API
- * at query time was ruled out. This uses Postgres full-text search instead —
- * 100% on-prem, no external calls — so the search_knowledge_base tool
- * registered in engine.ts is real retrieval, not a system-prompt promise.
+ * working embedding path in this repo is DashScope (embeddingClient.ts);
  */
 
 import { query } from '../../db/pool.js';
