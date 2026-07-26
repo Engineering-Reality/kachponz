@@ -13,7 +13,7 @@ import { registerAuthRoutes } from './routes/auth.js';
 import { registerFeatureSharingRoutes } from './routes/featureSharing.js';
 import { registerKnowledgeBaseRoutes } from './routes/knowledgeBase.js';
 import { DomainError } from './types/domain.js';
-import { DashScopeApiError } from './orchestrator/executors/dashscopeClient.js';
+import { OpenRouterApiError } from './orchestrator/executors/openrouterClient.js';
 import { closePool } from './db/pool.js';
 import fastifySwagger from '@fastify/swagger';
 import fastifySwaggerUi from '@fastify/swagger-ui';
@@ -133,7 +133,7 @@ export async function buildServer() {
         error: { code: err.code, message: err.message, details: err.details },
       });
     }
-    if (err instanceof DashScopeApiError) {
+    if (err instanceof OpenRouterApiError) {
       req.log.warn({ status: err.status, body: err.body }, err.message);
       let detailMsg = err.message;
       if (err.body) {
@@ -145,7 +145,7 @@ export async function buildServer() {
         } catch {}
       }
       return reply.code(err.status || 500).send({
-        error: { code: 'DASHSCOPE_API_ERROR', message: detailMsg, details: err.body },
+        error: { code: 'OPENROUTER_API_ERROR', message: detailMsg, details: err.body },
       });
     }
     // @fastify/rate-limit: statusCode 429 sudah diset plugin sebelum melempar,

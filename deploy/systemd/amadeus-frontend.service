@@ -1,0 +1,32 @@
+[Unit]
+Description=Amadeus Orchestrator — Next.js frontend (standalone)
+After=network.target amadeus-core.service
+Wants=amadeus-core.service
+
+[Service]
+Type=simple
+User=amadeus
+Group=amadeus
+WorkingDirectory=/opt/amadeus/microservice/frontend/.next/standalone
+# Contains AMADEUS_API_URL / AMADEUS_JWT_SECRET (see .env.local in the
+# frontend project) — copy it alongside server.js when deploying, same as
+# the static/public asset copy step in docs/vps-deployment.md.
+EnvironmentFile=/opt/amadeus/microservice/frontend/.next/standalone/.env.local
+Environment=NODE_ENV=production
+Environment=PORT=3000
+# Next.js' standalone server binds 0.0.0.0 by default — this stack's rule is
+# no direct public exposure, only via the Nginx reverse proxy, same as
+# amadeus-core's HOST=127.0.0.1.
+Environment=HOSTNAME=127.0.0.1
+ExecStart=/usr/bin/node server.js
+Restart=on-failure
+RestartSec=5
+
+NoNewPrivileges=true
+PrivateTmp=true
+ProtectSystem=strict
+ProtectHome=true
+ReadWritePaths=/opt/amadeus/microservice/frontend/.next/standalone/.next/cache
+
+[Install]
+WantedBy=multi-user.target

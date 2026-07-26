@@ -9,7 +9,7 @@
  * make the title flicker mid-conversation).
  */
 
-import { dashscopeChat } from './dashscopeClient.js';
+import { openrouterChat } from './openrouterClient.js';
 import { env } from '../../config/env.js';
 
 export interface ChatTitleMessage {
@@ -28,8 +28,8 @@ export async function suggestChatTitle(messages: ChatTitleMessage[]): Promise<st
     .map((m) => `${m.role}: ${m.content}`)
     .join('\n');
 
-  const result = await dashscopeChat({
-    model: env.DASHSCOPE_LLM_MODEL,
+  const result = await openrouterChat({
+    model: env.OPENROUTER_LLM_MODEL,
     messages: [
       { role: 'system', content: CHAT_TITLE_SYSTEM },
       { role: 'user', content: transcript },

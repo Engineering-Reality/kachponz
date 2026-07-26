@@ -1,7 +1,7 @@
 /**
  * AML/CFT knowledge base retrieval (apu.md Task 3b) — deliberately NOT
  * vector/embedding-based like ragClient.ts's retrievalWithRerank(). The only
- * working embedding path in this repo is DashScope (embeddingClient.ts);
+ * working embedding path in this repo is OpenRouter (embeddingClient.ts);
  */
 
 import { query } from '../../db/pool.js';

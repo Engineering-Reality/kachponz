@@ -6,7 +6,7 @@ import { DomainError } from '../types/domain.js';
 import { authenticateRobot } from '../middleware/auth.js';
 import { randomUUID } from 'node:crypto';
 import { runAgenticStep } from '../orchestrator/engine.js';
-import { dashscopeChat, parseJsonLoose } from '../orchestrator/executors/dashscopeClient.js';
+import { openrouterChat, parseJsonLoose } from '../orchestrator/executors/openrouterClient.js';
 import { env } from '../config/env.js';
 
 export const registerAgentsRoutes: FastifyPluginAsync = async (rootApp: FastifyInstance) => {
@@ -282,8 +282,8 @@ Respond with ONLY a valid JSON object, no markdown, no explanation.`;
 
       let parsed: any;
       try {
-        const res = await dashscopeChat({
-          model: env.DASHSCOPE_LLM_MODEL,
+        const res = await openrouterChat({
+          model: env.OPENROUTER_LLM_MODEL,
           messages: [
             { role: 'system', content: systemPrompt },
             { role: 'user', content: description },
@@ -294,7 +294,7 @@ Respond with ONLY a valid JSON object, no markdown, no explanation.`;
         parsed = parseJsonLoose(res.content);
       } catch (err: any) {
         request.log.error({ err }, 'Agent Architect LLM generation failed');
-        if (err.name === 'DashScopeApiError') throw err;
+        if (err.name === 'OpenRouterApiError') throw err;
         throw new DomainError('LLM_GENERATION_ERROR', `Gagal membuat konfigurasi agent: ${err.message}`, 500);
       }
 

@@ -1,11 +1,11 @@
 /**
  * RAG retrieval + generation — port of legacy Python
  * microservice/rag/service/rag/_rag_utils.py's retrieval_with_rerank() /
- * generate_response(). Generation goes through dashscopeChat(), embeddings
+ * generate_response(). Generation goes through openrouterChat(), embeddings
  * through embeddingClient.ts.
  */
 
-import { dashscopeChat } from './dashscopeClient.js';
+import { openrouterChat } from './openrouterClient.js';
 import { embedText, embedTexts } from './embeddingClient.js';
 import { query } from '../../db/pool.js';
 import { env } from '../../config/env.js';
@@ -80,8 +80,8 @@ export async function generateRagResponse(
     )
     .join('\n\n');
   const prompt = `Berdasarkan konteks yang diambil berikut, jawab pertanyaan ini.\n\nPertanyaan: ${userQuery}\n\nKonteks:\n${formattedContext}\n\nJawaban:`;
-  const result = await dashscopeChat({
-    model: env.DASHSCOPE_LLM_MODEL,
+  const result = await openrouterChat({
+    model: env.OPENROUTER_LLM_MODEL,
     messages: [{ role: 'user', content: prompt }],
     temperature: 0,
   });

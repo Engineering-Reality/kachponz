@@ -417,19 +417,35 @@ async function loadMcpTools(
     // must never be used to build a connection URL.
     let ssePort: number | null = null;
     if (release.method === "sse") {
-      const runtime = await query<{ port: number | null; status: string }>(
-        `SELECT port, status FROM mcp_runtime_state WHERE tool_id = $1`,
+      // Marks the tool as recently used (mcpAutoManager.ts's MCP_IDLE_TIMEOUT_MS
+      // sweep reads this) and, if it was previously idle-stopped, signals the
+      // manager's next sync tick to respawn it — see fn_touch_mcp_runtime.sql.
+      await callFn('fn_touch_mcp_runtime', [toolId]).catch(() => {});
+
+      const runtime = await query<{ port: number | null; status: string; last_error: string | null }>(
+        `SELECT port, status, last_error FROM mcp_runtime_state WHERE tool_id = $1`,
         [toolId],
       );
       let row = runtime.rows[0];
-      
-      // SSE Ready-Wait: If the McpAutoManager is currently spinning this up,
-      // give it a brief grace period instead of immediately failing the agent invoke.
-      if (row?.status === 'starting') {
-        await new Promise(r => setTimeout(r, 1500));
-        const retry = await query<{ port: number | null; status: string }>(
-          `SELECT port, status FROM mcp_runtime_state WHERE tool_id = $1`,
-          [toolId]
+
+      // SSE Ready-Wait: give mcpAutoManager.ts a grace period instead of
+      // immediately failing the agent invoke. 'starting' = already mid-spawn,
+      // usually ready within ~1-2s. A 'stopped' row is only worth waiting on
+      // when last_error marks it as idle-stopped (see IDLE_STOP_REASON in
+      // mcpAutoManager.ts) — the touch above just asked the manager to wake
+      // it, which takes up to its ~10s sync tick plus startup time. A
+      // 'stopped'/'crashed' tool for any other reason should still fail
+      // fast, unchanged from today.
+      const isWakingFromIdle = row?.status === 'stopped' && row.last_error === 'idle-timeout';
+      for (
+        let attempt = 0;
+        (row?.status === 'starting' || (attempt === 0 && isWakingFromIdle)) && attempt < 4;
+        attempt++
+      ) {
+        await new Promise((r) => setTimeout(r, isWakingFromIdle ? 3000 : 1000));
+        const retry = await query<{ port: number | null; status: string; last_error: string | null }>(
+          `SELECT port, status, last_error FROM mcp_runtime_state WHERE tool_id = $1`,
+          [toolId],
         );
         row = retry.rows[0];
       }
@@ -447,6 +463,10 @@ async function loadMcpTools(
         return new SSEClientTransport(new URL(url));
       }
       if (release.method === "stdio") {
+        // No Windows-specific handling needed here: StdioClientTransport spawns
+        // via the SDK's own `cross-spawn` dependency (see
+        // node_modules/@modelcontextprotocol/sdk .../client/stdio.js), which
+        // already resolves .cmd/.bat shims (npx/npm) correctly cross-platform.
         return new StdioClientTransport({
           command: release.command || "node",
           args: Array.isArray(release.args) ? release.args : [],
@@ -652,6 +672,13 @@ export async function connectToMcpToolById(toolId: string, clientName: string): 
 
   let ssePort: number | null = null;
   if (release.method === 'sse') {
+    // See fn_touch_mcp_runtime.sql: marks recent use (resets the idle-timeout
+    // clock) and wakes an idle-stopped tool on the manager's next sync tick.
+    // No ready-wait here (unlike loadMcpTools' SSE branch) — this path backs
+    // a frequently-polled one-off read, so a wake-in-progress just resolves
+    // on a later poll instead of blocking this call.
+    await callFn('fn_touch_mcp_runtime', [toolId]).catch(() => {});
+
     const runtime = await query<{ port: number | null; status: string }>(
       `SELECT port, status FROM mcp_runtime_state WHERE tool_id = $1`,
       [toolId],
@@ -661,11 +688,14 @@ export async function connectToMcpToolById(toolId: string, clientName: string): 
     ssePort = row.port;
   }
 
+  // No Windows-specific handling needed: StdioClientTransport spawns via the
+  // SDK's own `cross-spawn` dependency, which already resolves .cmd/.bat
+  // shims (npx/npm) correctly cross-platform.
   const buildTransport = () =>
     release.method === 'sse'
       ? new SSEClientTransport(new URL(`http://${mcpHost}:${ssePort}/sse`))
-      : new StdioClientTransport({ 
-          command: release.command || 'node', 
+      : new StdioClientTransport({
+          command: release.command || 'node',
           args: Array.isArray(release.args) ? release.args : [],
           env: { ...process.env, ...(release.env || {}) },
         });
@@ -974,11 +1004,11 @@ export async function runAgenticStep(
 
     const resolvedModel = agentConfig.model && agentConfig.model !== "gpt-4o"
       ? agentConfig.model
-      : (requiresVision ? env.DASHSCOPE_VL_MODEL : env.DASHSCOPE_LLM_MODEL);
+      : (requiresVision ? env.OPENROUTER_VL_MODEL : env.OPENROUTER_LLM_MODEL);
 
-    // DashScope API (DASHSCOPE_BASE_URL + DASHSCOPE_API_KEY from .env)
-    const apiKey = env.DASHSCOPE_API_KEY ?? '';
-    const baseURL = env.DASHSCOPE_BASE_URL;
+    // OpenRouter API (OPENROUTER_BASE_URL + OPENROUTER_API_KEY from .env)
+    const apiKey = env.OPENROUTER_API_KEY ?? '';
+    const baseURL = env.OPENROUTER_BASE_URL;
 
     // 4. Instantiate LangGraph createReactAgent In-Memory
     const llm = new ChatOpenAI({
@@ -1216,11 +1246,11 @@ export async function runAgenticStepStream(
 
     const resolvedModel = agentConfig.model && agentConfig.model !== "gpt-4o"
       ? agentConfig.model
-      : (requiresVision ? env.DASHSCOPE_VL_MODEL : env.DASHSCOPE_LLM_MODEL);
+      : (requiresVision ? env.OPENROUTER_VL_MODEL : env.OPENROUTER_LLM_MODEL);
 
-    // DashScope API (DASHSCOPE_BASE_URL + DASHSCOPE_API_KEY from .env)
-    const apiKey = env.DASHSCOPE_API_KEY ?? '';
-    const baseURL = env.DASHSCOPE_BASE_URL;
+    // OpenRouter API (OPENROUTER_BASE_URL + OPENROUTER_API_KEY from .env)
+    const apiKey = env.OPENROUTER_API_KEY ?? '';
+    const baseURL = env.OPENROUTER_BASE_URL;
 
     const modelInitStart = Date.now();
     const llm = new ChatOpenAI({

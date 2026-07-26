@@ -1,0 +1,30 @@
+[Unit]
+Description=Amadeus Orchestrator — Fastify API server
+After=network.target postgresql.service
+Wants=postgresql.service
+
+[Service]
+Type=simple
+User=amadeus
+Group=amadeus
+WorkingDirectory=/opt/amadeus/microservice/amadeus-core
+# 600, owned by the amadeus user — never world-readable, never in the repo.
+EnvironmentFile=/opt/amadeus/microservice/amadeus-core/.env
+Environment=NODE_ENV=production
+ExecStart=/usr/bin/node dist/src/server.js
+Restart=on-failure
+RestartSec=5
+# app already handles SIGTERM/SIGINT (src/server.ts) with a 5s force-exit
+# fallback — give it a little more than that before systemd escalates.
+TimeoutStopSec=15
+
+# Hardening. Adjust ReadWritePaths if RAG_STORAGE_DIR or log destinations
+# point elsewhere.
+NoNewPrivileges=true
+PrivateTmp=true
+ProtectSystem=strict
+ProtectHome=true
+ReadWritePaths=/opt/amadeus/microservice/amadeus-core/data
+
+[Install]
+WantedBy=multi-user.target

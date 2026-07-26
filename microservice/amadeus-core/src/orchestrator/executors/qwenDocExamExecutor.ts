@@ -1,17 +1,17 @@
 /**
- * DashScope VL Executor — menyelesaikan step `doc_examined` (LC/SKBDN/SBLC).
+ * OpenRouter (Qwen VL) Executor — menyelesaikan step `doc_examined` (LC/SKBDN/SBLC).
  *
  * Alur:
  *   1. Terima referensi image LC di ctx.data.imageRef (URL / data URI /
  *      base64 sesuai kesepakatan sumber).
- *   2. Kirim ke DashScope VL (default VL model) dengan prompt struktur ekstraksi
- *      field-field kunci LC (nomor, applicant, beneficiary, amount, currency,
- *      expiry, incoterm, port of loading/discharge, dokumen wajib).
+ *   2. Kirim ke Qwen VL (via OpenRouter, default VL model) dengan prompt struktur
+ *      ekstraksi field-field kunci LC (nomor, applicant, beneficiary, amount,
+ *      currency, expiry, incoterm, port of loading/discharge, dokumen wajib).
  *   3. Parse JSON hasil ekstraksi.
- *   4. Kirim hasil ekstraksi ke DashScope LLM untuk assessment compliance ringan
- *      (misal: field wajib lengkap? tanggal expiry masih valid? amount masuk
- *      akal?). Ini SEBELUM langkah maker/checker manusia — bukan pengganti,
- *      hanya screening awal.
+ *   4. Kirim hasil ekstraksi ke Qwen LLM (via OpenRouter) untuk assessment
+ *      compliance ringan (misal: field wajib lengkap? tanggal expiry masih
+ *      valid? amount masuk akal?). Ini SEBELUM langkah maker/checker manusia
+ *      — bukan pengganti, hanya screening awal.
  *   5. Return outcome `completed` dengan resultData berisi ekstraksi + assessment.
  *
  * Keputusan reject/rework akan dilakukan di step berikutnya oleh maker/checker
@@ -20,7 +20,7 @@
  */
 
 import { z } from 'zod';
-import { dashscopeChat, parseJsonLoose } from './dashscopeClient.js';
+import { openrouterChat, parseJsonLoose } from './openrouterClient.js';
 import type { Executor, ExecutorContext, ExecutorOutcome } from './base.js';
 import { env } from '../../config/env.js';
 import { logger } from '../../lib/logger.js';
@@ -91,10 +91,10 @@ Kembalikan HANYA JSON valid dengan struktur:
 }
 "proceed" bila lengkap dan tidak ada red flag; "review" bila ada hal yang perlu perhatian tapi tidak fatal; "reject" hanya bila jelas invalid (mis. expired, amount 0, applicant kosong).`;
 
-export const dashscopeDocExamExecutor: Executor = {
+export const openrouterDocExamExecutor: Executor = {
   descriptor: {
-    id: 'executor.dashscope_vl.doc_exam',
-    displayName: 'DashScope VL — LC Document Examination',
+    id: 'executor.openrouter_vl.doc_exam',
+    displayName: 'OpenRouter (Qwen VL) — LC Document Examination',
     kind: 'llm',
     costUnit: 3,
     capabilities: [
@@ -104,7 +104,7 @@ export const dashscopeDocExamExecutor: Executor = {
 
   async run(ctx: ExecutorContext): Promise<ExecutorOutcome> {
     const log = logger.child({
-      executor: 'dashscope_vl.doc_exam',
+      executor: 'openrouter_vl.doc_exam',
       transaction_id: ctx.transactionId,
     });
 
@@ -116,12 +116,12 @@ export const dashscopeDocExamExecutor: Executor = {
       };
     }
 
-    // === Langkah 1: ekstraksi field dari image via DashScope VL ===
+    // === Langkah 1: ekstraksi field dari image via Qwen VL (OpenRouter) ===
     let extracted: ExtractedLc;
     let extractionRaw: string;
     try {
-      const vlRes = await dashscopeChat({
-        model: env.DASHSCOPE_VL_MODEL,
+      const vlRes = await openrouterChat({
+        model: env.OPENROUTER_VL_MODEL,
         temperature: 0.1,
         max_tokens: 1024,
         responseJson: true,
@@ -147,11 +147,11 @@ export const dashscopeDocExamExecutor: Executor = {
       };
     }
 
-    // === Langkah 2: assessment compliance ringan via DashScope LLM ===
+    // === Langkah 2: assessment compliance ringan via Qwen LLM (OpenRouter) ===
     let assessment: Assessment;
     try {
-      const llmRes = await dashscopeChat({
-        model: env.DASHSCOPE_LLM_MODEL,
+      const llmRes = await openrouterChat({
+        model: env.OPENROUTER_LLM_MODEL,
         temperature: 0.1,
         max_tokens: 512,
         responseJson: true,
@@ -194,10 +194,10 @@ export const dashscopeDocExamExecutor: Executor = {
     return {
       kind: 'completed',
       resultData: {
-        examinedBy: 'executor.dashscope_vl.doc_exam',
-        provider: 'dashscope',
-        vlModel: env.DASHSCOPE_VL_MODEL,
-        llmModel: env.DASHSCOPE_LLM_MODEL,
+        examinedBy: 'executor.openrouter_vl.doc_exam',
+        provider: 'openrouter',
+        vlModel: env.OPENROUTER_VL_MODEL,
+        llmModel: env.OPENROUTER_LLM_MODEL,
         extracted,
         assessment,
         // JANGAN masukkan extractionRaw ke payload untuk mengurangi surface;

@@ -20,9 +20,12 @@ AS $$
 DECLARE
   v_row mcp_runtime_state;
 BEGIN
-  INSERT INTO mcp_runtime_state (tool_id, method, port, pid, status, last_error, entry_mtime, started_at, updated_at)
+  INSERT INTO mcp_runtime_state (tool_id, method, port, pid, status, last_error, entry_mtime, started_at, last_used_at, updated_at)
   VALUES (
     p_tool_id, p_method, p_port, p_pid, p_status, p_last_error, p_entry_mtime,
+    CASE WHEN p_set_started_at THEN now() ELSE NULL END,
+    -- A fresh (re)spawn counts as "just used" so the idle-timeout sweep (see
+    -- fn_touch_mcp_runtime) doesn't start counting from a stale/absent value.
     CASE WHEN p_set_started_at THEN now() ELSE NULL END,
     now()
   )
@@ -34,6 +37,7 @@ BEGIN
     last_error  = EXCLUDED.last_error,
     entry_mtime = COALESCE(EXCLUDED.entry_mtime, mcp_runtime_state.entry_mtime),
     started_at  = CASE WHEN p_set_started_at THEN now() ELSE mcp_runtime_state.started_at END,
+    last_used_at = CASE WHEN p_set_started_at THEN now() ELSE mcp_runtime_state.last_used_at END,
     updated_at  = now()
   RETURNING * INTO v_row;
 

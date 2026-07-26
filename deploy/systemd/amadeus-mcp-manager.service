@@ -1,0 +1,34 @@
+[Unit]
+Description=Amadeus Orchestrator — MCP AutoManager daemon
+After=network.target postgresql.service amadeus-core.service
+Wants=postgresql.service
+
+[Service]
+Type=simple
+User=amadeus
+Group=amadeus
+WorkingDirectory=/opt/amadeus/microservice/amadeus-core
+EnvironmentFile=/opt/amadeus/microservice/amadeus-core/.env
+Environment=NODE_ENV=production
+# Optional resource ceiling for a 4GB VPS — unset by default (today's
+# behavior). Uncomment and tune based on scripts/measure-footprint.mjs
+# output for your actual tool set:
+# Environment=MCP_MAX_LIVE_TOOLS=4
+# Environment=MCP_IDLE_TIMEOUT_MS=900000
+ExecStart=/usr/bin/node dist/scripts/mcpAutoManager.js
+Restart=on-failure
+RestartSec=5
+# This process spawns child MCP tool processes (mcp-uipath, amadeus-mcp,
+# etc.) — systemd's default KillMode=control-group ensures they're killed
+# together with the manager on stop, on top of the app's own shutdown()
+# handler in scripts/mcpAutoManager.ts.
+TimeoutStopSec=15
+
+NoNewPrivileges=true
+PrivateTmp=true
+ProtectSystem=strict
+ProtectHome=true
+ReadWritePaths=/opt/amadeus/microservice/amadeus-core/data
+
+[Install]
+WantedBy=multi-user.target

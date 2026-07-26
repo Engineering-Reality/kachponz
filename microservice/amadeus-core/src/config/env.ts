@@ -65,25 +65,25 @@ const EnvSchema = z.object({
   // OAUTH2 JWT Secret (Untuk verifikasi token Bearer stateless)
   OAUTH2_JWT_SECRET: z.string().min(16).optional(),
 
-  // ─── DashScope (LLM/VLM) — Alibaba Cloud Model Studio ─────────────────
-  // OpenAI-compatible endpoint: https://dashscope-intl.aliyuncs.com/compatible-mode/v1
-  // VL model: qwen-vl-max (multimodal — vision + text)
-  // LLM model: qwen-plus (text-only, cost-efficient)
-  DASHSCOPE_BASE_URL: z
-    .string()
-    .url()
-    .default('https://dashscope-intl.aliyuncs.com/compatible-mode/v1'),
-  DASHSCOPE_API_KEY: z.string().optional(),
-  DASHSCOPE_VL_MODEL: z.string().default('qwen-vl-max'),
-  DASHSCOPE_LLM_MODEL: z.string().default('qwen-plus'),
-  DASHSCOPE_TIMEOUT_MS: z.coerce.number().int().positive().default(60_000),
+  // ─── OpenRouter (LLM/VLM) — unified router over many model providers ──
+  // OpenAI-compatible endpoint: https://openrouter.ai/api/v1
+  // VL model: qwen/qwen3-vl-235b-a22b-instruct (multimodal — vision + text)
+  // LLM model: qwen/qwen-plus (text-only, cost-efficient)
+  OPENROUTER_BASE_URL: z.string().url().default('https://openrouter.ai/api/v1'),
+  OPENROUTER_API_KEY: z.string().optional(),
+  OPENROUTER_VL_MODEL: z.string().default('qwen/qwen3-vl-235b-a22b-instruct'),
+  OPENROUTER_LLM_MODEL: z.string().default('qwen/qwen-plus'),
+  OPENROUTER_TIMEOUT_MS: z.coerce.number().int().positive().default(60_000),
 
   // ─── Embeddings (RAG) ───────────────────────────────────────────────
-  // Reuses DASHSCOPE_BASE_URL/DASHSCOPE_API_KEY — DashScope serves both
-  // /chat/completions and /embeddings under the same compatible-mode base
-  // URL and key. EMBEDDING_DIM must match the `vector(N)` column in
-  // migrations/1795000000000_add_rag.ts if this model is ever changed.
-  EMBEDDING_MODEL: z.string().default('text-embedding-v3'),
+  // Reuses OPENROUTER_BASE_URL/OPENROUTER_API_KEY — OpenRouter serves both
+  // /chat/completions and /embeddings under the same base URL and key.
+  // EMBEDDING_DIM must match the `vector(N)` column in
+  // migrations/1795000000000_add_rag.ts if this model is ever changed —
+  // qwen/qwen3-embedding-4b's native output is larger than 1024 dims, but
+  // OpenRouter's /embeddings endpoint accepts a `dimensions` request field
+  // that truncates it to exactly EMBEDDING_DIM (confirmed live).
+  EMBEDDING_MODEL: z.string().default('qwen/qwen3-embedding-4b'),
   EMBEDDING_DIM: z.coerce.number().int().positive().default(1024),
 
   // Local-disk file storage for RAG uploads. No object-storage abstraction
@@ -130,6 +130,15 @@ const EnvSchema = z.object({
   MCP_HOST: z.string().optional(),
   MCP_START_PORT: z.coerce.number().int().positive().optional(),
   MCP_END_PORT: z.coerce.number().int().positive().optional(),
+
+  // Resource ceiling for small VPS deployments. Both optional/unset by
+  // default = today's behavior (unlimited concurrent 'sse' tools, never
+  // idle-stopped). Read directly from process.env by
+  // scripts/mcpAutoManager.ts (that script is a standalone entry point and
+  // doesn't import this module) — declared here too so the full set of
+  // recognized env vars stays documented in one schema.
+  MCP_MAX_LIVE_TOOLS: z.coerce.number().int().positive().optional(),
+  MCP_IDLE_TIMEOUT_MS: z.coerce.number().int().positive().optional(),
 
   // ─── AML/CFT alert outbox email worker (apu.md Task 5) ──────────────
   // scripts/mcpAutoManager.ts's pollAlertOutbox() reads alert_outbox and

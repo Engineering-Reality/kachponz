@@ -4,17 +4,22 @@ import { statSync } from 'node:fs';
 import pg from 'pg';
 import nodemailer from 'nodemailer';
 import { config } from 'dotenv';
-import path from 'path';
-import { fileURLToPath } from 'url';
 import { PortAllocator, loadPortRange } from '../src/services/portAllocator.js';
 import {
   getUiPathToken,
   extractCredentialsFromToolRow,
   type UiPathCredentials,
 } from '../src/lib/uipathAuth.js';
+import { resolveSpawnTarget } from '../src/lib/spawnCompat.js';
 
-const __dirname = path.dirname(fileURLToPath(import.meta.url));
-config({ path: path.join(__dirname, '../.env') });
+// cwd-relative, matching src/config/env.ts's own dotenv.config() convention —
+// correct regardless of whether this runs as `tsx scripts/mcpAutoManager.ts`
+// (dev) or the compiled `node dist/scripts/mcpAutoManager.js` (prod), as
+// long as the process's working directory is the package root (true for both
+// `npm run` scripts and a systemd unit's WorkingDirectory=). A __dirname-relative
+// path broke this for the compiled case, since dist/scripts/ is one level
+// deeper than scripts/ relative to the package root.
+config();
 
 const pool = new pg.Pool({
   connectionString: process.env.DATABASE_URL,
@@ -29,6 +34,12 @@ const activeProcesses = new Map<string, ActiveProc>();
 const SECRET_KEY_RE = /secret|password|token|key/i;
 const LIVENESS_BACKOFF_MS = [200, 400, 800, 1600, 3200];
 const MAX_SPAWN_ATTEMPTS = 3;
+
+// Resource ceiling for small VPS deployments. Both unset by default = today's
+// behavior (unlimited concurrent 'sse' tools, never idle-stopped).
+const MAX_LIVE_TOOLS = process.env.MCP_MAX_LIVE_TOOLS ? Number(process.env.MCP_MAX_LIVE_TOOLS) : null;
+const IDLE_TIMEOUT_MS = process.env.MCP_IDLE_TIMEOUT_MS ? Number(process.env.MCP_IDLE_TIMEOUT_MS) : null;
+const IDLE_STOP_REASON = 'idle-timeout';
 
 function redactEnv(env: Record<string, string> | undefined): Record<string, string> {
   const out: Record<string, string> = {};
@@ -336,10 +347,12 @@ async function startSseTool(tool: any, release: any): Promise<void> {
 
     const env = { ...process.env, ...release.env, PORT: String(port) };
 
-    const child = spawn(command, args, {
+    const resolved = resolveSpawnTarget(command, args);
+    const child = spawn(resolved.command, resolved.args, {
       env,
       stdio: ['ignore', 'pipe', 'pipe'],
-      shell: false, // never true — args are passed as-is to execvp, no shell re-interpretation
+      shell: false, // never true — resolveSpawnTarget handles Windows .cmd shims itself
+      ...resolved.options,
     });
 
     let earlyBindFailure = false;
@@ -433,12 +446,20 @@ async function syncMcpServers() {
     const res = await pool.query("SELECT * FROM tools WHERE on_status = 'Online' OR on_status = 'true'");
     const tools = res.rows;
 
-    const runningRes = await pool.query<{ tool_id: string; entry_mtime: string | null; port: number | null }>(
-      `SELECT tool_id, entry_mtime, port FROM mcp_runtime_state WHERE status IN ('starting','running')`,
-    );
-    const runningToolIds = new Set(runningRes.rows.map((r) => r.tool_id));
+    const runtimeRes = await pool.query<{
+      tool_id: string;
+      status: string;
+      entry_mtime: string | null;
+      port: number | null;
+      last_error: string | null;
+      last_used_at: string | null;
+      updated_at: string;
+    }>(`SELECT tool_id, status, entry_mtime, port, last_error, last_used_at, updated_at FROM mcp_runtime_state`);
+    const runtimeByToolId = new Map(runtimeRes.rows.map((r) => [r.tool_id, r]));
+    const runningRows = runtimeRes.rows.filter((r) => r.status === 'starting' || r.status === 'running');
+    const runningToolIds = new Set(runningRows.map((r) => r.tool_id));
     const recordedEntryMtimes = new Map(
-      runningRes.rows.map((r) => [r.tool_id, r.entry_mtime !== null ? Number(r.entry_mtime) : null]),
+      runningRows.map((r) => [r.tool_id, r.entry_mtime !== null ? Number(r.entry_mtime) : null]),
     );
 
     // Reconcile rows inherited from a previous daemon incarnation. A DB status
@@ -448,7 +469,7 @@ async function syncMcpServers() {
     // reloading on a file save), the row is left claiming 'starting' forever,
     // and every future tick below would skip respawning it since the DB says
     // someone already has it. Verify with a real TCP probe before trusting it.
-    for (const row of runningRes.rows) {
+    for (const row of runningRows) {
       const toolId = row.tool_id;
       if (activeProcesses.has(toolId)) continue; // owned by this process, no need to re-verify
       const alive = row.port ? await tcpProbe(portRange.host, row.port) : false;
@@ -469,6 +490,12 @@ async function syncMcpServers() {
     }
 
     const expectedServerIds = new Set<string>();
+    // Reserved-ahead count for MAX_LIVE_TOOLS admission control: starts from
+    // however many are already running/starting per the DB, and is
+    // incremented as this tick tentatively approves further new spawns, so
+    // multiple tools becoming eligible in the same tick don't all slip past
+    // the budget at once.
+    let liveCount = runningToolIds.size;
 
     for (const tool of tools) {
       // Find the latest valid version
@@ -495,6 +522,21 @@ async function syncMcpServers() {
 
       expectedServerIds.add(toolId);
 
+      // A tool this daemon idle-stopped (MCP_IDLE_TIMEOUT_MS) stays stopped
+      // until something actually wants it again. engine.ts's SSE connect
+      // path calls fn_touch_mcp_runtime() before connecting, which bumps
+      // last_used_at — if that happened after the stop was recorded, treat
+      // it as a wake request and fall through to the normal spawn check
+      // below (next tick, so up to ~10s of cold-start latency).
+      const runtimeRow = runtimeByToolId.get(toolId);
+      const isIdleStopped = runtimeRow?.status === 'stopped' && runtimeRow.last_error === IDLE_STOP_REASON;
+      if (isIdleStopped) {
+        const touchedSinceStop =
+          runtimeRow!.last_used_at != null &&
+          new Date(runtimeRow!.last_used_at).getTime() > new Date(runtimeRow!.updated_at).getTime();
+        if (!touchedSinceStop) continue;
+      }
+
       // Stale-build detection: applies to both stdio and sse tools spawned by
       // this daemon (only sse tools reach this point today, but the check
       // itself doesn't care about transport). If the entry file on disk is
@@ -518,6 +560,13 @@ async function syncMcpServers() {
       }
 
       if (!activeProcesses.has(toolId) && !runningToolIds.has(toolId)) {
+        if (MAX_LIVE_TOOLS !== null && liveCount >= MAX_LIVE_TOOLS) {
+          console.log(
+            `⚙️  [\x1b[35mMCP AutoManager\x1b[0m] ${logPrefix(tool.name)} not started — MCP_MAX_LIVE_TOOLS budget (${MAX_LIVE_TOOLS}) reached`,
+          );
+          continue;
+        }
+        liveCount++;
         // Fire-and-forget: each tool's start sequence (allocate, spawn,
         // liveness-check) runs independently so one slow/failing tool
         // doesn't block the rest of this sync tick.
@@ -539,6 +588,35 @@ async function syncMcpServers() {
       }
     }
     await markStopped(stoppedIds);
+
+    // Idle-timeout sweep: stop 'sse' tools this instance owns that haven't
+    // been touched (fn_touch_mcp_runtime, called by engine.ts before an SSE
+    // connect) in over MCP_IDLE_TIMEOUT_MS. They stay stopped — see the
+    // isIdleStopped check above — until touched again, then respawn on the
+    // next tick.
+    if (IDLE_TIMEOUT_MS !== null) {
+      const now = Date.now();
+      for (const [toolId, { child, port }] of activeProcesses.entries()) {
+        const row = runtimeByToolId.get(toolId);
+        const lastUsedMs = row?.last_used_at ? new Date(row.last_used_at).getTime() : null;
+        if (lastUsedMs !== null && now - lastUsedMs > IDLE_TIMEOUT_MS) {
+          console.log(
+            `⚙️  [\x1b[35mMCP AutoManager:\x1b[33m${port}\x1b[0m] Idle-stopping tool ${toolId} (unused for >${IDLE_TIMEOUT_MS}ms)`,
+          );
+          child.removeAllListeners('exit');
+          child.kill('SIGTERM');
+          activeProcesses.delete(toolId);
+          await upsertRuntimeState({
+            toolId,
+            method: 'sse',
+            port: null,
+            pid: null,
+            status: 'stopped',
+            lastError: IDLE_STOP_REASON,
+          });
+        }
+      }
+    }
   } catch (err) {
     console.error('[MCP AutoManager] Error syncing MCP servers:', err);
   }

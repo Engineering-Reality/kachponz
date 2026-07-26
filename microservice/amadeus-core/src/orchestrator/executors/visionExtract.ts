@@ -2,7 +2,7 @@
  * Image text extraction for knowledge-base document ingestion (apu.md
  * Task 2). No OCR library exists anywhere in this repo — reuses the
  * vision-capable chat model already wired up for playground image
- * attachments (env.DASHSCOPE_VL_MODEL via DashScope API).
+ * attachments (env.OPENROUTER_VL_MODEL via OpenRouter API).
  */
 
 import { ChatOpenAI } from '@langchain/openai';
@@ -11,10 +11,10 @@ import { env } from '../../config/env.js';
 
 export async function extractTextFromImage(buffer: Buffer, mimeType: string): Promise<string> {
   const llm = new ChatOpenAI({
-    modelName: env.DASHSCOPE_VL_MODEL,
+    modelName: env.OPENROUTER_VL_MODEL,
     temperature: 0,
-    apiKey: env.DASHSCOPE_API_KEY ?? '',
-    configuration: { baseURL: env.DASHSCOPE_BASE_URL },
+    apiKey: env.OPENROUTER_API_KEY ?? '',
+    configuration: { baseURL: env.OPENROUTER_BASE_URL },
   });
 
   const base64 = buffer.toString('base64');
