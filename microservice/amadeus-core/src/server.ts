@@ -104,10 +104,11 @@ export async function buildServer() {
   app.setErrorHandler((err, req, reply) => {
     if (err instanceof ZodError) {
       req.log.warn({ issues: err.issues }, 'validation failed');
+      const issueSummary = err.issues.map((i) => `${i.path.join('.') || 'body'}: ${i.message}`).join(', ');
       return reply.code(400).send({
         error: {
           code: 'VALIDATION_ERROR',
-          message: 'Input tidak valid',
+          message: `Input tidak valid (${issueSummary})`,
           details: err.issues.map((i) => ({ path: i.path.join('.'), message: i.message })),
         },
       });
@@ -116,10 +117,11 @@ export async function buildServer() {
     const fastifyErr = err as any;
     if (fastifyErr.validation && fastifyErr.validation.length > 0) {
       req.log.warn({ validation: fastifyErr.validation }, 'fastify validation failed');
+      const issueSummary = fastifyErr.validation.map((v: any) => v.message).join(', ');
       return reply.code(400).send({
         error: {
           code: 'VALIDATION_ERROR',
-          message: 'Input tidak valid',
+          message: `Input tidak valid (${issueSummary})`,
           details: fastifyErr.validation,
         },
       });

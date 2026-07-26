@@ -247,7 +247,7 @@ export const registerAgentsRoutes: FastifyPluginAsync = async (rootApp: FastifyI
     {
       schema: {
         body: z.object({
-          description: z.string().min(10).max(4000),
+          description: z.string().min(1).max(4000),
           runtime: z.enum(['cloud', 'on_prem']).optional().default('cloud'),
         }).strict(),
       },

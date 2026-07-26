@@ -263,7 +263,7 @@ export default function PricingPage() {
             <div className="bg-white dark:bg-slate-900/50 border border-slate-200 dark:border-slate-800 rounded-2xl p-6">
               <h4 className="font-semibold text-slate-900 dark:text-white mb-2">We're a regulated business — can we start on a self-serve tier?</h4>
               <p className="text-sm text-slate-600 dark:text-slate-400 leading-relaxed">
-                Probably not. If you have strict data residency, audit, or air-gapping requirements from day one, you need the Enterprise tier. The self-serve tiers are multi-tenant cloud-hosted and do not provide custom BAA or OJK compliance artifacts. Contact Sales to evaluate the on-premise Netra Runtime.
+                Probably not. If you have strict data residency, audit, or air-gapping requirements from day one, you need the Enterprise tier. The self-serve tiers are multi-tenant cloud-hosted and do not provide custom BAA or OJK compliance artifacts. Contact Sales to evaluate Enterprise DashScope deployment.
               </p>
             </div>
             <div className="bg-white dark:bg-slate-900/50 border border-slate-200 dark:border-slate-800 rounded-2xl p-6">

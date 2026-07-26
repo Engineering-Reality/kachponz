@@ -64,7 +64,7 @@ export const PRICING_DATA = {
       tagline: "We help you connect Amadeus to your actual systems — not just hand you a dashboard.",
       price: {
         type: "usage",
-        description: "Netra Token Usage + 30% Amadeus Markup",
+        description: "DashScope Token Usage + 30% Amadeus Markup",
         idr: "Custom",
         usd: "Custom"
       },
@@ -86,7 +86,7 @@ export const PRICING_DATA = {
         label: "Contact Sales"
       },
       features: [
-        "On-premise deployment (Netra Runtime)",
+        "On-premise / Dedicated Cloud deployment (DashScope Runtime)",
         "Custom SLAs",
         "Dedicated account team",
         "Compliance documentation support",
