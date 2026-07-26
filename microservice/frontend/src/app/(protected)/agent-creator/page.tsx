@@ -473,7 +473,7 @@ export default function AgentCreator() {
                           </div>
                         </div>
                       )}
-                      <div className={`px-4 py-3 rounded-2xl max-w-full text-sm leading-relaxed shadow-sm ${msg.role === "user" ? "bg-slate-900 dark:bg-white text-white dark:text-slate-900 rounded-tr-sm" : "bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-700 text-slate-800 dark:text-slate-200 rounded-tl-sm w-full"}`}>
+                      <div className={`px-4 py-3 rounded-2xl max-w-full text-sm leading-relaxed shadow-sm ${msg.role === "user" ? "bg-slate-900 dark:bg-white text-white dark:text-slate-900 [&_*]:!text-white dark:[&_*]:!text-slate-900 rounded-tr-sm" : "bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-700 text-slate-800 dark:text-slate-200 rounded-tl-sm w-full"}`}>
                         <MarkdownViewer content={msg.content} />
                       </div>
                     </div>
