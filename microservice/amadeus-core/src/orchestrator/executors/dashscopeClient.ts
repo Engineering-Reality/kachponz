@@ -57,12 +57,16 @@ export class DashScopeApiError extends Error {
  * Kirim chat completion ke DashScope. OpenAI-compatible endpoint.
  */
 export async function dashscopeChat(req: DashScopeChatRequest): Promise<DashScopeChatResponse> {
-  if (!env.DASHSCOPE_BASE_URL) {
-    throw new DashScopeApiError(500, 'DASHSCOPE_BASE_URL belum dikonfigurasi');
-  }
   if (!env.DASHSCOPE_API_KEY) {
     throw new DashScopeApiError(500, 'DASHSCOPE_API_KEY wajib di-set');
   }
+
+  const candidateBaseUrls = [
+    env.DASHSCOPE_BASE_URL || 'https://dashscope-intl.aliyuncs.com/compatible-mode/v1',
+    env.DASHSCOPE_BASE_URL?.includes('intl')
+      ? 'https://dashscope.aliyuncs.com/compatible-mode/v1'
+      : 'https://dashscope-intl.aliyuncs.com/compatible-mode/v1',
+  ];
 
   const headers: Record<string, string> = {
     'Content-Type': 'application/json',
@@ -77,45 +81,55 @@ export async function dashscopeChat(req: DashScopeChatRequest): Promise<DashScop
   if (req.max_tokens) body.max_tokens = req.max_tokens;
   if (req.responseJson) body.response_format = { type: 'json_object' };
 
-  const url = `${env.DASHSCOPE_BASE_URL.replace(/\/$/, '')}/chat/completions`;
-  const controller = new AbortController();
-  const timer = setTimeout(() => controller.abort(), env.DASHSCOPE_TIMEOUT_MS);
+  let lastErr: DashScopeApiError | null = null;
 
-  let res: Response;
-  try {
-    res = await fetch(url, {
-      method: 'POST',
-      headers,
-      body: JSON.stringify(body),
-      signal: controller.signal,
-    });
-  } catch (e) {
-    throw new DashScopeApiError(
-      0,
-      `Gagal menghubungi DashScope: ${
-        e instanceof Error ? e.message : String(e)
-      }`,
-    );
-  } finally {
-    clearTimeout(timer);
+  for (const baseUrl of candidateBaseUrls) {
+    const url = `${baseUrl.replace(/\/$/, '')}/chat/completions`;
+    const controller = new AbortController();
+    const timer = setTimeout(() => controller.abort(), env.DASHSCOPE_TIMEOUT_MS);
+
+    let res: Response;
+    try {
+      res = await fetch(url, {
+        method: 'POST',
+        headers,
+        body: JSON.stringify(body),
+        signal: controller.signal,
+      });
+    } catch (e) {
+      lastErr = new DashScopeApiError(
+        0,
+        `Gagal menghubungi DashScope (${baseUrl}): ${e instanceof Error ? e.message : String(e)}`,
+      );
+      continue;
+    } finally {
+      clearTimeout(timer);
+    }
+
+    if (!res.ok) {
+      const txt = await res.text().catch(() => '');
+      // If 401 Incorrect API key, try the alternative region endpoint before failing
+      if (res.status === 401 && txt.includes('Incorrect API key') && candidateBaseUrls.indexOf(baseUrl) === 0) {
+        lastErr = new DashScopeApiError(res.status, `DashScope API 401 (${baseUrl})`, txt.slice(0, 500));
+        continue;
+      }
+      throw new DashScopeApiError(res.status, `DashScope API ${res.status}`, txt.slice(0, 500));
+    }
+
+    const json = (await res.json()) as {
+      choices?: Array<{ message?: { content?: string } }>;
+      model?: string;
+      usage?: DashScopeChatResponse['usage'];
+    };
+    const content = json.choices?.[0]?.message?.content ?? '';
+    return {
+      content,
+      model: json.model ?? req.model,
+      usage: json.usage,
+    };
   }
 
-  if (!res.ok) {
-    const txt = await res.text().catch(() => '');
-    throw new DashScopeApiError(res.status, `DashScope API ${res.status}`, txt.slice(0, 500));
-  }
-
-  const json = (await res.json()) as {
-    choices?: Array<{ message?: { content?: string } }>;
-    model?: string;
-    usage?: DashScopeChatResponse['usage'];
-  };
-  const content = json.choices?.[0]?.message?.content ?? '';
-  return {
-    content,
-    model: json.model ?? req.model,
-    usage: json.usage,
-  };
+  throw lastErr || new DashScopeApiError(500, 'Gagal terhubung ke DashScope API');
 }
 
 /**
