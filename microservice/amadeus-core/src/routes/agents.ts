@@ -4,10 +4,10 @@ import { query } from '../db/pool.js';
 import { callFn } from '../db/rpc.js';
 import { DomainError } from '../types/domain.js';
 import { authenticateRobot } from '../middleware/auth.js';
-import { ChatOpenAI } from '@langchain/openai';
-import { HumanMessage, SystemMessage } from '@langchain/core/messages';
 import { randomUUID } from 'node:crypto';
 import { runAgenticStep } from '../orchestrator/engine.js';
+import { dashscopeChat, parseJsonLoose } from '../orchestrator/executors/dashscopeClient.js';
+import { env } from '../config/env.js';
 
 export const registerAgentsRoutes: FastifyPluginAsync = async (rootApp: FastifyInstance) => {
   await rootApp.register(async (app) => {
@@ -280,31 +280,22 @@ ${toolList}
 
 Respond with ONLY a valid JSON object, no markdown, no explanation.`;
 
-      // Always use the configured DASHSCOPE_BASE_URL + DASHSCOPE_API_KEY from .env.
-      const apiKey = process.env.DASHSCOPE_API_KEY || '';
-      const baseURL = process.env.DASHSCOPE_BASE_URL || 'https://dashscope-intl.aliyuncs.com/compatible-mode/v1';
-      const modelName = process.env.DASHSCOPE_LLM_MODEL || 'qwen-plus';
-
-      const llm = new ChatOpenAI({
-        modelName,
-        temperature: 0.3,
-        apiKey,
-        configuration: { baseURL },
-      });
-
-      const raw = await llm.invoke([
-        new SystemMessage(systemPrompt),
-        new HumanMessage(description),
-      ]);
-
       let parsed: any;
       try {
-        const text = typeof raw.content === 'string' ? raw.content : JSON.stringify(raw.content);
-        // Strip markdown code fences if present
-        const clean = text.replace(/^```(?:json)?\n?|\n?```$/g, '').trim();
-        parsed = JSON.parse(clean);
-      } catch {
-        throw new DomainError('LLM_PARSE_ERROR', 'LLM returned invalid JSON — please try again', 500);
+        const res = await dashscopeChat({
+          model: env.DASHSCOPE_LLM_MODEL,
+          messages: [
+            { role: 'system', content: systemPrompt },
+            { role: 'user', content: description },
+          ],
+          temperature: 0.3,
+          responseJson: true,
+        });
+        parsed = parseJsonLoose(res.content);
+      } catch (err: any) {
+        request.log.error({ err }, 'Agent Architect LLM generation failed');
+        if (err.name === 'DashScopeApiError') throw err;
+        throw new DomainError('LLM_GENERATION_ERROR', `Gagal membuat konfigurasi agent: ${err.message}`, 500);
       }
 
       return reply.code(200).send({

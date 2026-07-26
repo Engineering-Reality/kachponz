@@ -13,6 +13,7 @@ import { registerAuthRoutes } from './routes/auth.js';
 import { registerFeatureSharingRoutes } from './routes/featureSharing.js';
 import { registerKnowledgeBaseRoutes } from './routes/knowledgeBase.js';
 import { DomainError } from './types/domain.js';
+import { DashScopeApiError } from './orchestrator/executors/dashscopeClient.js';
 import { closePool } from './db/pool.js';
 import fastifySwagger from '@fastify/swagger';
 import fastifySwaggerUi from '@fastify/swagger-ui';
@@ -130,6 +131,21 @@ export async function buildServer() {
       req.log.warn({ code: err.code, details: err.details }, err.message);
       return reply.code(err.httpStatus).send({
         error: { code: err.code, message: err.message, details: err.details },
+      });
+    }
+    if (err instanceof DashScopeApiError) {
+      req.log.warn({ status: err.status, body: err.body }, err.message);
+      let detailMsg = err.message;
+      if (err.body) {
+        try {
+          const parsed = JSON.parse(err.body);
+          if (parsed.error?.message) {
+            detailMsg = `${err.message}: ${parsed.error.message}`;
+          }
+        } catch {}
+      }
+      return reply.code(err.status || 500).send({
+        error: { code: 'DASHSCOPE_API_ERROR', message: detailMsg, details: err.body },
       });
     }
     // @fastify/rate-limit: statusCode 429 sudah diset plugin sebelum melempar,
