@@ -390,7 +390,8 @@ async function classifyFault(detail: string): Promise<'retry' | 'abort'> {
 
 // ── Main recipe run loop ────────────────────────────────────────────────────
 
-export async function runRecipe(
+// Non-export: hanya dipakai runRecipeStream() di file ini. (refactor-inventory FASE 2)
+async function runRecipe(
   recipe: RecipeDef,
   opts: { agentId: string; iterations: number },
   onUpdate: (state: RecipeRunState) => void,

@@ -3,8 +3,6 @@ import {
   createHmac,
   timingSafeEqual,
   randomBytes,
-  createCipheriv,
-  createDecipheriv,
 } from 'node:crypto';
 import { env } from '../config/env.js';
 
@@ -81,32 +79,4 @@ export function safeEqualHex(a: string, b: string): boolean {
   const bb = Buffer.from(b, 'hex');
   if (ba.length !== bb.length || ba.length === 0) return false;
   return timingSafeEqual(ba, bb);
-}
-
-// ---------- AES-256-GCM (payload at-rest bila diperlukan) ----------
-
-/**
- * Enkripsi AES-256-GCM. Key harus 32 byte. Mengembalikan
- * base64(iv).base64(tag).base64(ciphertext). Dipakai bila payload jsonb perlu
- * disimpan terenkripsi (CISO Kriptografi #70 APP_TI: kerahasiaan data tersimpan).
- */
-export function aesGcmEncrypt(key: Buffer, plaintext: string): string {
-  if (key.length !== 32) throw new Error('AES-256 key harus 32 byte');
-  const iv = randomBytes(12);
-  const cipher = createCipheriv('aes-256-gcm', key, iv);
-  const enc = Buffer.concat([cipher.update(plaintext, 'utf8'), cipher.final()]);
-  const tag = cipher.getAuthTag();
-  return `${iv.toString('base64')}.${tag.toString('base64')}.${enc.toString('base64')}`;
-}
-
-export function aesGcmDecrypt(key: Buffer, packed: string): string {
-  if (key.length !== 32) throw new Error('AES-256 key harus 32 byte');
-  const [ivB64, tagB64, dataB64] = packed.split('.');
-  if (!ivB64 || !tagB64 || !dataB64) throw new Error('format ciphertext tidak valid');
-  const iv = Buffer.from(ivB64, 'base64');
-  const tag = Buffer.from(tagB64, 'base64');
-  const data = Buffer.from(dataB64, 'base64');
-  const decipher = createDecipheriv('aes-256-gcm', key, iv);
-  decipher.setAuthTag(tag);
-  return Buffer.concat([decipher.update(data), decipher.final()]).toString('utf8');
 }

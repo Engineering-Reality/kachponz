@@ -90,7 +90,8 @@ export function stepExists(flow: StepFlow, step: string): boolean {
  * bersifat MUNDUR (butuh `reason` eksplisit). Dibangun dari graph, bukan
  * daftar terpisah, supaya tidak pernah out-of-sync.
  */
-export function linearOrder(flow: StepFlow): string[] {
+// Non-export: hanya dipakai stepIndex() di file ini. (refactor-inventory FASE 2)
+function linearOrder(flow: StepFlow): string[] {
   const order: string[] = [];
   const seen = new Set<string>();
   let cur: string | undefined = flow.initial;
