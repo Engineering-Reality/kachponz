@@ -690,6 +690,14 @@ export async function connectToMcpToolById(toolId: string, clientName: string): 
     throw new Error('Tool not connectable (unsupported/legacy config)');
   }
 
+  // Same allowlist gate as loadMcpTools() (see the assertSpawnSafe call in that
+  // fn) — this is the THIRD stdio spawn call site (recipe executor, context
+  // panel, robots dashboard all reach it) and without this check it is a direct
+  // bypass of finding #1's allowlist. Fail closed on a non-allowlisted command.
+  if (release.method === 'stdio') {
+    assertSpawnSafe(release.command, Array.isArray(release.args) ? release.args : []);
+  }
+
   let ssePort: number | null = null;
   if (release.method === 'sse') {
     // See fn_touch_mcp_runtime.sql: marks recent use (resets the idle-timeout
