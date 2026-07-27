@@ -2,6 +2,7 @@ import type { FastifyInstance } from 'fastify';
 import type { ZodTypeProvider } from 'fastify-type-provider-zod';
 import { z } from 'zod';
 import { query } from '../db/pool.js';
+import { env as appEnv } from '../config/env.js';
 import { authenticateRobot, verifyFinancialSignature } from '../middleware/auth.js';
 import { handleA2A, runAgenticStep, runAgenticStepStream, fetchAgentUipathContext, fetchQueueTransactionsForTool } from './engine.js';
 import { registry } from './agents/base.js';
@@ -178,6 +179,16 @@ export async function registerOrchestratorRoutes(app: FastifyInstance): Promise<
 
     const typedSecured = secured.withTypeProvider<ZodTypeProvider>();
 
+    // Limit KETAT (env-driven) untuk route yang memanggil LLM — run-agentic dan
+    // RAG ingest/query. Override limiter global loose dari server.ts.
+    // (security-audit.md finding #5)
+    const llmRateLimit = {
+      rateLimit: {
+        max: appEnv.RATE_LIMIT_LLM_MAX,
+        timeWindow: appEnv.RATE_LIMIT_LLM_WINDOW_MS,
+      },
+    };
+
     // POST /a2a — terima envelope A2A dari robot/agent.
     // Legacy amadeus.a2a/0 — dipertahankan untuk backwards compat.
     typedSecured.post('/a2a', {
@@ -202,7 +213,8 @@ export async function registerOrchestratorRoutes(app: FastifyInstance): Promise<
     // POST /orchestrator/run-agentic — jalankan agent agentic in-process
     // untuk current_step transaksi (mis. Document Examination Agent).
     typedSecured.post('/orchestrator/run-agentic', {
-      schema: { body: RunAgenticSchema }
+      schema: { body: RunAgenticSchema },
+      config: llmRateLimit,
     }, async (req, reply) => {
       const body = req.body as { transactionId?: string; agentId?: string; idempotencyKey: string; prompt?: string; messages?: any[]; stream?: boolean; mode: 'playground' | 'production'; sessionLabel?: string; runtime?: 'cloud' | 'on_prem' };
       if (body.stream) {
@@ -581,12 +593,25 @@ export async function registerOrchestratorRoutes(app: FastifyInstance): Promise<
     // used by the Tools registration form (Part 2.2). Credentials are the
     // request body, never a query string, so they never land in access logs /
     // browser history / proxy logs.
-    // Blocks the highest-value SSRF targets (loopback, link-local, cloud
-    // metadata) while still allowing private RFC1918 addresses — an on-prem
-    // UiPath Orchestrator legitimately lives on an internal IP. Not a full
-    // DNS-rebinding defense; see security-audit.md finding #3.
+    // SSRF defense (security-audit.md finding #3). Two tiers:
+    //  1. If UIPATH_ALLOWED_HOSTS is set, ONLY those exact hostnames pass —
+    //     the tightest posture, no private range is implicitly trusted.
+    //  2. If it's empty, fall back to a blocklist: block the highest-value SSRF
+    //     targets (loopback, link-local, cloud metadata) but still allow private
+    //     RFC1918 addresses, since an on-prem UiPath Orchestrator legitimately
+    //     lives on an internal IP. Not a full DNS-rebinding defense.
+    const allowedHosts = (appEnv.UIPATH_ALLOWED_HOSTS ?? '')
+      .split(',')
+      .map((h) => h.trim().toLowerCase())
+      .filter((h) => h.length > 0);
     const assertSafeOutboundHost = (rawUrl: string): void => {
       const host = new URL(rawUrl).hostname.toLowerCase().replace(/^\[|\]$/g, '');
+      if (allowedHosts.length > 0) {
+        if (!allowedHosts.includes(host)) {
+          throw new DomainError('UNSAFE_URL', 'baseUrl menunjuk ke host yang tidak ada di allowlist', 400);
+        }
+        return;
+      }
       const blockedNames = ['localhost', '0.0.0.0', '::1', 'metadata.google.internal', '100.100.100.200'];
       const m = host.match(/^(\d{1,3})\.(\d{1,3})\.(\d{1,3})\.\d{1,3}$/);
       const isLoopback = m && m[1] === '127';
@@ -697,7 +722,7 @@ export async function registerOrchestratorRoutes(app: FastifyInstance): Promise<
     // object-storage client exists elsewhere in this on-prem-only repo.
 
     // POST /orchestrator/rag/upload_file
-    secured.post('/orchestrator/rag/upload_file', async (req, reply) => {
+    secured.post('/orchestrator/rag/upload_file', { config: llmRateLimit }, async (req, reply) => {
       const data = await req.file();
       if (!data) {
         throw new DomainError('VALIDATION_ERROR', 'file wajib disertakan (multipart field "file")', 400);
@@ -747,6 +772,7 @@ export async function registerOrchestratorRoutes(app: FastifyInstance): Promise<
     // legacy /rag/query's { query } in, { query, response } out shape.
     typedSecured.post('/orchestrator/rag/query', {
       schema: { body: RagQuerySchema },
+      config: llmRateLimit,
     }, async (req, reply) => {
       const { query: userQuery } = req.body as z.infer<typeof RagQuerySchema>;
       const retrieved = await retrievalWithRerank(userQuery);

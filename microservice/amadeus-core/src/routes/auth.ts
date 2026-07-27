@@ -1,5 +1,4 @@
 import { FastifyInstance, FastifyPluginAsync } from 'fastify';
-import rateLimit from '@fastify/rate-limit';
 import { z } from 'zod';
 import { SignJWT } from 'jose';
 import { env } from '../config/env.js';
@@ -32,16 +31,21 @@ const RegisterBody = z
  */
 export const registerAuthRoutes: FastifyPluginAsync = async (rootApp: FastifyInstance) => {
   await rootApp.register(async (app) => {
-    // Rate-limit hanya di sini — jangan bocorkan apakah email terdaftar lewat
-    // brute force (CISO Code Review #18/#32 pattern, sama seperti X-Robot-Key).
-    await app.register(rateLimit, {
-      max: 5,
-      timeWindow: '1 minute',
-    });
+    // /auth/login & /auth/register dapat limit PALING KETAT (env-driven,
+    // security-audit.md finding #5) lewat per-route config di atas limiter
+    // global loose yang diregister di server.ts — jangan bocorkan apakah email
+    // terdaftar lewat brute force (CISO Code Review #18/#32, sama seperti
+    // X-Robot-Key). Keyed per-IP.
+    const authRateLimit = {
+      rateLimit: {
+        max: env.RATE_LIMIT_LOGIN_MAX,
+        timeWindow: env.RATE_LIMIT_LOGIN_WINDOW_MS,
+      },
+    };
 
     app.post(
       '/auth/login',
-      { schema: { body: LoginBody } },
+      { schema: { body: LoginBody }, config: authRateLimit },
       async (request, reply) => {
         const { email, password } = request.body as z.infer<typeof LoginBody>;
 
@@ -92,7 +96,7 @@ export const registerAuthRoutes: FastifyPluginAsync = async (rootApp: FastifyIns
 
     app.post(
       '/auth/register',
-      { schema: { body: RegisterBody } },
+      { schema: { body: RegisterBody }, config: authRateLimit },
       async (request, reply) => {
         const { name, email, password } = request.body as z.infer<typeof RegisterBody>;
 

@@ -1,6 +1,7 @@
 import Fastify from 'fastify';
 import helmet from '@fastify/helmet';
 import cors from '@fastify/cors';
+import rateLimit from '@fastify/rate-limit';
 import { ZodError } from 'zod';
 import { env } from './config/env.js';
 import { ALLOWED_ORIGINS } from './config/cors.js';
@@ -27,7 +28,12 @@ export async function buildServer() {
     bodyLimit: 10 * 1_048_576, // 10 MB (chat requests can carry base64 image attachments)
     // Jangan expose versi/framework di response (CISO Code Review #31).
     disableRequestLogging: false,
-    trustProxy: true, // di belakang reverse proxy TLS on-prem
+    // Reverse proxy TLS on-prem bind di 127.0.0.1 pada host yang sama
+    // (docs/deployment.md), jadi hanya loopback yang boleh dipercaya untuk
+    // X-Forwarded-For. `true` akan mempercayai SEMUA hop dan membuat client IP
+    // (dipakai rate-limit /auth/login per-IP) bisa dipalsukan dari luar.
+    // (security-audit.md finding #8)
+    trustProxy: 'loopback',
   });
 
   app.setValidatorCompiler(validatorCompiler);
@@ -51,6 +57,18 @@ export async function buildServer() {
   // ceiling as bodyLimit above.
   await app.register(fastifyMultipart, {
     limits: { fileSize: 10 * 1_048_576 },
+  });
+
+  // Rate limiting per kelas route (security-audit.md finding #5). Registered
+  // ONCE globally with a loose default (covers polling/read frontend); the
+  // expensive LLM routes and /auth/login tighten it via per-route
+  // `config.rateLimit`. Keyed per-IP — with trustProxy: 'loopback', req.ip is
+  // the real client from X-Forwarded-For only when the peer is the loopback
+  // reverse proxy, so it can't be spoofed from outside.
+  await app.register(rateLimit, {
+    global: true,
+    max: env.RATE_LIMIT_GLOBAL_MAX,
+    timeWindow: env.RATE_LIMIT_GLOBAL_WINDOW_MS,
   });
 
   await app.register(fastifySwagger, {

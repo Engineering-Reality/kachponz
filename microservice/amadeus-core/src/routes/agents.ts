@@ -13,6 +13,16 @@ export const registerAgentsRoutes: FastifyPluginAsync = async (rootApp: FastifyI
   await rootApp.register(async (app) => {
   app.addHook('preHandler', authenticateRobot);
 
+  // Limit KETAT (env-driven) untuk route yang memanggil LLM — Agent Architect
+  // (create-from-description) & screening verdict. Override limiter global loose
+  // dari server.ts. (security-audit.md finding #5)
+  const llmRateLimit = {
+    rateLimit: {
+      max: env.RATE_LIMIT_LLM_MAX,
+      timeWindow: env.RATE_LIMIT_LLM_WINDOW_MS,
+    },
+  };
+
   // Base Agent schema
   const agentSchema = z.object({
     agent_id: z.string().uuid(),
@@ -251,6 +261,7 @@ export const registerAgentsRoutes: FastifyPluginAsync = async (rootApp: FastifyI
           runtime: z.enum(['cloud', 'on_prem']).optional().default('cloud'),
         }).strict(),
       },
+      config: llmRateLimit,
     },
     async (request, reply) => {
       const { description, runtime } = request.body as { description: string; runtime: 'cloud' | 'on_prem' };
@@ -331,6 +342,7 @@ Respond with ONLY a valid JSON object, no markdown, no explanation.`;
         }),
         response: { 200: AmlVerdictSchema },
       },
+      config: llmRateLimit,
     },
     async (request, reply) => {
       const { id } = request.params as { id: string };

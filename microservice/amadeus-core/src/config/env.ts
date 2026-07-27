@@ -45,6 +45,20 @@ const EnvSchema = z.object({
   // Log level
   LOG_LEVEL: z.enum(['fatal', 'error', 'warn', 'info', 'debug', 'trace']).default('info'),
 
+  // ─── Rate limiting per kelas route (security-audit.md finding #5) ──────────
+  // Semua threshold via env supaya bisa disetel tanpa deploy ulang. Default
+  // konservatif dulu (ketat), perketat/perlonggar setelah lihat trafik nyata.
+  // Keyed per-IP (req.ip; lihat trustProxy: 'loopback' di server.ts).
+  //  - GLOBAL: default longgar untuk polling/read frontend.
+  //  - LLM   : ketat untuk route yang memanggil LLM (run-agentic, architect, rag).
+  //  - LOGIN : paling ketat, anti brute-force /auth/login.
+  RATE_LIMIT_GLOBAL_MAX: z.coerce.number().int().positive().default(240),
+  RATE_LIMIT_GLOBAL_WINDOW_MS: z.coerce.number().int().positive().default(60_000),
+  RATE_LIMIT_LLM_MAX: z.coerce.number().int().positive().default(30),
+  RATE_LIMIT_LLM_WINDOW_MS: z.coerce.number().int().positive().default(60_000),
+  RATE_LIMIT_LOGIN_MAX: z.coerce.number().int().positive().default(5),
+  RATE_LIMIT_LOGIN_WINDOW_MS: z.coerce.number().int().positive().default(60_000),
+
   // Feature flag: alur LC/SKBDN/SBLC transaction tracking (route
   // `/transactions/*`) di-deprioritize demi Agent Playground, tapi kodenya
   // tetap ada dan tetap bisa dites lokal dengan flag ini diaktifkan manual.
@@ -110,6 +124,16 @@ const EnvSchema = z.object({
   UIPATH_CLIENT_SECRET: z.string().optional(),
   UIPATH_SCOPES: z.string().default('OR.Jobs OR.Robots.Read OR.Execution'),
   UIPATH_FOLDER_ID: z.string().default('0'),
+  /**
+   * Allowlist host outbound untuk endpoint "Test & List Folders"
+   * (/orchestrator/uipath/folders), comma-separated. Bila diisi, HANYA host di
+   * daftar ini yang boleh dihubungi — pertahanan SSRF paling ketat.
+   * Bila kosong, fallback ke blocklist RFC1918 (loopback/link-local/metadata
+   * diblok, alamat privat lain diizinkan) untuk UiPath on-prem.
+   * Contoh: "cloud.uipath.com,orchestrator.internal.corp"
+   * (security-audit.md finding #3)
+   */
+  UIPATH_ALLOWED_HOSTS: z.string().optional(),
   /**
    * Peta step→releaseKey, format: "step:type=releaseKey;step2=releaseKey2"
    * Contoh: "mt_converted:import_lc=abc-123;swift_released=def-456"
