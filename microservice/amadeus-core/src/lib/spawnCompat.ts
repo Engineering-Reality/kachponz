@@ -1,5 +1,6 @@
 import { existsSync, statSync } from "node:fs";
-import { delimiter, join } from "node:path";
+import { delimiter, dirname, join } from "node:path";
+import { fileURLToPath } from "node:url";
 
 /**
  * Cross-platform command resolution for the MCP tool spawn call sites
@@ -19,7 +20,7 @@ export interface ResolvedSpawnTarget {
   command: string;
   args: string[];
   /** Extra spawn()/StdioClientTransport options the caller must merge in. */
-  options?: { windowsVerbatimArguments?: boolean };
+  options?: { windowsVerbatimArguments?: boolean; cwd?: string };
 }
 
 const ALLOWLISTED_COMMANDS = new Set(["npx", "node", "python", "python3"]);
@@ -31,6 +32,50 @@ const WINDOWS_SHIM_COMMANDS = new Set(["npx", "npm", "pnpm", "yarn"]);
 // here — rejecting them outright is cheaper and safer than trying to make
 // cmd.exe quoting airtight against them.
 const SHELL_METACHARACTERS = /[;&|`$(){}<>^%\r\n]/;
+
+/**
+ * Absolute path of the amadeus-core package root (the dir with package.json),
+ * used as the spawn `cwd` for EVERY MCP child at all three call sites
+ * (mcpAutoManager SSE, engine stdio x2). spawn()/StdioClientTransport otherwise
+ * inherit whatever cwd the parent happened to start from, and `npx
+ * --no-install` resolves node_modules/.bin RELATIVE to cwd — without pinning it
+ * here the hardening in hardenNpxArgs() would silently fail to find packages.
+ * Walks up from this module so it works both under tsx (src/) and compiled
+ * (dist/). Memoized. (security-audit.md #1, A2)
+ */
+let _packageRoot: string | null = null;
+export function getPackageRoot(): string {
+  if (_packageRoot) return _packageRoot;
+  let dir = dirname(fileURLToPath(import.meta.url));
+  while (dir !== dirname(dir)) {
+    if (existsSync(join(dir, "package.json"))) {
+      _packageRoot = dir;
+      return dir;
+    }
+    dir = dirname(dir);
+  }
+  _packageRoot = process.cwd();
+  return _packageRoot;
+}
+
+/**
+ * Force npx to run cache/vendor-only in every non-dev environment.
+ * `npx -y <pkg>` fetches and executes arbitrary code from the npm registry at
+ * runtime — the real allowlist hole behind finding #1 (npx itself is
+ * allowlisted, its package argument isn't). Outside NODE_ENV=development we
+ * rewrite `-y`/`--yes` to `--no-install` (and ensure it's present), so npx only
+ * runs a package already installed under the pinned cwd — no runtime registry
+ * egress, which also matters for locked-down on-prem deploys. In development we
+ * leave `-y` alone for convenience. No-op for any command other than npx.
+ * (security-audit.md #1, A2)
+ */
+export function hardenNpxArgs(command: string, args: string[]): string[] {
+  if (command !== "npx") return args;
+  if (process.env.NODE_ENV === "development") return args;
+  const hardened = args.map((a) => (a === "-y" || a === "--yes" ? "--no-install" : a));
+  if (!hardened.includes("--no-install")) hardened.unshift("--no-install");
+  return hardened;
+}
 
 /**
  * Allowlist + shell-metacharacter gate for EVERY spawn call site.
@@ -90,27 +135,31 @@ function resolveOnPath(command: string): string | null {
   return null;
 }
 
-function wrapWithCmd(command: string, args: string[]): ResolvedSpawnTarget {
+function wrapWithCmd(command: string, args: string[], cwd: string): ResolvedSpawnTarget {
   return {
     command: "cmd.exe",
     args: ["/d", "/s", "/c", command, ...args.map(quoteCmdArg)],
-    options: { windowsVerbatimArguments: true },
+    options: { windowsVerbatimArguments: true, cwd },
   };
 }
 
 export function resolveSpawnTarget(command: string, args: string[]): ResolvedSpawnTarget {
   assertSpawnSafe(command, args);
+  // Harden npx (registry egress) and pin cwd so `--no-install` resolves — both
+  // at EVERY call site. (security-audit.md #1, A2)
+  const hardenedArgs = hardenNpxArgs(command, args);
+  const cwd = getPackageRoot();
 
   if (process.platform !== "win32") {
-    return { command, args };
+    return { command, args: hardenedArgs, options: { cwd } };
   }
 
   if (WINDOWS_SHIM_COMMANDS.has(command)) {
-    return wrapWithCmd(command, args);
+    return wrapWithCmd(command, hardenedArgs, cwd);
   }
 
   // node/python/python3: real .exe binaries once resolved on PATH — no cmd.exe
   // needed. (Absolute-path commands can't reach here; assertSpawnSafe rejects
   // anything outside ALLOWLISTED_COMMANDS.)
-  return { command: resolveOnPath(command) ?? command, args };
+  return { command: resolveOnPath(command) ?? command, args: hardenedArgs, options: { cwd } };
 }

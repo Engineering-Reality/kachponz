@@ -19,7 +19,7 @@ import { z } from "zod";
 import { BaseMessage } from "@langchain/core/messages";
 import { randomUUID } from "node:crypto";
 import { loadPortRange } from "../services/portAllocator.js";
-import { assertSpawnSafe } from "../lib/spawnCompat.js";
+import { assertSpawnSafe, getPackageRoot, hardenNpxArgs } from "../lib/spawnCompat.js";
 import { resolveCorsOrigin } from "../config/cors.js";
 import { jsonSchemaToZod } from "./jsonSchemaToZod.js";
 import { callFn } from "../db/rpc.js";
@@ -489,8 +489,10 @@ async function loadMcpTools(
         // already resolves .cmd/.bat shims (npx/npm) correctly cross-platform.
         return new StdioClientTransport({
           command: release.command || "node",
-          args: Array.isArray(release.args) ? release.args : [],
+          // Harden npx + pin cwd, same as mcpAutoManager (security-audit.md #1, A2).
+          args: hardenNpxArgs(release.command || "node", Array.isArray(release.args) ? release.args : []),
           env: { ...process.env, ...(release.env || {}) },
+          cwd: getPackageRoot(),
         });
       }
       return null;
@@ -724,8 +726,10 @@ export async function connectToMcpToolById(toolId: string, clientName: string): 
       ? new SSEClientTransport(new URL(`http://${mcpHost}:${ssePort}/sse`))
       : new StdioClientTransport({
           command: release.command || 'node',
-          args: Array.isArray(release.args) ? release.args : [],
+          // Harden npx + pin cwd, same as mcpAutoManager (security-audit.md #1, A2).
+          args: hardenNpxArgs(release.command || 'node', Array.isArray(release.args) ? release.args : []),
           env: { ...process.env, ...(release.env || {}) },
+          cwd: getPackageRoot(),
         });
 
   return withMcpRetry(async () => {
