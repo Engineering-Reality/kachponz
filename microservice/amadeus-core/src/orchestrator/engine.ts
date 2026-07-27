@@ -176,7 +176,7 @@ export async function handleA2A(
     case 'task.complete':
       return completeAndHandoff(auth, env, log);
     case 'task.failed':
-      return failStep(auth, env, log);
+      return failStepFromEnvelope(auth, env, log);
     case 'task.status':
       return statusOf(env);
     case 'task.assign':
@@ -262,7 +262,11 @@ export async function computeHandoffAfterTaskCompletion(
   };
 }
 
-async function failStep(
+// A2A-envelope adapter over the authoritative domain op (transactions.ts
+// failStep, imported as txFailStep). NOT a second implementation — it unwraps
+// the A2AEnvelope, delegates, and re-wraps the result as an A2AResult. Renamed
+// from failStep to remove the misleading name collision. (refactor FASE 3 D2)
+async function failStepFromEnvelope(
   auth: AuthContext,
   env: A2AEnvelope,
   log: ReturnType<typeof txLogger>,
@@ -1151,7 +1155,7 @@ export async function runAgenticStep(
     }
 
     // Convert failure into a failed step in the transaction tracker
-    return failStep(
+    return failStepFromEnvelope(
       auth,
       {
         protocol: 'amadeus.a2a/0',
@@ -1421,7 +1425,7 @@ export async function runAgenticStepStream(
 
     if (mode === 'production') {
       try {
-        await failStep(
+        await failStepFromEnvelope(
           auth,
           {
             protocol: 'amadeus.a2a/0',
