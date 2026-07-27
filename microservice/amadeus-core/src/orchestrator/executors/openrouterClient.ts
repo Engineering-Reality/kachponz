@@ -15,6 +15,7 @@
  */
 
 import { env } from '../../config/env.js';
+import { logLlmUsageEvent, measurementBodyOverrides } from '../../telemetry/llmUsage.js';
 
 export interface OpenRouterChatMessage {
   role: 'system' | 'user' | 'assistant';
@@ -33,6 +34,11 @@ export interface OpenRouterChatRequest {
   max_tokens?: number;
   /** Bila di-set, minta model kembalikan JSON valid (best-effort). */
   responseJson?: boolean;
+  /** Telemetry tag (owo.md/tok.md sizing exercise) — e.g. 'chatTitle', 'autofill', 'qwenDocExam'. */
+  callSite?: string;
+  modelKind?: 'text' | 'vision';
+  agentId?: string;
+  threadId?: string;
 }
 
 export interface OpenRouterChatResponse {
@@ -42,7 +48,9 @@ export interface OpenRouterChatResponse {
     prompt_tokens?: number;
     completion_tokens?: number;
     total_tokens?: number;
+    completion_tokens_details?: { reasoning_tokens?: number };
   };
+  provider?: string;
 }
 
 export class OpenRouterApiError extends Error {
@@ -74,12 +82,14 @@ export async function openrouterChat(req: OpenRouterChatRequest): Promise<OpenRo
     model: req.model,
     messages: req.messages,
     temperature: req.temperature ?? 0.1,
+    ...measurementBodyOverrides(),
   };
   if (req.max_tokens) body.max_tokens = req.max_tokens;
   if (req.responseJson) body.response_format = { type: 'json_object' };
 
   const controller = new AbortController();
   const timer = setTimeout(() => controller.abort(), env.OPENROUTER_TIMEOUT_MS);
+  const startedAt = Date.now();
 
   let res: Response;
   try {
@@ -104,15 +114,37 @@ export async function openrouterChat(req: OpenRouterChatRequest): Promise<OpenRo
   }
 
   const json = (await res.json()) as {
-    choices?: Array<{ message?: { content?: string } }>;
+    choices?: Array<{ message?: { content?: string }; finish_reason?: string }>;
     model?: string;
     usage?: OpenRouterChatResponse['usage'];
+    provider?: string;
   };
   const content = json.choices?.[0]?.message?.content ?? '';
+
+  if (req.callSite) {
+    void logLlmUsageEvent({
+      callSite: req.callSite,
+      modelSlug: json.model ?? req.model,
+      modelKind: req.modelKind ?? 'text',
+      provider: json.provider,
+      agentId: req.agentId,
+      threadId: req.threadId,
+      thinkingEnabled: env.LLM_MEASUREMENT_REASONING ? env.LLM_MEASUREMENT_REASONING === 'on' : undefined,
+      promptTokens: json.usage?.prompt_tokens,
+      completionTokens: json.usage?.completion_tokens,
+      totalTokens: json.usage?.total_tokens,
+      reasoningTokens: json.usage?.completion_tokens_details?.reasoning_tokens,
+      latencyMs: Date.now() - startedAt,
+      finishReason: json.choices?.[0]?.finish_reason,
+      stream: false,
+    });
+  }
+
   return {
     content,
     model: json.model ?? req.model,
     usage: json.usage,
+    provider: json.provider,
   };
 }
 

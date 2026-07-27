@@ -125,6 +125,8 @@ export const openrouterDocExamExecutor: Executor = {
         temperature: 0.1,
         max_tokens: 1024,
         responseJson: true,
+        callSite: 'qwenDocExam.extract',
+        modelKind: 'vision',
         messages: [
           { role: 'system', content: EXTRACTION_SYSTEM },
           {
@@ -155,6 +157,7 @@ export const openrouterDocExamExecutor: Executor = {
         temperature: 0.1,
         max_tokens: 512,
         responseJson: true,
+        callSite: 'qwenDocExam.assess',
         messages: [
           { role: 'system', content: ASSESSMENT_SYSTEM },
           {

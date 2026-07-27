@@ -55,6 +55,7 @@ export async function suggestFieldValue(req: AutofillRequest): Promise<string> {
     ],
     temperature: 0.4,
     max_tokens: 200,
+    callSite: 'autofill',
   });
   return result.content.trim();
 }

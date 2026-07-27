@@ -152,6 +152,22 @@ const EnvSchema = z.object({
   SMTP_FROM: z.string().default('aml-alerts@amadeus.local'),
   COMPLIANCE_ALERT_EMAIL: z.string().optional(),
   OPS_ALERT_EMAIL: z.string().optional(),
+
+  // ─── LLM usage telemetry (token/GPU sizing measurement — owo.md/tok.md) ──
+  // Passive, numeric-only instrumentation writing to `llm_usage_events`.
+  // Default off: zero behavior change and zero DB writes unless explicitly
+  // turned on for a measurement session.
+  LLM_USAGE_TELEMETRY: z.enum(['on', 'off']).default('off').transform((v) => v === 'on'),
+  // Optional OpenRouter provider pin (e.g. 'coreweave', 'deepinfra'). Unset =
+  // no `provider` field sent = today's behavior (OpenRouter auto-routes).
+  LLM_MEASUREMENT_PROVIDER: z.string().optional(),
+  // Optional force of reasoning/thinking on|off via `reasoning.enabled`.
+  // Unset = provider default (thinking ON for qwen3.6-35b-a3b, per
+  // docs/model-parity.md §6.2).
+  LLM_MEASUREMENT_REASONING: z.enum(['on', 'off']).optional(),
+  // Tags telemetry rows with a scenario label (S1..S5) during the sizing
+  // exercise. Unset in normal operation.
+  LLM_MEASUREMENT_SCENARIO: z.string().optional(),
 });
 
 export type Env = z.infer<typeof EnvSchema>;

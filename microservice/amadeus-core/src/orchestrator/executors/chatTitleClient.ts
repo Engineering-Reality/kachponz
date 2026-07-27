@@ -36,6 +36,7 @@ export async function suggestChatTitle(messages: ChatTitleMessage[]): Promise<st
     ],
     temperature: 0.3,
     max_tokens: 20,
+    callSite: 'chatTitle',
   });
   return result.content.trim().replace(/^["']|["']$/g, '');
 }

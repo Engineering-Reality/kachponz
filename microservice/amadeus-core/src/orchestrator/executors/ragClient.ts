@@ -84,6 +84,7 @@ export async function generateRagResponse(
     model: env.OPENROUTER_LLM_MODEL,
     messages: [{ role: 'user', content: prompt }],
     temperature: 0,
+    callSite: 'rag',
   });
   return result.content;
 }

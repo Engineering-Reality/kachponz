@@ -18,6 +18,7 @@ import { DomainError } from '../../types/domain.js';
 import { txLogger } from '../../lib/logger.js';
 import { env } from '../../config/env.js';
 import { resolveCorsOrigin } from '../../config/cors.js';
+import { logLlmUsageEvent, measurementBodyOverrides } from '../../telemetry/llmUsage.js';
 import { connectToMcpToolById, extractJobTraceMeta } from '../engine.js';
 import type { RecipeDef, RecipeResolverDef, RecipeRunState, RecipeStepDef, StepOutcome } from './types.js';
 
@@ -339,11 +340,42 @@ async function classifyFault(detail: string): Promise<'retry' | 'abort'> {
   const lower = detail.toLowerCase();
   if (KNOWN_RETRYABLE.some((k) => lower.includes(k))) return 'retry'; // no LLM call needed for known patterns
 
+  const telemetryFetch: typeof fetch = async (input, init) => {
+    const res = await fetch(input, init);
+    if (env.LLM_USAGE_TELEMETRY) {
+      res
+        .clone()
+        .json()
+        .then((json: any) => {
+          void logLlmUsageEvent({
+            callSite: 'recipe.classifyFault',
+            modelSlug: json?.model ?? env.OPENROUTER_LLM_MODEL,
+            modelKind: 'text',
+            provider: json?.provider,
+            promptTokens: json?.usage?.prompt_tokens,
+            completionTokens: json?.usage?.completion_tokens,
+            totalTokens: json?.usage?.total_tokens,
+            reasoningTokens: json?.usage?.completion_tokens_details?.reasoning_tokens,
+            finishReason: json?.choices?.[0]?.finish_reason,
+            stream: false,
+          });
+        })
+        .catch(() => {
+          /* best-effort telemetry only */
+        });
+    }
+    return res;
+  };
+
   const llm = new ChatOpenAI({
     modelName: env.OPENROUTER_LLM_MODEL || 'qwen/qwen-plus',
     temperature: 0,
+    modelKwargs: { ...measurementBodyOverrides() },
     apiKey: env.OPENROUTER_API_KEY,
-    configuration: { baseURL: env.OPENROUTER_BASE_URL },
+    configuration: {
+      baseURL: env.OPENROUTER_BASE_URL,
+      fetch: env.LLM_USAGE_TELEMETRY ? telemetryFetch : undefined,
+    },
   });
 
   // A single, narrow, stateless call — it gets a short string in, returns one

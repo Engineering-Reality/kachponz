@@ -24,6 +24,7 @@ import { jsonSchemaToZod } from "./jsonSchemaToZod.js";
 import { callFn } from "../db/rpc.js";
 import { env } from "../config/env.js";
 import { searchKnowledgeBase, getAgentKnowledgeBases } from "./executors/kbClient.js";
+import { logLlmUsageEvent, measurementBodyOverrides } from "../telemetry/llmUsage.js";
 
 const mcpHost = loadPortRange().host;
 
@@ -1010,15 +1011,59 @@ export async function runAgenticStep(
     const apiKey = env.OPENROUTER_API_KEY ?? '';
     const baseURL = env.OPENROUTER_BASE_URL;
 
+    // Telemetry (owo.md LANJUTAN C): one ReAct iteration = one fetch call to
+    // /chat/completions here, so a fetch wrapper gives us step_index for free.
+    // Reads the raw JSON before LangChain's own parsing consumes the body
+    // (via .clone()) so provider/reasoning_tokens — fields LangChain's OpenAI
+    // wrapper doesn't surface — can be captured without changing behavior.
+    let reactStepIndex = 0;
+    const agentIdForTelemetry: string | undefined = agentConfig.agent_id;
+    const telemetryFetch: typeof fetch = async (input, init) => {
+      const res = await fetch(input, init);
+      if (env.LLM_USAGE_TELEMETRY) {
+        reactStepIndex += 1;
+        const stepIndex = reactStepIndex;
+        res
+          .clone()
+          .json()
+          .then((json: any) => {
+            void logLlmUsageEvent({
+              requestId: txId,
+              agentId: agentIdForTelemetry,
+              stepIndex,
+              callSite: 'engine.react',
+              modelSlug: json?.model ?? resolvedModel,
+              modelKind: requiresVision ? 'vision' : 'text',
+              provider: json?.provider,
+              thinkingEnabled: env.LLM_MEASUREMENT_REASONING
+                ? env.LLM_MEASUREMENT_REASONING === 'on'
+                : undefined,
+              promptTokens: json?.usage?.prompt_tokens,
+              completionTokens: json?.usage?.completion_tokens,
+              totalTokens: json?.usage?.total_tokens,
+              reasoningTokens: json?.usage?.completion_tokens_details?.reasoning_tokens,
+              toolsAttachedCount: tools.length,
+              finishReason: json?.choices?.[0]?.finish_reason,
+              stream: false,
+            });
+          })
+          .catch(() => {
+            /* best-effort telemetry only, never affects the real response */
+          });
+      }
+      return res;
+    };
+
     // 4. Instantiate LangGraph createReactAgent In-Memory
     const llm = new ChatOpenAI({
       modelName: resolvedModel,
       temperature: 1,
       topP: 1,
-      modelKwargs: { top_k: 40, min_p: 0 },
+      modelKwargs: { top_k: 40, min_p: 0, ...measurementBodyOverrides() },
       apiKey,
       configuration: {
         baseURL,
+        fetch: env.LLM_USAGE_TELEMETRY ? telemetryFetch : undefined,
       }
     });
 

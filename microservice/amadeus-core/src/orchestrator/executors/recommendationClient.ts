@@ -54,6 +54,7 @@ export async function suggestFollowUps(conversationTail: ConversationTailMessage
       ],
       temperature: 0.6,
       max_tokens: 150,
+      callSite: 'recommendation',
     });
     const parsed = JSON.parse(result.content.trim());
     return Array.isArray(parsed) ? parsed.slice(0, 4).map(String) : [];
