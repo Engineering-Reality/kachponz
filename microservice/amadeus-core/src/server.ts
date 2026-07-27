@@ -134,18 +134,17 @@ export async function buildServer() {
       });
     }
     if (err instanceof OpenRouterApiError) {
+      // Full upstream detail (status + raw body) goes to the log only. The
+      // client gets a generic message + requestId for correlation — the raw
+      // provider body can carry internal URLs/model names/credential fragments.
+      // (security-audit.md finding #4)
       req.log.warn({ status: err.status, body: err.body }, err.message);
-      let detailMsg = err.message;
-      if (err.body) {
-        try {
-          const parsed = JSON.parse(err.body);
-          if (parsed.error?.message) {
-            detailMsg = `${err.message}: ${parsed.error.message}`;
-          }
-        } catch {}
-      }
       return reply.code(err.status || 500).send({
-        error: { code: 'OPENROUTER_API_ERROR', message: detailMsg, details: err.body },
+        error: {
+          code: 'OPENROUTER_API_ERROR',
+          message: 'Upstream LLM provider returned an error',
+          details: { requestId: req.id },
+        },
       });
     }
     // @fastify/rate-limit: statusCode 429 sudah diset plugin sebelum melempar,

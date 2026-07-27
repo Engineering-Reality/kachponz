@@ -295,7 +295,10 @@ Respond with ONLY a valid JSON object, no markdown, no explanation.`;
       } catch (err: any) {
         request.log.error({ err }, 'Agent Architect LLM generation failed');
         if (err.name === 'OpenRouterApiError') throw err;
-        throw new DomainError('LLM_GENERATION_ERROR', `Gagal membuat konfigurasi agent: ${err.message}`, 500);
+        // Don't forward the raw provider err.message to the client — it can
+        // carry internal URLs/model names. Full detail is in the log above.
+        // (security-audit.md finding #4)
+        throw new DomainError('LLM_GENERATION_ERROR', 'Gagal membuat konfigurasi agent', 500, { requestId: request.id });
       }
 
       return reply.code(200).send({
