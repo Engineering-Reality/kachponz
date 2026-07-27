@@ -41,15 +41,25 @@ describe("resolveSpawnTarget", () => {
     expect(() => resolveSpawnTarget("curl", ["http://example.com"])).toThrow(/not allowlisted/);
   });
 
-  it("allows an absolute path command even though it isn't in the allowlist set", () => {
+  // security-audit.md finding #1 / A1: an absolute path is NOT a substitute for
+  // the allowlist. Before the A1 fix these lolos karena assertSpawnSafe punya
+  // escape hatch `!isAbsolutePathLike(command)` — RCE via any DB-writable tool row.
+  it("rejects an absolute unix path command not on the allowlist", () => {
     setPlatform("linux");
-    const result = resolveSpawnTarget("/usr/local/bin/amadeus-mcp", ["--stdio"]);
-    expect(result).toEqual({ command: "/usr/local/bin/amadeus-mcp", args: ["--stdio"] });
+    expect(() => resolveSpawnTarget("/bin/sh", ["-c", "id"])).toThrow(/not allowlisted/);
   });
 
-  it("rejects an allowlisted-path command containing shell metacharacters", () => {
+  it("rejects an absolute windows path command not on the allowlist", () => {
+    setPlatform("win32");
+    expect(() => resolveSpawnTarget("C:\\Windows\\System32\\cmd.exe", [])).toThrow(/not allowlisted/);
+  });
+
+  it("still allows an allowlisted command whose args carry an absolute path", () => {
     setPlatform("linux");
-    expect(() => resolveSpawnTarget("/usr/local/bin/tool; rm -rf /", [])).toThrow(/metacharacters/);
+    // The DB stdio tools are `node <absolute-entry.js>` — the path is an ARG,
+    // the command stays `node`. A1 must not regress this.
+    const result = resolveSpawnTarget("node", ["/opt/mcp/build/index.js", "--stdio"]);
+    expect(result).toEqual({ command: "node", args: ["/opt/mcp/build/index.js", "--stdio"] });
   });
 
   it("rejects an argument containing shell metacharacters", () => {
