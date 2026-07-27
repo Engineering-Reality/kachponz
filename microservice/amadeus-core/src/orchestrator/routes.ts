@@ -581,6 +581,21 @@ export async function registerOrchestratorRoutes(app: FastifyInstance): Promise<
     // used by the Tools registration form (Part 2.2). Credentials are the
     // request body, never a query string, so they never land in access logs /
     // browser history / proxy logs.
+    // Blocks the highest-value SSRF targets (loopback, link-local, cloud
+    // metadata) while still allowing private RFC1918 addresses — an on-prem
+    // UiPath Orchestrator legitimately lives on an internal IP. Not a full
+    // DNS-rebinding defense; see security-audit.md finding #3.
+    const assertSafeOutboundHost = (rawUrl: string): void => {
+      const host = new URL(rawUrl).hostname.toLowerCase().replace(/^\[|\]$/g, '');
+      const blockedNames = ['localhost', '0.0.0.0', '::1', 'metadata.google.internal', '100.100.100.200'];
+      const m = host.match(/^(\d{1,3})\.(\d{1,3})\.(\d{1,3})\.\d{1,3}$/);
+      const isLoopback = m && m[1] === '127';
+      const isLinkLocal = m && m[1] === '169' && m[2] === '254'; // covers 169.254.169.254
+      if (blockedNames.includes(host) || host.endsWith('.localhost') || isLoopback || isLinkLocal) {
+        throw new DomainError('UNSAFE_URL', 'baseUrl menunjuk ke alamat yang tidak diizinkan', 400);
+      }
+    };
+
     typedSecured.post('/orchestrator/uipath/folders', {
       schema: {
         body: z.object({
@@ -593,6 +608,7 @@ export async function registerOrchestratorRoutes(app: FastifyInstance): Promise<
       },
     }, async (req, reply) => {
       const b = req.body as { clientId: string; clientSecret: string; baseUrl: string; org: string; tenant: string };
+      assertSafeOutboundHost(b.baseUrl);
       try {
         const tokenRes = await fetch(`${b.baseUrl}/identity_/connect/token`, {
           method: 'POST',
@@ -605,9 +621,11 @@ export async function registerOrchestratorRoutes(app: FastifyInstance): Promise<
           }).toString(),
         });
         const tokenText = await tokenRes.text();
-        req.log.info({ status: tokenRes.status }, 'UiPath folder-test OAuth response');
+        // Don't reflect the upstream body to the client — it would turn this
+        // into an SSRF oracle. Log server-side, return status only. (audit #3)
         if (!tokenRes.ok) {
-          return reply.code(502).send({ error: { code: 'UIPATH_AUTH_FAILED', message: `UiPath OAuth2 failed ${tokenRes.status}: ${tokenText.slice(0, 300)}` } });
+          req.log.warn({ status: tokenRes.status, body: tokenText.slice(0, 300) }, 'UiPath folder-test OAuth failed');
+          return reply.code(502).send({ error: { code: 'UIPATH_AUTH_FAILED', message: `UiPath OAuth2 gagal (status ${tokenRes.status})` } });
         }
         const { access_token } = JSON.parse(tokenText) as { access_token: string };
 
@@ -615,15 +633,17 @@ export async function registerOrchestratorRoutes(app: FastifyInstance): Promise<
           headers: { Authorization: `Bearer ${access_token}` },
         });
         const foldersText = await foldersRes.text();
-        req.log.info({ status: foldersRes.status, body: foldersText.slice(0, 2000) }, 'UiPath Folders raw response');
+        req.log.info({ status: foldersRes.status }, 'UiPath Folders response');
         if (!foldersRes.ok) {
-          return reply.code(502).send({ error: { code: 'UIPATH_FOLDERS_FAILED', message: `UiPath Folders failed ${foldersRes.status}: ${foldersText.slice(0, 300)}` } });
+          req.log.warn({ status: foldersRes.status, body: foldersText.slice(0, 300) }, 'UiPath Folders failed');
+          return reply.code(502).send({ error: { code: 'UIPATH_FOLDERS_FAILED', message: `UiPath Folders gagal (status ${foldersRes.status})` } });
         }
         const data = JSON.parse(foldersText) as { value?: Array<{ Id: number; FullyQualifiedName?: string; DisplayName?: string }> };
         const folders = (data.value ?? []).map((f) => ({ id: String(f.Id), fullyQualifiedName: f.FullyQualifiedName ?? f.DisplayName ?? String(f.Id) }));
         return reply.send({ folders });
       } catch (e) {
-        return reply.code(502).send({ error: { code: 'UIPATH_REQUEST_FAILED', message: e instanceof Error ? e.message : String(e) } });
+        req.log.warn({ err: e }, 'UiPath folder-test request failed');
+        return reply.code(502).send({ error: { code: 'UIPATH_REQUEST_FAILED', message: 'Gagal menghubungi UiPath' } });
       }
     });
 
