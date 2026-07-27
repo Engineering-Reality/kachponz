@@ -1,7 +1,8 @@
 # FASE 1 — Inventaris Bukti (Refactor amadeus-core)
 
-> Status: **INVENTARIS SAJA. Belum ada yang dihapus.** Menunggu konfirmasi
-> sebelum FASE 2 (hapus) / FASE 3 (duplikat) / FASE 4 (pecah file).
+> Status: FASE 1 inventaris + **FASE 2 (hapus) & FASE 3 D1/D2 SUDAH dikerjakan**
+> setelah konfirmasi review (lihat bagian "FASE 2 & 3 — DIKERJAKAN" di bawah).
+> FASE 4 (pecah file) menunggu FASE 6 (test).
 >
 > Service: `microservice/amadeus-core` — 71 file `.ts`, ~11.544 baris (src + scripts).
 
@@ -121,12 +122,31 @@ terlihat tersedia, suatu hari dipakai tanpa review. **Aman dihapus** — risiko
 rendah, tidak ada kontrak eksternal, tidak ada migrasi/config yang menyebut.
 Alternatif bila memang direncanakan: beri komentar alasan + tanggal + pemutus.
 
-## Temuan C — `spawnCompat` (SUDAH tersambung, bukan bug)
+## Temuan C — `spawnCompat` (SUDAH tersambung, bukan bug) — allowlist di DUA lokasi
 
-Sudah terpasang di `scripts/mcpAutoManager.ts:13,351` (jalur spawn MCP stdio).
-`engine.ts` **sengaja** tidak memakainya — ia pakai `StdioClientTransport` dari MCP
-SDK yang punya `cross-spawn` sendiri (ada komentar eksplisit di `engine.ts:467-468,
-692-693`). Jadi tidak ada bug di sini.
+Jawaban review Q2 (allowlist + spawnCompat harus tersambung di kedua call site):
+**Ya, keduanya tergating.**
+
+1. **`scripts/mcpAutoManager.ts:351`** (spawn server SSE) — lewat
+   `resolveSpawnTarget()` yang memanggil `assertSpawnSafe()` di dalamnya
+   (`spawnCompat.ts:96`). Baris `:516` menolak legacy string-args / command
+   kosong sebelum sampai spawn.
+2. **`src/orchestrator/engine.ts:422`** (jalur stdio `StdioClientTransport`) —
+   memanggil `assertSpawnSafe(release.command, release.args)` **langsung**
+   sebelum `buildTransport()` (ditambahkan oleh fix #1, commit 5fd1e9c). Engine
+   tetap tidak memakai `resolveSpawnTarget` untuk Windows-shim handling (SDK
+   `StdioClientTransport` punya `cross-spawn` sendiri), tapi allowlist yang SAMA
+   kini ikut ditegakkan. **Koreksi doc ini yang lama** ("engine sengaja tidak
+   memakainya") — itu ditulis sebelum fix #1.
+
+Bukti tak ada breaking change (Q1): `SELECT ... command FROM tools` terhadap DB
+runtime hanya menghasilkan `command="node"` (7 tool) + tool SSE legacy dengan
+`command` kosong/flat-string. Semua command yang benar-benar sampai ke spawn
+site = `node` → **lolos** allowlist (`npx/node/python/python3` + absolute path).
+Tool SSE legacy dengan args string sudah ditolak di guard "re-save" (`engine.ts:399`,
+`mcpAutoManager.ts:516`) — mati duluan, independen dari allowlist. `npx` juga ada
+di allowlist, jadi tool yang di-re-save ke format `{command:"npx",...}` tetap lolos.
+**Nol tool stdio yang saat ini jalan menjadi rusak.**
 
 > Catatan kecil untuk FASE 5: `server.ts:252` men-`spawn('tsx', …)` mcpAutoManager
 > **tanpa** lewat `resolveSpawnTarget`. Itu jalur dev-only auto-spawn; di Windows
@@ -154,5 +174,39 @@ SDK yang punya `cross-spawn` sendiri (ada komentar eksplisit di `engine.ts:467-4
 
 ---
 
-**BERHENTI DI SINI (perintah prompt).** Menunggu konfirmasi. Urutan berikutnya
-sesuai prompt: FASE 5 (keamanan) lebih dulu, baru FASE 2/3/6, terakhir FASE 4.
+## ✅ FASE 2 & 3 — DIKERJAKAN (2026-07-27, setelah konfirmasi review)
+
+Subset yang disetujui review (a2aTasks & spawnCompat **tidak** disentuh sampai
+Q2 & Q4 terjawab — sekarang terjawab: keduanya LIVE, dipertahankan).
+
+**FASE 2 — hapus/turunkan (commit 6f1cce8):**
+- ❌ Hapus `aesGcmEncrypt`/`aesGcmDecrypt` (Temuan B) + import `createCipheriv`/
+  `createDecipheriv` yang jadi yatim. Nol caller, nol test.
+- 🔽 `linearOrder` (stepFlows.ts) → non-export (dipakai `stepIndex` di file yang sama).
+- 🔽 `runRecipe` (executor.ts, Temuan E) → non-export (dipakai `runRecipeStream`).
+- **Tidak dihapus:** `markTask*`, `A2AClient` (Temuan A — lubang fungsional, bukan
+  dead code), `spawnCompat`/`quoteCmdArg` (Temuan C — tersambung), `watchTask`,
+  `a2aEventEmitter` (LIVE via SSE stream).
+
+**FASE 3 — duplikasi:**
+- **D2 (failStep dua "implementasi")** — commit 5407926. BUKAN duplikat: yang di
+  `engine.ts` adalah adapter A2A-envelope yang sudah mendelegasi ke domain op
+  otoritatif (`transactions.ts` `failStep`, di-import `txFailStep`). Hanya namanya
+  yang menyesatkan → **rename** `engine.ts` `failStep` → `failStepFromEnvelope`
+  (+ 3 call site). Nol perubahan perilaku.
+- **D1 (scripts/e2e-demo.ts)** — **SENGAJA TIDAK DIUBAH.** Premis audit ("menulis
+  ulang logika produksi") tidak akurat: `createTransaction/completeStep/failStep/
+  explainRoute/…` semuanya thin wrapper `fetch()`/`apiRequest` terhadap API yang
+  berjalan — script ini **sudah** opsi (a) (klien HTTP black-box, sebagaimana
+  seharusnya e2e demo). Satu-satunya "dup" nyata `sleep` beradu dengan helper
+  **privat** non-export di `uipathAuth.ts`; meng-couple demo black-box ke `src`
+  demi 3 baris `sleep` justru salah arah. Dibiarkan.
+- **D3 (dup non-identik)** — belum dikejar: refactor spekulatif pada basis kode
+  ~11.5k baris tanpa test (baru 1 file test) berisiko; ditahan sampai FASE 6
+  (test karakterisasi) sesuai urutan prompt.
+
+`tsc --noEmit` bersih (kecuali 2 error pre-existing di
+`scripts/seedSwiftKbSynthetic.ts`, tak terkait). `spawnCompat.test.ts` 12/12 lulus.
+
+**Sisa sesuai urutan prompt:** FASE 6 (test karakterisasi) → baru FASE 4 (pecah
+`engine.ts`). Belum dikerjakan.
