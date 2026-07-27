@@ -37,7 +37,10 @@ export async function authenticateRobot(
     const token = authHeader.substring(7);
     try {
       const secret = new TextEncoder().encode(env.OAUTH2_JWT_SECRET);
-      const { payload } = await jwtVerify(token, secret);
+      // Pin the algorithm to what routes/auth.ts signs with (HS256). Without
+      // this, jwtVerify accepts any HMAC alg the token header claims — pinning
+      // removes that flexibility as an attack surface. (security-audit.md #6)
+      const { payload } = await jwtVerify(token, secret, { algorithms: ['HS256'] });
       
       req.auth = {
         serviceAccountId: payload.sub as string,
