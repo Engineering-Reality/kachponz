@@ -36,7 +36,14 @@ function isAbsolutePathLike(command: string): boolean {
   return /^[a-zA-Z]:[\\/]/.test(command) || command.startsWith("/");
 }
 
-function assertSafe(command: string, args: string[]): void {
+/**
+ * Allowlist + shell-metacharacter gate for EVERY spawn call site.
+ * `resolveSpawnTarget()` (scripts/mcpAutoManager.ts) calls this, and the
+ * engine's direct `StdioClientTransport` path (src/orchestrator/engine.ts)
+ * MUST call it too — otherwise a DB-configured tool command bypasses the
+ * allowlist and reaches spawn() unchecked (security-audit.md finding #1).
+ */
+export function assertSpawnSafe(command: string, args: string[]): void {
   if (!ALLOWLISTED_COMMANDS.has(command) && !isAbsolutePathLike(command)) {
     throw new Error(`spawnCompat: command "${command}" is not allowlisted`);
   }
@@ -86,7 +93,7 @@ function wrapWithCmd(command: string, args: string[]): ResolvedSpawnTarget {
 }
 
 export function resolveSpawnTarget(command: string, args: string[]): ResolvedSpawnTarget {
-  assertSafe(command, args);
+  assertSpawnSafe(command, args);
 
   if (process.platform !== "win32") {
     return { command, args };

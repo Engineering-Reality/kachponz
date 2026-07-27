@@ -3,6 +3,7 @@ import { z } from 'zod';
 import { query } from '../db/pool.js';
 import { DomainError } from '../types/domain.js';
 import { authenticateRobot } from '../middleware/auth.js';
+import { assertSpawnSafe } from '../lib/spawnCompat.js';
 
 const SECRET_KEY_RE = /secret|password|token|key/i;
 
@@ -25,6 +26,24 @@ function rejectCredsInArgs(args: string[]): string | null {
     }
   }
   return null;
+}
+
+/**
+ * Reject tool configs whose command isn't on the spawn allowlist. Stops a
+ * non-allowlisted (or shell-metacharacter-laced) command from ever being
+ * stored — defense-in-depth alongside the same gate the engine now enforces
+ * at spawn time (security-audit.md finding #1). Same allowlist as
+ * scripts/mcpAutoManager.ts, so no legitimate tool config is newly rejected.
+ */
+function rejectDisallowedCommand(released: { command?: unknown; args?: unknown }): string | null {
+  if (typeof released?.command !== 'string') return null;
+  const args = Array.isArray(released.args) ? released.args.filter((a): a is string => typeof a === 'string') : [];
+  try {
+    assertSpawnSafe(released.command, args);
+    return null;
+  } catch (e) {
+    return e instanceof Error ? e.message : 'command is not allowlisted';
+  }
 }
 
 export const registerToolsRoutes: FastifyPluginAsync = async (rootApp: FastifyInstance) => {
@@ -167,6 +186,12 @@ export const registerToolsRoutes: FastifyPluginAsync = async (rootApp: FastifyIn
               throw new DomainError('CREDENTIALS_IN_ARGS', rejection, 400);
             }
           }
+          if (released) {
+            const cmdRejection = rejectDisallowedCommand(released);
+            if (cmdRejection) {
+              throw new DomainError('COMMAND_NOT_ALLOWLISTED', cmdRejection, 400);
+            }
+          }
         }
       }
       
@@ -209,6 +234,12 @@ export const registerToolsRoutes: FastifyPluginAsync = async (rootApp: FastifyIn
             const rejection = rejectCredsInArgs(released.args);
             if (rejection) {
               throw new DomainError('CREDENTIALS_IN_ARGS', rejection, 400);
+            }
+          }
+          if (released) {
+            const cmdRejection = rejectDisallowedCommand(released);
+            if (cmdRejection) {
+              throw new DomainError('COMMAND_NOT_ALLOWLISTED', cmdRejection, 400);
             }
           }
         }

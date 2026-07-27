@@ -19,6 +19,7 @@ import { z } from "zod";
 import { BaseMessage } from "@langchain/core/messages";
 import { randomUUID } from "node:crypto";
 import { loadPortRange } from "../services/portAllocator.js";
+import { assertSpawnSafe } from "../lib/spawnCompat.js";
 import { resolveCorsOrigin } from "../config/cors.js";
 import { jsonSchemaToZod } from "./jsonSchemaToZod.js";
 import { callFn } from "../db/rpc.js";
@@ -409,6 +410,20 @@ async function loadMcpTools(
     if (release.method !== "sse" && release.method !== "stdio") {
       report.push({ toolName, toolId, status: 'no_versions', error: 'Unsupported or missing transport method', loadedTools: [] });
       continue;
+    }
+
+    // Security: the stdio transport spawns release.command directly (via the
+    // SDK's StdioClientTransport). That command/args come from DB tool config
+    // (set via /tools) and must pass the SAME allowlist mcpAutoManager uses —
+    // otherwise a tenant could register an arbitrary command and get RCE on
+    // this host (security-audit.md #1). Fail closed on a non-allowlisted cmd.
+    if (release.method === "stdio") {
+      try {
+        assertSpawnSafe(release.command, Array.isArray(release.args) ? release.args : []);
+      } catch (e) {
+        report.push({ toolName, toolId, status: 'connect_failed', error: sanitizeMcpError(e), loadedTools: [] });
+        continue;
+      }
     }
 
     // For SSE, the only source of truth for "where is this tool actually
