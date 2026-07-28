@@ -13,7 +13,7 @@ import { fileURLToPath } from "node:url";
  * reopen the shell-injection surface the `shell: false` callers were
  * written to avoid. Instead we route shims through `cmd.exe /d /s /c`
  * with our own argument quoting (windowsVerbatimArguments: true), and
- * resolve real executables (node/python) to an absolute path via PATH.
+ * resolve the real executable (node) to an absolute path via PATH.
  */
 
 export interface ResolvedSpawnTarget {
@@ -23,7 +23,13 @@ export interface ResolvedSpawnTarget {
   options?: { windowsVerbatimArguments?: boolean; cwd?: string };
 }
 
-const ALLOWLISTED_COMMANDS = new Set(["npx", "node", "python", "python3"]);
+// CISO rule: absolutely no Python. `python`/`python3` were removed from this
+// allowlist (previously ["npx","node","python","python3"]) — assertSpawnSafe()
+// now throws for either, which permanently closes Python-based MCP servers
+// (the uvx ecosystem). This is an accepted trade-off, not an oversight; see
+// docs/security-audit.md. The only DB tool that used python (Supabase MCP
+// v1.1.0, a Windows-path app_mcp_rag.py) was already non-functional here.
+const ALLOWLISTED_COMMANDS = new Set(["npx", "node"]);
 
 // Commands that ship as .cmd/.bat shims on Windows rather than a real .exe.
 const WINDOWS_SHIM_COMMANDS = new Set(["npx", "npm", "pnpm", "yarn"]);
@@ -158,8 +164,8 @@ export function resolveSpawnTarget(command: string, args: string[]): ResolvedSpa
     return wrapWithCmd(command, hardenedArgs, cwd);
   }
 
-  // node/python/python3: real .exe binaries once resolved on PATH — no cmd.exe
-  // needed. (Absolute-path commands can't reach here; assertSpawnSafe rejects
-  // anything outside ALLOWLISTED_COMMANDS.)
+  // node: a real .exe binary once resolved on PATH — no cmd.exe needed.
+  // (Absolute-path commands can't reach here; assertSpawnSafe rejects anything
+  // outside ALLOWLISTED_COMMANDS, and python was removed from it.)
   return { command: resolveOnPath(command) ?? command, args: hardenedArgs, options: { cwd } };
 }

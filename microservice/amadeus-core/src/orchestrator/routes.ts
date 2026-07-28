@@ -169,10 +169,17 @@ const RagRemoveFileSchema = z.object({
 }).strict();
 
 export async function registerOrchestratorRoutes(app: FastifyInstance): Promise<void> {
-  // GET /.well-known/amadeus-agent-card.json (Public discovery)
-  app.get('/.well-known/amadeus-agent-card.json', async (_req, reply) => {
-    return reply.send(buildAgentCard());
-  });
+  // A2A v1 DITUNDA (security-audit.md finding #4-A2A; refactor-inventory Temuan A):
+  // state machine sisi-agen belum lengkap, jadi keempat rute A2A TIDAK
+  // didaftarkan saat A2A_ENABLED=false (default). Bukan 404-dari-handler — benar-
+  // benar tidak terdaftar, termasuk agent card publik di bawah yang tanpa auth
+  // mengiklankan kapabilitas settlement Trade Finance yang belum bisa dipenuhi.
+  if (appEnv.A2A_ENABLED) {
+    // GET /.well-known/amadeus-agent-card.json (Public discovery)
+    app.get('/.well-known/amadeus-agent-card.json', async (_req, reply) => {
+      return reply.send(buildAgentCard());
+    });
+  }
 
   app.register(async (secured) => {
     secured.addHook('preHandler', authenticateRobot);
@@ -190,26 +197,30 @@ export async function registerOrchestratorRoutes(app: FastifyInstance): Promise<
       },
     };
 
-    // POST /a2a — terima envelope A2A dari robot/agent.
-    // Legacy amadeus.a2a/0 — dipertahankan untuk backwards compat.
-    typedSecured.post('/a2a', {
-      schema: { body: A2AEnvelopeSchema }
-    }, async (req, reply) => {
-      const env = req.body as A2AEnvelope;
-      const result = await handleA2A(req.auth!, env);
-      return reply.send(result);
-    });
+    // A2A v1 rute (DITUNDA) — didaftarkan hanya saat A2A_ENABLED=true. Lihat
+    // komentar di registerOrchestratorRoutes() + security-audit.md finding #4-A2A.
+    if (appEnv.A2A_ENABLED) {
+      // POST /a2a — terima envelope A2A dari robot/agent.
+      // Legacy amadeus.a2a/0 — dipertahankan untuk backwards compat.
+      typedSecured.post('/a2a', {
+        schema: { body: A2AEnvelopeSchema }
+      }, async (req, reply) => {
+        const env = req.body as A2AEnvelope;
+        const result = await handleA2A(req.auth!, env);
+        return reply.send(result);
+      });
 
-    // POST /a2a/rpc — Endpoint utama amadeus.a2a/1 (JSON-RPC 2.0)
-    typedSecured.post('/a2a/rpc', async (req, reply) => {
-      const rawBody = typeof req.body === 'string' ? req.body : JSON.stringify(req.body ?? {});
-      const result = await handleRpc(req.body as any, req.auth!, rawBody);
-      // Ensure HTTP status is 200 for JSON-RPC even if it contains a JSON-RPC error
-      return reply.code(200).send(result);
-    });
+      // POST /a2a/rpc — Endpoint utama amadeus.a2a/1 (JSON-RPC 2.0)
+      typedSecured.post('/a2a/rpc', async (req, reply) => {
+        const rawBody = typeof req.body === 'string' ? req.body : JSON.stringify(req.body ?? {});
+        const result = await handleRpc(req.body as any, req.auth!, rawBody);
+        // Ensure HTTP status is 200 for JSON-RPC even if it contains a JSON-RPC error
+        return reply.code(200).send(result);
+      });
 
-    // GET /a2a/tasks/:id/stream — SSE endpoint untuk task update
-    typedSecured.get('/a2a/tasks/:id/stream', streamHandler);
+      // GET /a2a/tasks/:id/stream — SSE endpoint untuk task update
+      typedSecured.get('/a2a/tasks/:id/stream', streamHandler);
+    }
 
     // POST /orchestrator/run-agentic — jalankan agent agentic in-process
     // untuk current_step transaksi (mis. Document Examination Agent).

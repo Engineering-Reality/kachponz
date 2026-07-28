@@ -69,8 +69,25 @@ const EnvSchema = z.object({
     .default('false')
     .transform((v) => v === 'true'),
 
+  // Feature flag: subsistem A2A v1 (task DB + JSON-RPC + agent card publik).
+  // DITUNDA — kodenya dipertahankan tapi rutenya DIMATIKAN karena state machine
+  // sisi-agen belum lengkap (markTask* tak pernah dipanggil → task nyangkut di
+  // 'submitted') sementara agent card publik mengiklankan kapabilitas settlement
+  // Trade Finance yang tak bisa diselesaikan. Default false: keempat rute
+  // (agent card, /a2a, /a2a/rpc, /a2a/tasks/:id/stream) TIDAK didaftarkan sama
+  // sekali (404 natural), bukan sekadar 404 dari dalam handler.
+  // (security-audit.md finding #4-A2A; docs/refactor-inventory.md Temuan A)
+  A2A_ENABLED: z
+    .enum(['true', 'false'])
+    .default('false')
+    .transform((v) => v === 'true'),
+
   // Skew toleransi timestamp signature (detik) — anti-replay window.
-  SIGNATURE_MAX_SKEW_SEC: z.coerce.number().int().positive().default(300),
+  // Default 60 dtk: robot ada di jaringan bank ber-NTP, jadi 60 dtk aman dan
+  // mempersempit jendela replay (belum ada nonce — finding #7). Tetap
+  // konfigurabel via env; kalau klien sah kena signature-expired, NAIKKAN
+  // nilainya, jangan diam-diam balik ke 300. (security-audit.md finding #7)
+  SIGNATURE_MAX_SKEW_SEC: z.coerce.number().int().positive().default(60),
 
   // Endpoint LLM Air-gapped (mis. model via Ollama/vLLM)
   // Opsional. Jika kosong, agent akan menggunakan fallback deterministik.

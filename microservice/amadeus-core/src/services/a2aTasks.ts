@@ -1,3 +1,20 @@
+/**
+ * A2A v1 task store (tabel a2a_tasks / a2a_task_messages).
+ *
+ * STATUS: A2A DITUNDA. Subsistem ini SETENGAH TERPASANG — sisi klien
+ * (submitTask/getTaskWithMessages/cancelTask/provideInput via JSON-RPC) hidup,
+ * tapi sisi agen belum: markTaskWorking/markTaskInputRequired/markTaskFailed/
+ * markTaskCompleted (dan `a2aEventEmitter` yang di-export) TIDAK dipanggil dari
+ * mana pun, sehingga sebuah task yang di-submit nyangkut di state 'submitted'
+ * selamanya — tak ada yang memindahkannya ke working/completed/failed.
+ *
+ * Karena itu A2A DIMATIKAN di balik flag `A2A_ENABLED` (default off): rutenya
+ * tidak didaftarkan di orchestrator/routes.ts. File ini + a2a/ + migrasi
+ * 1784000000000_a2a-tasks SENGAJA DIPERTAHANKAN (penundaan, bukan penghapusan),
+ * dan kelima export tak-terpakai di atas SENGAJA dibiarkan ter-export sampai
+ * sisi-agen tersambung. (security-audit.md finding #4-A2A; refactor-inventory
+ * Temuan A)
+ */
 import { query, withTransaction } from '../db/pool.js';
 import { DomainError } from '../types/domain.js';
 import { getFlow, isKnownType, stepExists } from '../config/stepFlows.js';
