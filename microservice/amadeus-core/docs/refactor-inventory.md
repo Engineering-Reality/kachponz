@@ -47,12 +47,12 @@ quoting argumen Windows rusak. **Jangan hapus.**
 | `cancelTask` | services/a2aTasks.ts:168 | M2 `rpcHandler.ts:109` | **LIVE** |
 | `provideInput` | services/a2aTasks.ts:172 | M2 `rpcHandler.ts:122` | **LIVE** |
 | `watchTask` | services/a2aTasks.ts:204 | M1 `streamHandler.ts:2` | **LIVE** |
-| `a2aEventEmitter` | services/a2aTasks.ts:10 | internal (`notifyTaskUpdate`, `watchTask`); **tidak** ada M1/M2/M3 eksternal | **LIVE tapi over-exported** → turunkan jadi non-export |
-| `markTaskWorking` | services/a2aTasks.ts:177 | tidak ada (M1/M2/M3 nihil) | **SUSPECT-DEAD → lihat Temuan A** |
-| `markTaskInputRequired` | services/a2aTasks.ts:181 | tidak ada | **SUSPECT-DEAD → Temuan A** |
-| `markTaskFailed` | services/a2aTasks.ts:185 | tidak ada | **SUSPECT-DEAD → Temuan A** |
-| `markTaskCompleted` | services/a2aTasks.ts:189 | tidak ada (padahal ia satu-satunya pemicu `computeHandoffAfterTaskCompletion` dari jalur task-DB) | **SUSPECT-DEAD → Temuan A** |
-| `A2AClient` (class) | a2a/client.ts:? | tidak ada `new A2AClient` di mana pun | **SUSPECT-DEAD → Temuan A** (bagian dari subsistem v1 yang sama) |
+| `a2aEventEmitter` | services/a2aTasks.ts:10 | internal (`notifyTaskUpdate`, `watchTask`); **tidak** ada M1/M2/M3 eksternal | **INTENTIONALLY-RETAINED** (A2A ditunda, flag off; export dibiarkan sampai sisi-agen tersambung — Temuan A 2026-07-28) |
+| `markTaskWorking` | services/a2aTasks.ts:177 | tidak ada (M1/M2/M3 nihil) | **INTENTIONALLY-RETAINED (deferred feature) → Temuan A** |
+| `markTaskInputRequired` | services/a2aTasks.ts:181 | tidak ada | **INTENTIONALLY-RETAINED (deferred feature) → Temuan A** |
+| `markTaskFailed` | services/a2aTasks.ts:185 | tidak ada | **INTENTIONALLY-RETAINED (deferred feature) → Temuan A** |
+| `markTaskCompleted` | services/a2aTasks.ts:189 | tidak ada (padahal ia satu-satunya pemicu `computeHandoffAfterTaskCompletion` dari jalur task-DB) | **INTENTIONALLY-RETAINED (deferred feature) → Temuan A** |
+| `A2AClient` (class) | ~~a2a/client.ts~~ | tidak ada `new A2AClient` di mana pun, tidak di-import siapa pun | **DIHAPUS 2026-07-28** (`a2a/client.ts` di-`git rm` — Temuan A pengecualian) |
 | `aesGcmEncrypt` | lib/crypto.ts:93 | tidak ada; semua import crypto bersifat named & tak menyentuh ini | **SUSPECT-DEAD (Temuan B)** |
 | `aesGcmDecrypt` | lib/crypto.ts:102 | tidak ada | **SUSPECT-DEAD (Temuan B)** |
 | `runRecipe` | recipes/executor.ts:393 | hanya internal: dipanggil `runRecipeStream` (`executor.ts:528`). Eksternal cuma `runRecipeStream` (`routes.ts:20,288`) | **LIVE tapi over-exported (Temuan E)** → turunkan jadi non-export |
@@ -112,6 +112,24 @@ tersambung ke handler agen, sehingga task yang di-submit lewat JSON-RPC nyangkut
 robot agen ke `markTaskWorking/InputRequired/Failed/Completed` sehingga tabel
 `a2a_tasks` benar-benar dipakai dan `computeHandoffAfterTaskCompletion` terpicu dari
 jalur task-DB. Sampai itu terjadi, simbol-simbol ini SENGAJA dipertahankan.
+
+**KEPUTUSAN USER (2026-07-28, MENGGANTIKAN yang di atas): A2A DITUNDA — kode
+DIPERTAHANKAN, rute DIMATIKAN.** Kontrak publik yang tak bisa diselesaikan
+(agent card tanpa auth mengiklankan 9 kapabilitas settlement Trade Finance, 4
+rute A2A aktif, sisi-agen mati) lebih berbahaya daripada dead code. Maka:
+
+- Flag baru **`A2A_ENABLED` (default false)** di `config/env.ts`. Saat off,
+  keempat rute A2A (`GET /.well-known/amadeus-agent-card.json`, `POST /a2a`,
+  `POST /a2a/rpc`, `GET /a2a/tasks/:id/stream`) **tidak didaftarkan** di
+  `orchestrator/routes.ts` — bukan 404-dari-handler.
+- **DIPERTAHANKAN:** `a2a/` (kecuali client.ts), `services/a2aTasks.ts`, migrasi
+  `1784000000000_a2a-tasks`. Kelima export tak-terpakai (`a2aEventEmitter`,
+  `markTaskWorking/InputRequired/Failed/Completed`) **INTENTIONALLY-RETAINED**
+  (deferred feature), bukan dead code — header `a2aTasks.ts` mencatatnya.
+- **PENGECUALIAN — `a2a/client.ts` DIHAPUS.** File 132-baris `A2AClient` tidak
+  dipakai bahkan oleh permukaan A2A sendiri (0 `new A2AClient`, tidak di-import
+  siapa pun, tidak dipakai untuk memanggil agent eksternal). Di-`git rm`.
+- Test: dengan flag off, `GET /.well-known/amadeus-agent-card.json` → 404.
 
 ---
 
