@@ -184,11 +184,39 @@ di allowlist, jadi tool yang di-re-save ke format `{command:"npx",...}` tetap lo
 2. **Hapus `aesGcmEncrypt`/`aesGcmDecrypt` (B)** — rekomendasi: hapus. Aman.
 3. **Turunkan `runRecipe` (E) & `a2aEventEmitter` jadi non-export** — aman, murni internal.
 
-## SENGAJA TIDAK DISENTUH di FASE 1
+## SENGAJA DIPERTAHANKAN (diperbarui 2026-07-28)
 - Semua interface/type "zero-ref" (kontrak modul / structural typing).
 - `watchTask`, `linearOrder`, `quoteCmdArg` (koreksi atas prompt — LIVE).
 - `buildServer`, `loadEnv`, script `main()`, `mcpAdapters` (entrypoint).
+- `AgentRegistry` + `registry` singleton (`agents/base.ts`) — **LIVE**, dipakai
+  `routes.ts:33,400` (register docExamAgent + serve `GET /orchestrator/agents`) dan
+  `scripts/agentSandbox.ts:13,18,37,53`. `recipes/store.ts` menggantikan recipe
+  registry, BUKAN agent registry — concern berbeda.
+- `docExamAgent` (`agents/docExamAgent.ts`) — **LIVE**, di-register dan aktif.
+- `MCP_METHODS` — sumber tipe `McpMethod`, dipakai `routes.ts:24,445`.
+- `ExecutorRegistry` (`executors/base.ts`) — **LIVE**, `executorRegistry.findForStep()`
+  di `router.ts:49`, `register()` di `executorMap.ts:38`.
+- A2A subsistem (kecuali `client.ts` yang sudah dihapus) — ditunda di balik
+  `A2A_ENABLED` (default off).
 - Perilaku eksternal, schema DB, kode error (aturan H1).
+
+---
+
+## Temuan G (2026-07-28) — AgentRegistry: LIVE, bukan dead
+
+Prompt a.md #4 menyarankan `AgentRegistry` + `registry` singleton sudah digantikan
+oleh `recipes/store.ts`. **Salah.** Keduanya concern berbeda:
+
+- `agents/base.ts` `AgentRegistry` = **daftar agent** (descriptor, kapabilitas, handle).
+- `recipes/store.ts` = **recipe per agent** (konfigurasi loop mode, persistensi DB).
+
+Bukti `registry` LIVE:
+- `routes.ts:33` → `registry.register(docExamAgent)` (module init)
+- `routes.ts:400` → `registry.all().map(a => a.descriptor)` (endpoint `GET /orchestrator/agents`)
+- `scripts/agentSandbox.ts:13,18,37,53` → full register/get/all usage (CLI sandbox)
+
+Direktori `agents/` juga berisi `docExamAgent.ts` (110 baris, agen agentic utk
+document examination). **Tidak dihapus.**
 
 ---
 
@@ -223,11 +251,21 @@ Q2 & Q4 terjawab — sekarang terjawab: keduanya LIVE, dipertahankan).
   ~11.5k baris tanpa test (baru 1 file test) berisiko; ditahan sampai FASE 6
   (test karakterisasi) sesuai urutan prompt.
 
-`tsc --noEmit` menyisakan error pre-existing tak-terkait. (KOREKSI 2026-07-28:
-bukan 2 tapi **3** — `scripts/seedSwiftKbSynthetic.ts:23,24` **dan**
-`a2a/agentCard.ts:29`, semuanya `noUncheckedIndexedAccess` "possibly undefined",
-di luar cakupan branch security. Lihat security-audit.md "Status tsc pra-merge".)
-`spawnCompat.test.ts` 12/12 lulus.
+## ✅ FASE 2.5 — PEMBERSIHAN EXPORT (2026-07-28, a.md #3)
+
+Cabut `export` dari simbol yang dipakai internal saja (0 import eksternal):
+- 🔽 `EmbeddingApiError` (embeddingClient.ts) — 7 pemakaian internal, 0 eksternal.
+- 🔽 `PortRangeExhaustedError` (portAllocator.ts) — 2 pemakaian internal, 0 eksternal.
+- 🔽 ~46 interface/type yang namanya tak muncul di file selain deklarasi.
+
+Pengecualian (tetap export):
+- Tipe di signature fungsi yang di-export (kontrak).
+- Tipe yang diimpor frontend (khususnya mcpStatus).
+- Entrypoint (`loadEnv`, `buildServer`, `main()`, `mcpAdapters`).
+- A2A — konsisten dengan penundaan.
+
+`tsc --noEmit` **BERSIH** setelah 3 error pre-existing diperbaiki (a.md #1,
+`seedSwiftKbSynthetic.ts:23,24` dan `agentCard.ts:29`). 32 test lulus.
 
 **Sisa sesuai urutan prompt:** FASE 6 (test karakterisasi) → baru FASE 4 (pecah
 `engine.ts`). Belum dikerjakan.
