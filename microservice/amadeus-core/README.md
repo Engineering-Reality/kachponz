@@ -67,3 +67,12 @@ Butuh Postgres on-prem dengan `DATABASE_URL` di-set di file `.env`.
 - Semua query parameterized (anti-SQLi). Secret di-hash, tak pernah plaintext.
 - Error handler tak pernah bocorkan stack trace. Security header via helmet.
 - Lihat `docs/security_compliance.md` untuk peta kontrol per requirement.
+
+## Skrip sekali-pakai
+
+Skrip sekali-pakai (scratch, probe, query manual, migrasi ad-hoc) **tidak boleh**
+diletakkan di root package. Tempatnya di `scripts/`, dengan nama yang jujur,
+mengambil koneksi/kredensial dari environment (`src/config/env.ts`) — **tidak
+pernah** kredensial hardcoded — dan didaftarkan di `package.json` scripts bila
+akan dipakai ulang. Pola scratch/probe di root sudah di-ignore lewat `.gitignore`
+supaya tidak kambuh. Test asli tetap di `test/*.test.ts` (Vitest).

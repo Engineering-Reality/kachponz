@@ -1,0 +1,12 @@
+# One-off scratch/probe scripts must NEVER be committed to the package root.
+# See README "Skrip sekali-pakai". Real tests live in test/*.test.ts and are
+# unaffected: these patterns are anchored to the package root (leading "/")
+# and only cover .cjs/.js/.mjs, never *.test.ts.
+/scratch*
+/fix_*.cjs
+/fix_*.js
+/query_*.cjs
+/query_*.js
+/query_*.mjs
+/test_*.cjs
+/test_*.mjs
