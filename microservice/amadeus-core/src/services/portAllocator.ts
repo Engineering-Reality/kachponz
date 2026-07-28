@@ -11,7 +11,7 @@ export interface PortRange {
   endPort: number;
 }
 
-export class PortRangeExhaustedError extends Error {
+class PortRangeExhaustedError extends Error {
   constructor(range: PortRange) {
     super(`No free port available in range ${range.host}:${range.startPort}-${range.endPort}`);
     this.name = 'PortRangeExhaustedError';

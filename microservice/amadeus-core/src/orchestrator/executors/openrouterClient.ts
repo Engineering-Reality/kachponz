@@ -17,7 +17,7 @@
 import { env } from '../../config/env.js';
 import { logLlmUsageEvent, measurementBodyOverrides } from '../../telemetry/llmUsage.js';
 
-export interface OpenRouterChatMessage {
+interface OpenRouterChatMessage {
   role: 'system' | 'user' | 'assistant';
   content:
     | string

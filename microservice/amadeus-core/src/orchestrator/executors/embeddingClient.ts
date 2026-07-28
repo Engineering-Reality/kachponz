@@ -10,7 +10,7 @@
 
 import { env } from '../../config/env.js';
 
-export class EmbeddingApiError extends Error {
+class EmbeddingApiError extends Error {
   constructor(
     public readonly status: number,
     message: string,

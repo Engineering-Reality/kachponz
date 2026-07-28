@@ -13,7 +13,7 @@
  *    tetap by service account, bukan by hint ini).
  */
 
-export interface StepDef {
+interface StepDef {
   readonly next: readonly string[];
   readonly financial?: boolean;
   readonly actorHint?: string;
