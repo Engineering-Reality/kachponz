@@ -20,8 +20,9 @@ async function main() {
   const entries: Array<{ title: string; text: string }> = JSON.parse(fs.readFileSync(ENTRIES_PATH, 'utf8'));
 
   const existing = await query('SELECT count(*) FROM kb_documents WHERE kb_id = $1', [SWIFT_KB_ID]);
-  if (Number(existing.rows[0].count) > 0) {
-    console.log(`kb_documents already has ${existing.rows[0].count} rows for SWIFT KB — skipping (idempotent).`);
+  const existingRow = existing.rows[0];
+  if (existingRow && Number(existingRow.count) > 0) {
+    console.log(`kb_documents already has ${existingRow.count} rows for SWIFT KB — skipping (idempotent).`);
     await closePool();
     return;
   }
