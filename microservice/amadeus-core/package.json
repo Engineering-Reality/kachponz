@@ -23,6 +23,7 @@
     "tool:set-local-mode": "tsx scripts/setToolLocalMode.ts",
     "test": "NODE_ENV=test vitest run",
     "test:watch": "NODE_ENV=test vitest",
+    "test:contract": "NODE_ENV=test vitest run test/mcpStatusContract.test.ts",
     "typecheck": "tsc --noEmit -p tsconfig.json",
     "preflight": "node scripts/preflight-windows.mjs",
     "measure": "node scripts/measure-footprint.mjs"

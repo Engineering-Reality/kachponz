@@ -1,0 +1,36 @@
+# INTERIM CI — MCP status BE/FE drift guard only.
+#
+# This runs the ONE contract test that keeps the frontend's copy of the MCP
+# status vocabulary in sync with the amadeus-core source of truth
+# (src/types/mcpStatus.ts vs frontend/src/lib/mcpStatus.ts). It needs no
+# database, so it can gate every PR cheaply and immediately.
+#
+# It is deliberately NOT the full `npm test`: the rest of the amadeus-core
+# suite is DB-backed (Postgres, migrations, .env.test) and standing that up in
+# CI is part of the smoke-test-harness work (fe.md item C). When that lands,
+# replace `npm run test:contract` here with the full suite + a Postgres
+# service, and drop this "interim" note.
+name: CI Tests
+
+on:
+  pull_request:
+    branches:
+      - main
+      - develop
+
+jobs:
+  contract:
+    name: MCP status drift guard
+    runs-on: ubuntu-latest
+    defaults:
+      run:
+        working-directory: microservice/amadeus-core
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+          cache-dependency-path: microservice/amadeus-core/package-lock.json
+      - run: npm ci
+      - run: npm run test:contract

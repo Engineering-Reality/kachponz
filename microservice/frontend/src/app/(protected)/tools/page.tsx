@@ -4,6 +4,7 @@ import { useEffect, useState } from "react";
 import { RainbowRibbonLoader } from "@/components/RainbowRibbonLoader";
 import { Select } from "@/components/Select";
 import { McpManagerBanner } from "@/components/McpManagerBanner";
+import { toMcpStatus, type McpStatus } from "@/lib/mcpStatus";
 import {
   RefreshCw,
   Plus,
@@ -27,6 +28,45 @@ import {
   Globe,
   Cpu,
 } from "lucide-react";
+
+// Live runtime state per tool, as returned by GET /orchestrator/mcp/status.
+// `method` and `status` arrive as separate fields — the UI composes the label,
+// the API never does (fe.md A4).
+type LiveStatus = {
+  port: number | null;
+  status: string; // raw wire value; always narrowed via toMcpStatus() before use
+  method: string | null;
+  updatedAt: string | null;
+  lastError: string | null;
+};
+
+// Presentation for each status. Exhaustive over the McpStatus union, but every
+// LOOKUP goes through toMcpStatus() first so an unrecognised value (BE/FE
+// drift) renders as 'unknown' instead of crashing or falling through blank.
+const STATUS_UI: Record<McpStatus, { label: string; dot: string; text: string }> = {
+  running: { label: "Running", dot: "bg-green-500 animate-pulse", text: "text-green-700" },
+  starting: { label: "Starting", dot: "bg-amber-400 animate-pulse", text: "text-amber-600" },
+  stopped: { label: "Stopped", dot: "bg-slate-400", text: "text-slate-500 dark:text-slate-400" },
+  crashed: { label: "Crashed", dot: "bg-red-500", text: "text-red-600" },
+  "on-demand": { label: "On-demand", dot: "bg-cyan-400", text: "text-cyan-600 dark:text-cyan-400" },
+  unknown: { label: "Unknown", dot: "bg-slate-300", text: "text-slate-400 dark:text-slate-500" },
+};
+
+// "checked 12s ago" — surfaces how fresh a reading is so a stale one is
+// visibly stale rather than silently trusted. Not a heartbeat yet (see the
+// updatedAt note on the backend endpoint), so this is informational.
+function timeAgo(iso: string | null): string | null {
+  if (!iso) return null;
+  const ms = Date.now() - new Date(iso).getTime();
+  if (Number.isNaN(ms) || ms < 0) return null;
+  const s = Math.floor(ms / 1000);
+  if (s < 60) return `${s}s ago`;
+  const m = Math.floor(s / 60);
+  if (m < 60) return `${m}m ago`;
+  const h = Math.floor(m / 60);
+  if (h < 24) return `${h}h ago`;
+  return `${Math.floor(h / 24)}d ago`;
+}
 
 export default function ToolsPage() {
   const [tools, setTools] = useState<any[]>([]);
@@ -52,7 +92,7 @@ export default function ToolsPage() {
   // GET /orchestrator/mcp/status — the ONLY place a currently-live SSE port
   // is recorded. Ports are assigned dynamically at process-start, so there is
   // no static value to show until the tool has actually been started.
-  const [mcpStatus, setMcpStatus] = useState<Record<string, { port: number | null; status: string }>>({});
+  const [mcpStatus, setMcpStatus] = useState<Record<string, LiveStatus>>({});
 
   const [starredTools, setStarredTools] = useState<string[]>([]);
   useEffect(() => {
@@ -127,9 +167,24 @@ export default function ToolsPage() {
     try {
       const res = await fetch("/api/orchestrator/mcp/status");
       if (!res.ok) return;
-      const rows: Array<{ toolId: string; port: number | null; status: string }> = await res.json();
-      const next: Record<string, { port: number | null; status: string }> = {};
-      for (const row of rows) next[row.toolId] = { port: row.port, status: row.status };
+      const rows: Array<{
+        toolId: string;
+        port: number | null;
+        status: string;
+        method: string | null;
+        updatedAt: string | null;
+        lastError: string | null;
+      }> = await res.json();
+      const next: Record<string, LiveStatus> = {};
+      for (const row of rows) {
+        next[row.toolId] = {
+          port: row.port,
+          status: row.status,
+          method: row.method ?? null,
+          updatedAt: row.updatedAt ?? null,
+          lastError: row.lastError ?? null,
+        };
+      }
       setMcpStatus(next);
     } catch {
       // Best-effort — the tools list itself still works if this polling fails.
@@ -525,6 +580,16 @@ export default function ToolsPage() {
       return a.name.localeCompare(b.name);
     });
 
+  // Two independent axes, counted separately (fe.md A2):
+  //  - running: live truth from /orchestrator/mcp/status
+  //  - enabled: the on_status toggle (whether the daemon is asked to keep it up)
+  const runningCount = tools.filter(
+    (t) => toMcpStatus(mcpStatus[t.tool_id]?.status) === "running",
+  ).length;
+  const enabledCount = tools.filter(
+    (t) => !t.on_status?.toLowerCase().includes("offline"),
+  ).length;
+
   return (
     <div className="p-8 max-w-6xl mx-auto">
       <McpManagerBanner />
@@ -536,7 +601,8 @@ export default function ToolsPage() {
           <h1 className="section-head text-3xl text-slate-900 dark:text-white mb-1">Tools Registry</h1>
           <p className="text-sm text-slate-500 dark:text-slate-400">
             {tools.length} MCP server{tools.length !== 1 ? "s" : ""} registered ·{" "}
-            {tools.filter(t => !t.on_status?.toLowerCase().includes("offline")).length} active &amp; running
+            <span className="text-green-600 dark:text-green-400 font-medium">{runningCount} running</span> ·{" "}
+            {enabledCount} enabled
           </p>
         </div>
         <div className="flex items-center gap-3">
@@ -659,11 +725,17 @@ export default function ToolsPage() {
       ) : (
         <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
           {filteredTools.map((tool) => {
-            const isActive = !tool.on_status?.toLowerCase().includes("offline");
+            // Enablement toggle (on_status) — is the daemon asked to keep this
+            // tool alive? Distinct from whether it is actually running.
+            const isEnabled = !tool.on_status?.toLowerCase().includes("offline");
             const { command, args, method, isLegacyStringArgs } = parseVersions(tool);
             const argsDisplay = isLegacyStringArgs ? args.join(" ") : `${command} ${args.join(" ")}`.trim();
             const jsonSnippet = getJsonSnippet(tool, command, args, method);
             const liveStatus = mcpStatus[tool.tool_id];
+            // Live truth, narrowed so an unknown value can never mislabel.
+            const live: McpStatus = toMcpStatus(liveStatus?.status);
+            const liveUi = STATUS_UI[live];
+            const checkedAgo = timeAgo(liveStatus?.updatedAt ?? null);
 
             return (
               <div
@@ -675,7 +747,7 @@ export default function ToolsPage() {
                   <button onClick={() => toggleStar(tool.tool_id)} title="Favorite" className="p-1.5 bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-700 text-slate-400 dark:text-slate-500 hover:text-amber-500 hover:border-amber-200 hover:bg-amber-50 rounded-lg shadow-sm transition-all">
                     <Star className={`w-3.5 h-3.5 ${starredTools.includes(tool.tool_id) ? "fill-amber-400 text-amber-500" : ""}`} />
                   </button>
-                  {isActive && (
+                  {isEnabled && (
                     <button
                       onClick={() => restartTool(tool.tool_id)}
                       disabled={restartingId === tool.tool_id}
@@ -698,18 +770,36 @@ export default function ToolsPage() {
 
                 {/* Header */}
                 <div className="flex items-start gap-4 mb-4 pr-16">
-                  <div className={`w-12 h-12 rounded-2xl ${isActive ? "bg-yellow-50 border border-yellow-100 text-yellow-600" : "bg-slate-50 dark:bg-slate-800/50 border border-slate-100 dark:border-slate-800 text-slate-400 dark:text-slate-500"} flex items-center justify-center flex-shrink-0 shadow-sm`}>
-                    {getDynamicIcon(tool.name, isActive)}
+                  <div className={`w-12 h-12 rounded-2xl ${isEnabled ? "bg-yellow-50 border border-yellow-100 text-yellow-600" : "bg-slate-50 dark:bg-slate-800/50 border border-slate-100 dark:border-slate-800 text-slate-400 dark:text-slate-500"} flex items-center justify-center flex-shrink-0 shadow-sm`}>
+                    {getDynamicIcon(tool.name, isEnabled)}
                   </div>
-                  <div>
+                  <div className="min-w-0">
                     <h3 className="font-semibold text-slate-900 dark:text-white text-base leading-snug">{tool.name}</h3>
-                    <div className="flex items-center gap-2 mt-1">
-                      <span className={`badge text-[9px] px-2 py-0.5 rounded-full ${isActive ? "badge-green" : "badge-slate"}`}>
-                        <span className={`w-1.5 h-1.5 rounded-full mr-1 inline-block ${isActive ? "bg-green-500 animate-pulse" : "bg-slate-400"}`} />
-                        {isActive ? "Active" : "Offline"}
+                    <div className="flex flex-wrap items-center gap-x-2 gap-y-1 mt-1.5">
+                      {/* Live status — the ground truth from /orchestrator/mcp/status */}
+                      <span className={`badge text-[9px] px-2 py-0.5 rounded-full inline-flex items-center bg-slate-50 dark:bg-slate-800/60 border border-slate-100 dark:border-slate-700 ${liveUi.text}`}>
+                        <span className={`w-1.5 h-1.5 rounded-full mr-1 inline-block ${liveUi.dot}`} />
+                        {liveUi.label}
+                      </span>
+                      {checkedAgo && (
+                        <span className="text-[9px] text-slate-400 dark:text-slate-500" title={`Last state change ${checkedAgo}`}>
+                          checked {checkedAgo}
+                        </span>
+                      )}
+                      {/* Enablement toggle — a separate concept from liveness */}
+                      <span
+                        className={`badge text-[9px] px-2 py-0.5 rounded-full ${isEnabled ? "badge-green" : "badge-slate"}`}
+                        title="Enablement toggle (on_status) — whether the daemon is asked to keep this tool alive. Not the same as whether it is running."
+                      >
+                        {isEnabled ? "Enabled" : "Disabled"}
                       </span>
                       <span className="text-[10px] font-mono text-slate-400 dark:text-slate-500">Transport: <span className="font-medium text-slate-600 dark:text-slate-400">{method}</span></span>
                     </div>
+                    {live === "crashed" && liveStatus?.lastError && (
+                      <p className="text-[10px] text-red-600 mt-1 font-mono break-all line-clamp-2" title="Last recorded error">
+                        {liveStatus.lastError.slice(0, 140)}{liveStatus.lastError.length > 140 ? "…" : ""}
+                      </p>
+                    )}
                   </div>
                 </div>
 
@@ -783,17 +873,17 @@ export default function ToolsPage() {
                     <div className="flex justify-between border-r border-slate-100 dark:border-slate-800 pr-2">
                       <span className="text-slate-400 dark:text-slate-500">Live Port</span>
                       {method === "sse" ? (
-                        liveStatus?.status === "running" && liveStatus.port ? (
+                        live === "running" && liveStatus?.port ? (
                           <span className="text-green-700 font-semibold flex items-center gap-1">
                             <span className="w-1.5 h-1.5 rounded-full bg-green-500 animate-pulse" /> :{liveStatus.port}
                           </span>
                         ) : (
-                          <span className="text-slate-400 dark:text-slate-500 font-semibold flex items-center gap-1">
-                            <span className="w-1.5 h-1.5 rounded-full bg-slate-300" /> stopped
+                          <span className={`font-semibold flex items-center gap-1 ${liveUi.text}`}>
+                            <span className={`w-1.5 h-1.5 rounded-full ${liveUi.dot}`} /> {liveUi.label.toLowerCase()}
                           </span>
                         )
                       ) : (
-                        <span className="text-slate-400 dark:text-slate-500 font-semibold">n/a (stdio)</span>
+                        <span className="text-cyan-600 dark:text-cyan-400 font-semibold">n/a (stdio)</span>
                       )}
                     </div>
                     <div className="flex justify-between pl-2">
@@ -832,13 +922,13 @@ export default function ToolsPage() {
               </div>
               <div className="grid grid-cols-2 gap-4">
                 <div>
-                  <label className="form-label">Status</label>
+                  <label className="form-label">Enablement <span className="normal-case font-normal text-slate-400 dark:text-slate-500">(keep-alive toggle, not live status)</span></label>
                   <Select
                     value={formData.on_status}
                     onChange={(v) => setFormData({ ...formData, on_status: v })}
                     options={[
-                      { value: "Online", label: "Online" },
-                      { value: "Offline", label: "Offline" },
+                      { value: "Online", label: "Enabled" },
+                      { value: "Offline", label: "Disabled" },
                     ]}
                     triggerClassName="rounded-xl"
                   />
@@ -861,11 +951,14 @@ export default function ToolsPage() {
                   <label className="form-label">Live Port</label>
                   <div className="form-input rounded-xl border-slate-200 dark:border-slate-700 bg-slate-50 dark:bg-slate-800/50 text-slate-400 dark:text-slate-500 flex items-center gap-2 cursor-not-allowed">
                     {(() => {
-                      const live = currentTool ? mcpStatus[currentTool.tool_id] : undefined;
-                      if (live?.status === "running" && live.port) {
-                        return <><span className="w-1.5 h-1.5 rounded-full bg-green-500 animate-pulse" /> running on :{live.port}</>;
+                      const liveRow = currentTool ? mcpStatus[currentTool.tool_id] : undefined;
+                      const s = toMcpStatus(liveRow?.status);
+                      if (s === "running" && liveRow?.port) {
+                        return <><span className="w-1.5 h-1.5 rounded-full bg-green-500 animate-pulse" /> running on :{liveRow.port}</>;
                       }
-                      return <><span className="w-1.5 h-1.5 rounded-full bg-slate-300" /> not started yet — assigned automatically when the server starts</>;
+                      const ui = STATUS_UI[s];
+                      const suffix = s === "unknown" ? " — assigned automatically when the server starts" : "";
+                      return <><span className={`w-1.5 h-1.5 rounded-full ${ui.dot}`} /> {ui.label.toLowerCase()}{suffix}</>;
                     })()}
                   </div>
                 </div>

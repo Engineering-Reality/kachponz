@@ -21,6 +21,7 @@ import { getRecipeForAgent, upsertRecipeForAgent, deleteRecipeForAgent } from '.
 import { runRecipeStream } from './recipes/executor.js';
 import type { RecipeDef } from './recipes/types.js';
 import { DomainError } from '../types/domain.js';
+import { toMcpStatus, type McpStatus, type McpMethod } from '../types/mcpStatus.js';
 import { suggestFieldValue } from './executors/autofillClient.js';
 import { suggestFollowUps } from './executors/recommendationClient.js';
 import { suggestChatTitle } from './executors/chatTitleClient.js';
@@ -409,10 +410,12 @@ export async function registerOrchestratorRoutes(app: FastifyInstance): Promise<
         status: string | null;
         pid: number | null;
         started_at: string | null;
+        updated_at: string | null;
         last_error: string | null;
       }>(
         `SELECT t.tool_id, t.name AS tool_name, t.versions,
-                mrs.method AS mrs_method, mrs.port, mrs.status, mrs.pid, mrs.started_at, mrs.last_error
+                mrs.method AS mrs_method, mrs.port, mrs.status, mrs.pid,
+                mrs.started_at, mrs.updated_at, mrs.last_error
          FROM tools t
          LEFT JOIN mcp_runtime_state mrs ON mrs.tool_id = t.tool_id
          ORDER BY t.name ASC`,
@@ -427,8 +430,28 @@ export async function registerOrchestratorRoutes(app: FastifyInstance): Promise<
           // mrs.method (actual runtime-recorded value) takes priority over the
           // tool's stored config — it's the ground truth for what's currently
           // live, and could momentarily differ from a since-edited tool row.
-          const method: string | null = r.mrs_method ?? release?.method ?? null;
-          const status = r.status ?? (method === 'stdio' ? 'stdio (spawned on demand)' : 'stopped');
+          const rawMethod: string | null = r.mrs_method ?? release?.method ?? null;
+          const method: McpMethod | null =
+            rawMethod === 'stdio' || rawMethod === 'sse' ? rawMethod : null;
+
+          // `method` and `status` are returned as two SEPARATE fields — the
+          // API never composes a UI sentence (that's the frontend's job).
+          //  - stdio tools are spawned per-call and have no persistent process
+          //    or runtime row, so their status is the dedicated 'on-demand'
+          //    category rather than a fake running/stopped.
+          //  - an sse tool with a runtime row reports that row's status.
+          //  - an sse tool with NO row has genuinely never started; that is
+          //    'unknown' (no data), NOT 'stopped' — only an explicit stop is
+          //    'stopped'. toMcpStatus() also coerces any unrecognised DB value
+          //    to 'unknown' so a bad row can't mislabel a tool as running.
+          let status: McpStatus;
+          if (method === 'stdio') {
+            status = 'on-demand';
+          } else if (r.status != null) {
+            status = toMcpStatus(r.status);
+          } else {
+            status = 'unknown';
+          }
 
           return {
             toolId: r.tool_id,
@@ -438,6 +461,13 @@ export async function registerOrchestratorRoutes(app: FastifyInstance): Promise<
             status,
             pid: r.pid,
             startedAt: r.started_at,
+            // Raw last-write timestamp so the UI can show "checked Xs ago" and
+            // make a stale reading visibly stale. NOTE: this is NOT yet a
+            // heartbeat — fn_reserve_mcp_port only bumps updated_at on a state
+            // TRANSITION, so a healthy long-running tool's updated_at just
+            // ages. Auto-downgrading stale 'running' -> 'unknown' must wait for
+            // the periodic re-probe that writes last_checked_at (fe.md item 3).
+            updatedAt: r.updated_at,
             lastError: r.last_error,
           };
         }),
