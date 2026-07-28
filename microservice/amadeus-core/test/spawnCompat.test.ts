@@ -2,6 +2,7 @@ import { afterEach, describe, expect, it } from "vitest";
 import { existsSync, readFileSync } from "node:fs";
 import { join } from "node:path";
 import {
+  assertSpawnSafe,
   getPackageRoot,
   hardenNpxArgs,
   quoteCmdArg,
@@ -49,7 +50,7 @@ describe("resolveSpawnTarget (SSE path — mcpAutoManager)", () => {
     expect(result.options).toEqual({ windowsVerbatimArguments: true, cwd: ROOT });
   });
 
-  it("does not wrap node/python on Windows in cmd.exe, but still pins cwd", () => {
+  it("does not wrap node on Windows in cmd.exe, but still pins cwd", () => {
     setPlatform("win32");
     const result = resolveSpawnTarget("node", ["C:\\tools\\mcp-uipath\\build\\index.js"]);
     expect(result.command).not.toBe("cmd.exe");
@@ -89,6 +90,25 @@ describe("resolveSpawnTarget (SSE path — mcpAutoManager)", () => {
   it("rejects an argument containing shell metacharacters", () => {
     setPlatform("linux");
     expect(() => resolveSpawnTarget("node", ["index.js", "$(whoami)"])).toThrow(/metacharacters/);
+  });
+});
+
+// CISO rule: absolutely no Python. `python`/`python3` were removed from
+// ALLOWLISTED_COMMANDS — assertSpawnSafe must now reject them like any other
+// non-allowlisted command. This permanently closes Python/uvx-based MCP
+// servers (accepted trade-off, see docs/security-audit.md).
+describe("assertSpawnSafe rejects python (removed from allowlist)", () => {
+  it("throws for python", () => {
+    expect(() => assertSpawnSafe("python", [])).toThrow(/not allowlisted/);
+  });
+
+  it("throws for python3", () => {
+    expect(() => assertSpawnSafe("python3", [])).toThrow(/not allowlisted/);
+  });
+
+  it("still allows node and npx", () => {
+    expect(() => assertSpawnSafe("node", ["/abs/index.js"])).not.toThrow();
+    expect(() => assertSpawnSafe("npx", ["--no-install", "pkg"])).not.toThrow();
   });
 });
 
@@ -132,7 +152,7 @@ describe("hardenNpxArgs (shared by SSE + stdio spawn paths)", () => {
     expect(hardenNpxArgs("npx", ["-y", "pkg"])).toEqual(["-y", "pkg"]);
   });
 
-  it("is a no-op for non-npx commands (node/python)", () => {
+  it("is a no-op for non-npx commands (node)", () => {
     process.env.NODE_ENV = "production";
     expect(hardenNpxArgs("node", ["-y", "/abs/index.js"])).toEqual(["-y", "/abs/index.js"]);
   });

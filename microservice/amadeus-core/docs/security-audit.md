@@ -51,6 +51,31 @@ Penting dicantumkan agar jelas ini sudah diperiksa, bukan terlewat.
 
 ---
 
+## Keputusan: Python dihapus dari allowlist (spawn) — permanen
+
+`ALLOWLISTED_COMMANDS` (`src/lib/spawnCompat.ts`) dulu `["npx","node","python",
+"python3"]`; kini `["npx","node"]`. `assertSpawnSafe()` sekarang **throw** untuk
+`python`/`python3` di ketiga call site spawn.
+
+**Konsekuensi (diterima, bukan kelalaian):** keputusan ini secara **permanen**
+menutup pemakaian MCP server berbasis Python (ekosistem **uvx/uv**). Tidak ada
+lagi jalur untuk menjalankan tool `python …`/`python3 …` dari `tools`. Trade-off
+ini diambil atas aturan CISO absolut "tidak boleh ada Python sama sekali".
+
+**Verifikasi sebelum penghapusan (`SELECT DISTINCT command FROM tools`):** command
+token yang benar-benar dipakai = `node`, `npx`, `python`. Satu-satunya baris
+python = **`Supabase MCP` v1.1.0**, dengan command
+`python C:\Users\…\ponzgen\microservice\mcp_lib\supabase_rag_mcp\app_mcp_rag.py`
+— sebuah **path Windows** pada host Linux ini, ber-status `Inactive`. Artinya
+tool itu sudah non-fungsional sebelum perubahan; penghapusan python **tidak**
+mematikan tool yang benar-benar jalan. (Versi v1.0.0 tool yang sama memakai
+`npx @supabase/mcp-server-supabase@latest`, tapi engine memilih versi terakhir
+= v1.1.0 python, sehingga tool ini efektif python-only.) Dilaporkan di sini,
+sesuai perintah, sebelum merge.
+
+Test: `test/spawnCompat.test.ts` — `assertSpawnSafe('python'|'python3', [])`
+harus throw `not allowlisted`.
+
 ## Prioritas tindakan
 1. ✅ **#1 (RCE stdio)** & **#4 (error leak)** & **#6 (JWT alg)** — done.
    ⚠️ **#2 (backend/.env)** — untracked, **ROTASI + scrub history masih manual user**.
