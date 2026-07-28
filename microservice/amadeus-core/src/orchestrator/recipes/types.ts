@@ -88,7 +88,7 @@ export interface RecipeDef {
   // recipe whose tools take human-readable names/args directly.
 }
 
-export interface RecipeIterationResult {
+interface RecipeIterationResult {
   iteration: number;
   status: 'success' | 'failed' | 'aborted';
   detail: string;

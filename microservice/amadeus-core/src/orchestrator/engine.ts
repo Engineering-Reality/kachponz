@@ -29,9 +29,9 @@ import { logLlmUsageEvent, measurementBodyOverrides } from "../telemetry/llmUsag
 
 const mcpHost = loadPortRange().host;
 
-export type InvocationMode = 'playground' | 'production';
+type InvocationMode = 'playground' | 'production';
 
-export type McpServerHealth = {
+type McpServerHealth = {
   toolName: string;
   toolId: string;
   status: 'connected' | 'connect_failed' | 'list_tools_failed' | 'no_versions' | 'not_running';
@@ -890,7 +890,7 @@ export async function fetchAgentUipathContext(agentId: string): Promise<UipathCo
   return results;
 }
 
-export type QueueTransactionItem = { id: number; status: string; reference: string | null; createdAt: string | null };
+type QueueTransactionItem = { id: number; status: string; reference: string | null; createdAt: string | null };
 
 /**
  * Backs the Robots dashboard's row-expand ("show queue items for this job's

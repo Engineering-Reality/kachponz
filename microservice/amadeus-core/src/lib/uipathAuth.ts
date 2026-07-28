@@ -31,7 +31,7 @@ export interface UiPathCredentials {
 
 const DEFAULT_SCOPES = 'OR.Jobs OR.Robots.Read OR.Execution OR.Queues OR.Monitoring';
 
-export type UipathAuthFailureCause = 'network' | 'credentials' | 'server' | 'rate_limit';
+type UipathAuthFailureCause = 'network' | 'credentials' | 'server' | 'rate_limit';
 
 /**
  * Typed failure surfaced by getUiPathToken so callers can distinguish "UiPath

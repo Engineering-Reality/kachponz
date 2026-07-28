@@ -68,7 +68,7 @@ function splitStepWriteRow(row: StepWriteRow): {
   };
 }
 
-export interface CreateTxInput {
+interface CreateTxInput {
   type: string;
   payload?: Record<string, unknown>;
   idempotencyKey: string;
@@ -109,7 +109,7 @@ export async function createTransaction(
   });
 }
 
-export interface CompleteStepInput {
+interface CompleteStepInput {
   step: string; // step yang DISELESAIKAN (harus == current_step)
   idempotencyKey: string;
   reason?: string;
@@ -117,7 +117,7 @@ export interface CompleteStepInput {
   targetStep?: string;
 }
 
-export interface CompleteStepResult {
+interface CompleteStepResult {
   transaction: Transaction;
   event: TransactionEvent;
   idempotentReplay: boolean;
@@ -247,14 +247,14 @@ export async function completeStep(
   }
 }
 
-export interface FailStepInput {
+interface FailStepInput {
   step: string;
   idempotencyKey: string;
   reason: string;
   payload?: Record<string, unknown>;
 }
 
-export interface FailStepResult {
+interface FailStepResult {
   transaction: Transaction;
   event: TransactionEvent;
   idempotentReplay: boolean;

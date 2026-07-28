@@ -25,7 +25,7 @@ pool.on('error', (err) => {
   console.error('[pg] idle client error:', err.message);
 });
 
-export type QueryParams = ReadonlyArray<unknown>;
+type QueryParams = ReadonlyArray<unknown>;
 
 /** Query berparameter. Text query TIDAK PERNAH diinterpolasi dengan input user. */
 export async function query<T extends pg.QueryResultRow = pg.QueryResultRow>(

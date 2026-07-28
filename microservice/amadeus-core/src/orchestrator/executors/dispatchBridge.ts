@@ -20,7 +20,7 @@ import { DomainError } from '../../types/domain.js';
 import type { ExecutorOutcome } from './base.js';
 import { logger } from '../../lib/logger.js';
 
-export interface StepDispatchResult {
+interface StepDispatchResult {
   outcome: ExecutorOutcome['kind'];
   executor: string;
   step: string;

@@ -18,7 +18,7 @@
  *    saat selesai. Outcome-nya "dispatched", bukan "completed".
  */
 
-export type ExecutorKind = 'llm' | 'uipath' | 'pad';
+type ExecutorKind = 'llm' | 'uipath' | 'pad';
 
 export interface ExecutorContext {
   transactionId: string;
@@ -54,7 +54,7 @@ export type ExecutorOutcome =
       resultData?: Record<string, unknown>;
     };
 
-export interface ExecutorCapability {
+interface ExecutorCapability {
   /** step yang bisa ditangani executor ini. */
   step: string;
   /** tipe transaksi yang didukung. */
@@ -63,7 +63,7 @@ export interface ExecutorCapability {
   financial: boolean;
 }
 
-export interface ExecutorDescriptor {
+interface ExecutorDescriptor {
   id: string;
   displayName: string;
   kind: ExecutorKind;
