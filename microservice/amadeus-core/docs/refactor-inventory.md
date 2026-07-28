@@ -223,8 +223,11 @@ Q2 & Q4 terjawab — sekarang terjawab: keduanya LIVE, dipertahankan).
   ~11.5k baris tanpa test (baru 1 file test) berisiko; ditahan sampai FASE 6
   (test karakterisasi) sesuai urutan prompt.
 
-`tsc --noEmit` bersih (kecuali 2 error pre-existing di
-`scripts/seedSwiftKbSynthetic.ts`, tak terkait). `spawnCompat.test.ts` 12/12 lulus.
+`tsc --noEmit` menyisakan error pre-existing tak-terkait. (KOREKSI 2026-07-28:
+bukan 2 tapi **3** — `scripts/seedSwiftKbSynthetic.ts:23,24` **dan**
+`a2a/agentCard.ts:29`, semuanya `noUncheckedIndexedAccess` "possibly undefined",
+di luar cakupan branch security. Lihat security-audit.md "Status tsc pra-merge".)
+`spawnCompat.test.ts` 12/12 lulus.
 
 **Sisa sesuai urutan prompt:** FASE 6 (test karakterisasi) → baru FASE 4 (pecah
 `engine.ts`). Belum dikerjakan.
