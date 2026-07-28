@@ -19,7 +19,7 @@ import { z } from "zod";
 import { BaseMessage } from "@langchain/core/messages";
 import { randomUUID } from "node:crypto";
 import { loadPortRange } from "../services/portAllocator.js";
-import { assertSpawnSafe } from "../lib/spawnCompat.js";
+import { assertSpawnSafe, getPackageRoot, hardenNpxArgs } from "../lib/spawnCompat.js";
 import { resolveCorsOrigin } from "../config/cors.js";
 import { jsonSchemaToZod } from "./jsonSchemaToZod.js";
 import { callFn } from "../db/rpc.js";
@@ -489,8 +489,10 @@ async function loadMcpTools(
         // already resolves .cmd/.bat shims (npx/npm) correctly cross-platform.
         return new StdioClientTransport({
           command: release.command || "node",
-          args: Array.isArray(release.args) ? release.args : [],
+          // Harden npx + pin cwd, same as mcpAutoManager (security-audit.md #1, A2).
+          args: hardenNpxArgs(release.command || "node", Array.isArray(release.args) ? release.args : []),
           env: { ...process.env, ...(release.env || {}) },
+          cwd: getPackageRoot(),
         });
       }
       return null;
@@ -690,6 +692,14 @@ export async function connectToMcpToolById(toolId: string, clientName: string): 
     throw new Error('Tool not connectable (unsupported/legacy config)');
   }
 
+  // Same allowlist gate as loadMcpTools() (see the assertSpawnSafe call in that
+  // fn) — this is the THIRD stdio spawn call site (recipe executor, context
+  // panel, robots dashboard all reach it) and without this check it is a direct
+  // bypass of finding #1's allowlist. Fail closed on a non-allowlisted command.
+  if (release.method === 'stdio') {
+    assertSpawnSafe(release.command, Array.isArray(release.args) ? release.args : []);
+  }
+
   let ssePort: number | null = null;
   if (release.method === 'sse') {
     // See fn_touch_mcp_runtime.sql: marks recent use (resets the idle-timeout
@@ -716,8 +726,10 @@ export async function connectToMcpToolById(toolId: string, clientName: string): 
       ? new SSEClientTransport(new URL(`http://${mcpHost}:${ssePort}/sse`))
       : new StdioClientTransport({
           command: release.command || 'node',
-          args: Array.isArray(release.args) ? release.args : [],
+          // Harden npx + pin cwd, same as mcpAutoManager (security-audit.md #1, A2).
+          args: hardenNpxArgs(release.command || 'node', Array.isArray(release.args) ? release.args : []),
           env: { ...process.env, ...(release.env || {}) },
+          cwd: getPackageRoot(),
         });
 
   return withMcpRetry(async () => {
