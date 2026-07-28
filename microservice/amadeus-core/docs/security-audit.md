@@ -1,11 +1,11 @@
 # FASE 5 — Audit Keamanan Backend (amadeus-core)
 
-> Scope: `microservice/amadeus-core`. Tanggal: 2026-07-27.
+> Scope: `microservice/amadeus-core`. Tanggal: 2026-07-27 (update 2026-07-28: #13).
 > Metodologi: baca jalur auth end-to-end, telusuri tiap `fetch()`/`spawn()`,
 > tiap route yang menerima `id`, tiap titik error→klien, tiap secret.
 > **Belum ada kode yang diubah** — ini laporan. Severity = dampak nyata.
 
-Ringkasan: **2 High, 5 Medium, 5 Low.** Bagian "SUDAH AMAN" di bawah sama
+Ringkasan: **2 High, 6 Medium, 5 Low.** Bagian "SUDAH AMAN" di bawah sama
 pentingnya — menunjukkan apa yang sudah diperiksa dan terbukti benar.
 
 ---
@@ -26,6 +26,7 @@ pentingnya — menunjukkan apa yang sudah diperiksa dan terbukti benar.
 | 10 | **`as any` mematikan pengecekan tipe (S6)** | engine.ts (12), server.ts (9), executor.ts (3), tools.ts (2), orchestrator/routes.ts (2), streamHandler.ts (2) (1 di `a2a/client.ts` hilang saat file dihapus, #4-A2A) | Low | Tiap `as any` = satu cek tipe dimatikan. Sebagian batas library (fastify validation `err as any`, `app as any` saat register) wajar; sisanya sebaiknya `unknown`+Zod. | Ganti tipe benar atau `unknown`+validasi; sisakan batas library dengan komentar. | OPEN |
 | 11 | **Body UiPath Folders di-log 2000 char** | `orchestrator/routes.ts:618` | Low | Bukan token, tapi struktur folder internal ter-log. | Log ringkasan/hitungan, bukan body mentah. | OPEN |
 | 12 | **Endpoint publik shared-agent balikan kolom `tools`** | `routes/featureSharing.ts:201` | Low (verifikasi) | GET `/agent-invoke/shared-agent/:hash` (tanpa auth) mengembalikan `tools`. Pastikan JSONB `tools` tak memuat `env`/secret. | Batasi field publik; jangan sertakan konfigurasi tool sensitif. | OPEN |
+| 13 | **Kredensial API disimpan plaintext di DB (`tools.versions[].released.env`/`.args`)** | `db` kolom `tools.versions` (JSONB); dibaca via `routes/tools.ts:10` `maskSecrets()` | **Med** | Baris di tabel `tools` menyimpan kunci API asli (mis. Linear, GitHub PAT, token Supabase) di `released.env`/`released.headers` — plaintext, tanpa enkripsi at-rest. `maskSecrets()` (`routes/tools.ts:10-18`) menyamarkan nilai **saat dibaca lewat API** (bagus, mitigasi jalur baca), tapi penyimpanannya sendiri tidak berubah. Siapa pun dengan akses baca DB langsung — DBA, dump backup, replika DR, atau backup yang tak sengaja terbagi — mendapat kredensial asli, mem-bypass masking aplikasi sepenuhnya. | Opsi ke depan (belum diputuskan): (a) enkripsi kolom `env`/`headers` at-rest (butuh manajemen kunci + migrasi data existing), atau (b) pindahkan kredensial ke secret manager eksternal dan simpan hanya referensi/ID di kolom DB. **Enkripsi TIDAK diimplementasikan sekarang** — perubahan besar (migrasi + rotasi kunci), sengaja ditunda menunggu arahan. | **OPEN — keputusan tertunda.** Mitigasi ada (masking di jalur baca API), enkripsi at-rest belum. Kunci-kunci yang sudah tersimpan plaintext masuk daftar rotasi manual (lihat bagian "Kredensial lokal" / rotasi produksi di bawah — beda kelas: ini kredensial company milik pengguna platform, bukan dev lokal). |
 
 ---
 
@@ -158,7 +159,8 @@ jaringan bersama, ganti password lokal ini dan hapus DSN fallback.
    300→**60 dtk** diterapkan (branch security ini). **Python** dihapus dari
    allowlist. **A2A** ditunda di balik `A2A_ENABLED` (default off).
 3. Tersisa OPEN: #7 (nonce, backlog), #9 (console.*), #10 (`as any`),
-   #11 (Folders body log), #12 (shared-agent `tools` field).
+   #11 (Folders body log), #12 (shared-agent `tools` field), #13 (kredensial
+   tools plaintext at-rest — keputusan enkripsi/secret-manager tertunda).
 
 **Status tsc pra-merge (jujur):** `tsc --noEmit` menyisakan **3 error
 pre-existing** yang TIDAK diperkenalkan branch ini dan di luar cakupannya —
