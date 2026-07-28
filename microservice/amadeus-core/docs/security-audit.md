@@ -51,6 +51,58 @@ Penting dicantumkan agar jelas ini sudah diperiksa, bukan terlewat.
 
 ---
 
+## Verifikasi pra-merge (B2, B4)
+
+Dua pertanyaan yang sebelumnya menggantung, dijawab terhadap kode nyata.
+
+### B2 — apakah `err.message` ASLI masih masuk log? **YA.**
+
+Perbaikan #4 hanya menggenerik-kan pesan **ke klien**; detail asli tetap
+tercatat di log terstruktur, dengan requestId yang sama dengan yang dikirim
+ke klien:
+
+- `OpenRouterApiError` (`server.ts:159-166`):
+  `req.log.warn({ status: err.status, body: err.body }, err.message)` menulis
+  **status + body upstream mentah + `err.message` asli** ke log; klien hanya
+  dapat `{ code:'OPENROUTER_API_ERROR', message:'Upstream LLM provider returned
+  an error', details:{ requestId: req.id } }`.
+- Error tak dikenal (`server.ts:177`): `req.log.error({ err }, 'unhandled
+  error')` menulis objek `err` penuh (message + stack); klien dapat pesan
+  generik `INTERNAL_ERROR`.
+
+Korelasi: Fastify otomatis menyematkan `reqId: req.id` pada **setiap** baris
+`req.log.*`, dan `req.id` itulah yang dikirim ke klien sebagai `requestId`.
+Jadi satu id menghubungkan respons klien ↔ baris log. Tidak menukar kebocoran
+dengan kebutaan debug.
+
+### B4 — apakah ada tool DB yang mati akibat hardening `--no-install`? **BERISIKO, tapi tidak ada yang saat ini jalan.**
+
+`hardenNpxArgs` menulis-ulang `-y`→`--no-install` di luar `NODE_ENV=development`,
+sehingga paket npx harus sudah ter-install lokal. Cek `node_modules` terhadap
+`SELECT DISTINCT command,args FROM tools` (15 tool, DB runtime — dump di
+`database/tools_rows.sql` sudah basi/8 baris):
+
+| Paket npx (dari `args`) | Ter-install? | Tool | Status DB |
+|---|---|---|---|
+| `mcp-remote` | ❌ MISSING | Linear Official | Inactive |
+| `@modelcontextprotocol/server-github` | ❌ MISSING | Github MCP | Inactive |
+| `@modelcontextprotocol/server-gmail` | ❌ MISSING | mcp-gmail | Offline |
+| `@modelcontextprotocol/server-google-sheets` | ❌ MISSING | mcp-google-sheets | Offline |
+| `@modelcontextprotocol/server-sequential-thinking` | ❌ MISSING | Sequential Thinking | Inactive |
+| `linear-mcp-server` | ❌ MISSING | Linear_1 | Inactive |
+| `@supabase/mcp-server-supabase@latest` | ❌ MISSING | Supabase MCP v1.0.0 | Inactive |
+| `@pegasusheavy/google-mcp` | ❌ MISSING | google-mcp | Inactive |
+
+**SEMUA** paket npx MISSING → di luar dev, tiap tool npx ini akan gagal
+resolve paket. **TAPI:** kedelapan-nya ber-status `Inactive`/`Offline`. Tool
+yang benar-benar `Online` semuanya berbentuk `node <abs>/build/index.js`
+(UiPath/amadeus MCP lokal, tidak butuh install) → **tidak terpengaruh**. Di
+`NODE_ENV=development` `-y` dibiarkan, jadi dev juga tidak rusak.
+
+**Rekomendasi sebelum salah satu tool npx diaktifkan di prod:** pilih sadar —
+(a) pre-install paketnya sebagai dependency amadeus-core, atau (b) nonaktifkan
+tool itu secara eksplisit. Jangan biarkan gagal diam-diam saat diaktifkan.
+
 ## Keputusan: Python dihapus dari allowlist (spawn) — permanen
 
 `ALLOWLISTED_COMMANDS` (`src/lib/spawnCompat.ts`) dulu `["npx","node","python",
