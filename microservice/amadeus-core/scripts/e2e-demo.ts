@@ -28,8 +28,18 @@
  *   UIPATH_RELEASE_MAP      "mt_converted=<key>;swift_released=<key>;settled=<key>"
  *
  * Output: log narasi step-by-step yang bisa di-screenshot.
+ *
+ * Desain: demo ini adalah klien HTTP BLACK-BOX terhadap API amadeus-core yang
+ * berjalan — sengaja TIDAK mengimpor logika domain dari src/. Fungsi lokal
+ * seperti createTransaction/completeStep/explainRoute/failStep hanyalah
+ * pembungkus `fetch` tipis atas endpoint publik; itu bukan duplikasi logika,
+ * justru bentuk e2e yang benar (menguji API dari luar). Fungsi UiPath* adalah
+ * klien REST tipis atas UiPath Cloud (mode live), bukan atas internal amadeus.
+ * Satu-satunya primitive yang dibagi dengan produksi adalah `sleep`, yang kini
+ * berasal dari satu sumber (src/lib/sleep.ts).
  */
 import { createHash, createHmac, randomUUID } from "node:crypto";
+import { sleep } from "../src/lib/sleep.js";
 
 const AMADEUS_API = process.env.AMADEUS_API_BASE ?? "http://127.0.0.1:8080";
 const AMADEUS_KEY = process.env.AMADEUS_ROBOT_KEY ?? "";
@@ -291,10 +301,6 @@ async function getUiPathJobStatus(jobId: string): Promise<string> {
   if (!res.ok) throw new Error(`UiPath job lookup failed ${res.status}`);
   const job = (await res.json()) as { State?: string };
   return job.State ?? "Unknown";
-}
-
-async function sleep(ms: number): Promise<void> {
-  return new Promise((resolve) => setTimeout(resolve, ms));
 }
 
 // ── Demo flow ────────────────────────────────────────────────────────────

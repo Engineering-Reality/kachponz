@@ -16,6 +16,7 @@
  * UipathAuthError.cause and retries only the classes where retrying can help.
  */
 import { logger } from './logger.js';
+import { sleep } from './sleep.js';
 
 const authLogger = logger.child({ module: 'uipathAuth' });
 
@@ -82,10 +83,6 @@ function parseRetryAfterMs(header: string | null): number | null {
 function jittered(ms: number): number {
   const jitter = ms * 0.25 * (Math.random() * 2 - 1);
   return Math.max(0, Math.round(ms + jitter));
-}
-
-function sleep(ms: number): Promise<void> {
-  return new Promise((resolve) => setTimeout(resolve, ms));
 }
 
 const tokenCache = new Map<string, { accessToken: string; expiresAt: number }>();
