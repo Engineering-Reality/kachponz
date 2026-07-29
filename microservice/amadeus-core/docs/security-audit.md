@@ -162,12 +162,14 @@ jaringan bersama, ganti password lokal ini dan hapus DSN fallback.
    #11 (Folders body log), #12 (shared-agent `tools` field), #13 (kredensial
    tools plaintext at-rest — keputusan enkripsi/secret-manager tertunda).
 
-**Status tsc pra-merge (jujur):** `tsc --noEmit` menyisakan **3 error
-pre-existing** yang TIDAK diperkenalkan branch ini dan di luar cakupannya —
+**Status tsc (diperbarui a.md #1):** `tsc --noEmit` kini **BERSIH (0 error)**.
+Tiga error pre-existing `noUncheckedIndexedAccess` "possibly undefined" —
 `scripts/seedSwiftKbSynthetic.ts:23,24` (2) dan `a2a/agentCard.ts:29` (1, hanya
-terpanggil bila `A2A_ENABLED=true`). Semua bertipe `noUncheckedIndexedAccess`
-"possibly undefined". Perbaikannya trivial tapi menyentuh file di luar scope;
-diserahkan sebagai keputusan (bukan didiamkan). Semua test (29) lulus.
+terpanggil bila `A2A_ENABLED=true`) — telah diperbaiki dengan narrowing eksplisit
+(binding lokal), **bukan** `!`/`as`/`ts-ignore` yang hanya memindahkan masalah ke
+runtime. 32 test lulus. (Catatan historis: saat branch security di-merge, ketiga
+error ini masih ada dan sengaja diserahkan sebagai keputusan; a.md #1 yang
+menuntaskannya.)
 
 Setiap perbaikan = commit terpisah (aturan H4). Perbaikan keamanan **tidak**
 dicampur dengan penghapusan dead code / perubahan struktur.

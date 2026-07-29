@@ -240,25 +240,41 @@ Q2 & Q4 terjawab — sekarang terjawab: keduanya LIVE, dipertahankan).
   otoritatif (`transactions.ts` `failStep`, di-import `txFailStep`). Hanya namanya
   yang menyesatkan → **rename** `engine.ts` `failStep` → `failStepFromEnvelope`
   (+ 3 call site). Nol perubahan perilaku.
-- **D1 (scripts/e2e-demo.ts)** — **SENGAJA TIDAK DIUBAH.** Premis audit ("menulis
-  ulang logika produksi") tidak akurat: `createTransaction/completeStep/failStep/
-  explainRoute/…` semuanya thin wrapper `fetch()`/`apiRequest` terhadap API yang
-  berjalan — script ini **sudah** opsi (a) (klien HTTP black-box, sebagaimana
-  seharusnya e2e demo). Satu-satunya "dup" nyata `sleep` beradu dengan helper
-  **privat** non-export di `uipathAuth.ts`; meng-couple demo black-box ke `src`
-  demi 3 baris `sleep` justru salah arah. Dibiarkan.
+- **D1 (scripts/e2e-demo.ts)** — **DISELESAIKAN sbg opsi (a) (commit cdb697a, a.md #5).**
+  Premis audit ("menulis ulang logika produksi") memang tidak akurat untuk mayoritas
+  fungsi: `createTransaction/completeStep/failStep/explainRoute/…` semuanya thin
+  wrapper `fetch()`/`apiRequest` terhadap API yang berjalan — tidak ada padanannya di
+  `src/` untuk diimpor; script ini **sudah** klien HTTP black-box, sebagaimana
+  seharusnya e2e demo. Fungsi `UiPath*` = klien REST tipis atas UiPath Cloud (mode
+  live), bukan atas internal amadeus. **Perubahan yang dilakukan:** hanya `sleep`,
+  satu-satunya dup lintas-modul yang nyata, diangkat ke leaf-util netral baru
+  `src/lib/sleep.ts` dan diimpor oleh `uipathAuth.ts` **dan** `e2e-demo.ts`. Ini
+  mematuhi arahan eksplisit a.md v22 ("sleep harus dari satu sumber") tanpa meng-
+  couple demo ke logika domain — `sleep` adalah primitive waktu, bukan business
+  logic. Header `e2e-demo.ts` kini mendokumentasikan keputusan black-box ini.
 - **D3 (dup non-identik)** — belum dikejar: refactor spekulatif pada basis kode
   ~11.5k baris tanpa test (baru 1 file test) berisiko; ditahan sampai FASE 6
   (test karakterisasi) sesuai urutan prompt.
 
 ## ✅ FASE 2.5 — PEMBERSIHAN EXPORT (2026-07-28, a.md #3)
 
-Cabut `export` dari simbol yang dipakai internal saja (0 import eksternal):
-- 🔽 `EmbeddingApiError` (embeddingClient.ts) — 7 pemakaian internal, 0 eksternal.
-- 🔽 `PortRangeExhaustedError` (portAllocator.ts) — 2 pemakaian internal, 0 eksternal.
-- 🔽 ~46 interface/type yang namanya tak muncul di file selain deklarasi.
+Cabut `export` dari simbol yang dipakai internal saja (0 import eksternal).
+**Total yang benar-benar dicabut: 19** (2 kelas + 17 interface/type) — jauh di
+bawah estimasi kasar "46 tipe + 2 kelas" di prompt, karena setelah pengecualian
+di bawah diterapkan (kontrak, frontend, entrypoint, A2A) hanya 19 yang lolos.
+Angka prompt adalah tebakan pra-pengecualian, bukan target.
 
-Pengecualian (tetap export):
+- 🔽 2 kelas: `EmbeddingApiError` (embeddingClient.ts, 7 pemakaian internal),
+  `PortRangeExhaustedError` (portAllocator.ts, 2 pemakaian internal).
+- 🔽 17 interface/type (commit 1df543e + fc7e4e3): `InvocationMode`,
+  `McpServerHealth`, `QueueTransactionItem` (engine.ts); `ExecutorKind`,
+  `ExecutorCapability`, `ExecutorDescriptor` (executors/base.ts);
+  `StepDispatchResult` (dispatchBridge.ts); `RecipeIterationResult` (recipes/types.ts);
+  `CompleteStepInput`, `CompleteStepResult`, `FailStepInput`, `FailStepResult`,
+  `CreateTxInput` (transactions.ts); `StepDef` (stepFlows.ts);
+  `OpenRouterChatMessage` (openrouterClient.ts); + 2 di pool.ts & uipathAuth.ts.
+
+Pengecualian (tetap export — inilah yang memangkas 46→19):
 - Tipe di signature fungsi yang di-export (kontrak).
 - Tipe yang diimpor frontend (khususnya mcpStatus).
 - Entrypoint (`loadEnv`, `buildServer`, `main()`, `mcpAdapters`).
