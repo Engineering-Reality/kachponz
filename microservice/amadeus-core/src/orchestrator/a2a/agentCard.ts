@@ -25,8 +25,12 @@ export function buildAgentCard(): AgentCard {
   for (const [type, flow] of Object.entries(STEP_FLOWS)) {
     for (const [step, def] of Object.entries(flow.steps)) {
       allSteps.add(step);
-      if (!stepToTypes[step]) stepToTypes[step] = new Set();
-      stepToTypes[step].add(type);
+      let types = stepToTypes[step];
+      if (!types) {
+        types = new Set();
+        stepToTypes[step] = types;
+      }
+      types.add(type);
       if (def.financial) stepFinancial[step] = true;
     }
   }
