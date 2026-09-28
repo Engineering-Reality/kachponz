@@ -6,6 +6,7 @@ import { useTheme } from "next-themes";
 import { ChevronLeft, ChevronRight, ListTree, Moon, Sun, Maximize2, X } from "lucide-react";
 import { BlockView } from "@/components/ebook/Blocks";
 import { BookSpread, type SpreadHandle } from "@/components/ebook/BookSpread";
+import { MobilePager } from "@/components/ebook/MobilePager";
 import { paginate, type PageAtom } from "@/components/ebook/Paginator";
 import type { Block, Book } from "@/components/ebook/types";
 import "@/app/read/ebook-theme.css";
@@ -24,11 +25,14 @@ export default function ReaderV2({ slug }: { slug: string }) {
   const [error, setError] = useState<string | null>(null);
   const [profile, setProfile] = useState<"desktop" | "mobile">("desktop");
   const [pages, setPages] = useState<string[][]>([]);
-  const [spread, setSpread] = useState(0); // desktop: indeks spread
-  const [cur, setCur] = useState(0); // mobile: indeks halaman
+  const [spread, setSpread] = useState(0);
+  const [cur, setCur] = useState(0);
   const [tocOpen, setTocOpen] = useState(false);
+  const [chrome, setChrome] = useState(true); // mobile: toolbar/bar terlihat
+  const [reduced, setReduced] = useState(false);
   const measureRef = useRef<HTMLDivElement>(null);
   const spreadRef = useRef<SpreadHandle>(null);
+  const hideTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
 
   const deviceId = useRef("");
   if (!deviceId.current && typeof window !== "undefined") {
@@ -37,7 +41,10 @@ export default function ReaderV2({ slug }: { slug: string }) {
     deviceId.current = id;
   }
 
-  useEffect(() => setProfile(pickProfile()), []);
+  useEffect(() => {
+    setProfile(pickProfile());
+    setReduced(window.matchMedia?.("(prefers-reduced-motion: reduce)").matches ?? false);
+  }, []);
   useEffect(() => { const r = () => setProfile(pickProfile()); window.addEventListener("resize", r); return () => window.removeEventListener("resize", r); }, []);
 
   useEffect(() => {
@@ -85,7 +92,6 @@ export default function ReaderV2({ slug }: { slug: string }) {
   const byId = useMemo(() => new Map(flat.map((f) => [f.id, f.block])), [flat]);
   const maxSpread = Math.max(0, Math.ceil(pages.length / 2) - 1);
 
-  // Peta bab -> halaman pertama (untuk daftar isi).
   const chapterStart = useMemo(() => {
     const m = new Map<number, number>();
     pages.forEach((ids, pi) => { const ci = Number(ids[0]?.split(".")[0]); if (!m.has(ci)) m.set(ci, pi); });
@@ -97,7 +103,14 @@ export default function ReaderV2({ slug }: { slug: string }) {
     if (profile === "desktop") setSpread(Math.floor(p / 2)); else setCur(p);
   }, [pages.length, profile]);
 
-  // Keyboard (desktop).
+  // Chrome mobile: auto-hide 3 detik saat terlihat.
+  const pokeChrome = useCallback((show: boolean) => {
+    setChrome(show);
+    if (hideTimer.current) clearTimeout(hideTimer.current);
+    if (show) hideTimer.current = setTimeout(() => setChrome(false), 3000);
+  }, []);
+  useEffect(() => () => { if (hideTimer.current) clearTimeout(hideTimer.current); }, []);
+
   useEffect(() => {
     if (profile !== "desktop") return;
     const onKey = (e: KeyboardEvent) => {
@@ -128,14 +141,63 @@ export default function ReaderV2({ slug }: { slug: string }) {
   const isDark = resolvedTheme === "dark";
   const vw = typeof window !== "undefined" ? window.innerWidth : 1440;
   const desktopScale = Math.min(1, (vw - 56) / (prof.w * 2));
-  const mobileScale = Math.min(1, (vw - 24) / prof.w);
+  const mobileScale = Math.min(1, (vw - 8) / prof.w);
   const curPage = profile === "desktop" ? spread * 2 : cur;
+  const iconBtn = "p-2 rounded-lg text-zinc-200 hover:bg-white/10 disabled:opacity-40";
+  const themeCls = `ebook ${isDark ? "dark" : ""}`;
 
-  const iconBtn = "p-2 rounded-lg text-zinc-300 hover:bg-white/10 disabled:opacity-40";
+  // ── MOBILE ───────────────────────────────────────────────────────────────
+  if (profile === "mobile") {
+    return (
+      <div className={`${themeCls} fixed inset-0 flex items-center justify-center overflow-hidden`} style={{ background: "#26262e" }}>
+        <div ref={measureRef} aria-hidden style={{ position: "absolute", left: -99999, top: 0, width: prof.w - prof.margin * 2, visibility: "hidden" }}>
+          {flat.map((f) => <div key={f.id} data-atom={f.id}>{f.block.type !== "fullPage" && <BlockView b={f.block} />}</div>)}
+        </div>
 
+        {pages.length > 0 && (
+          <div style={{ width: prof.w * mobileScale, height: prof.h * mobileScale }}>
+            <div style={{ transform: `scale(${mobileScale})`, transformOrigin: "top left" }}>
+              <MobilePager cur={cur} count={pages.length} renderPage={renderPage} pageW={prof.w} pageH={prof.h} onCur={setCur} onTap={() => pokeChrome(!chrome)} reduced={reduced} />
+            </div>
+          </div>
+        )}
+
+        {/* top chrome */}
+        <header className={`absolute top-0 inset-x-0 bg-black/60 text-white flex items-center justify-between px-3 transition-transform ${chrome ? "translate-y-0" : "-translate-y-full"}`} style={{ paddingTop: "env(safe-area-inset-top,0px)", height: "calc(48px + env(safe-area-inset-top,0px))" }}>
+          <h1 className="text-sm font-medium truncate">{book.title}</h1>
+          <div className="flex items-center gap-1">
+            <button className={iconBtn} onClick={() => setTheme(isDark ? "light" : "dark")} aria-label="Ganti tema">{isDark ? <Sun size={18} /> : <Moon size={18} />}</button>
+          </div>
+        </header>
+
+        {/* bottom chrome */}
+        <footer className={`absolute bottom-0 inset-x-0 bg-black/60 text-white px-4 pt-2 transition-transform ${chrome ? "translate-y-0" : "translate-y-full"}`} style={{ paddingBottom: "calc(8px + env(safe-area-inset-bottom,0px))" }}>
+          <div className="flex items-center gap-3">
+            <button className={iconBtn} onClick={() => setTocOpen(true)} aria-label="Daftar isi"><ListTree size={18} /></button>
+            <input type="range" min={1} max={pages.length} value={cur + 1} onChange={(e) => setCur(Number(e.target.value) - 1)} className="flex-1 accent-pink-500" aria-label="Geser halaman" />
+            <span className="text-xs tabular-nums">{cur + 1}/{pages.length}</span>
+          </div>
+        </footer>
+
+        {tocOpen && (
+          <div className="fixed inset-0 z-50 bg-black/50 flex items-end" onClick={() => setTocOpen(false)}>
+            <nav className="w-full max-h-[70vh] bg-zinc-900 text-white rounded-t-2xl p-4 overflow-auto" style={{ paddingBottom: "calc(16px + env(safe-area-inset-bottom,0px))" }} onClick={(e) => e.stopPropagation()}>
+              <div className="flex items-center justify-between mb-2"><h2 className="font-semibold">Daftar Isi</h2><button onClick={() => setTocOpen(false)} aria-label="Tutup"><X size={18} /></button></div>
+              <ol className="space-y-1">
+                {book.chapters.map((c, ci) => (
+                  <li key={c.id}><button className="w-full text-left px-2 py-2 rounded hover:bg-white/10 text-sm" onClick={() => { const p = chapterStart.get(ci); if (p != null) setCur(p); setTocOpen(false); }}>{c.title}</button></li>
+                ))}
+              </ol>
+            </nav>
+          </div>
+        )}
+      </div>
+    );
+  }
+
+  // ── DESKTOP ──────────────────────────────────────────────────────────────
   return (
-    <div className={`ebook min-h-screen flex flex-col ${isDark ? "dark" : ""}`} style={{ background: "var(--desk, #2b2b33)" }}>
-      {/* toolbar */}
+    <div className={`${themeCls} min-h-screen flex flex-col`} style={{ background: "#2b2b33" }}>
       <header className="flex items-center justify-between gap-3 px-4 py-2 bg-black/40 text-white">
         <div className="flex items-center gap-2 min-w-0">
           <button className={iconBtn} onClick={() => setTocOpen(true)} aria-label="Daftar isi"><ListTree size={18} /></button>
@@ -147,18 +209,16 @@ export default function ReaderV2({ slug }: { slug: string }) {
         </div>
       </header>
 
-      {/* hidden measure */}
       <div ref={measureRef} aria-hidden style={{ position: "absolute", left: -99999, top: 0, width: prof.w - prof.margin * 2, visibility: "hidden" }}>
         {flat.map((f) => <div key={f.id} data-atom={f.id}>{f.block.type !== "fullPage" && <BlockView b={f.block} />}</div>)}
       </div>
 
       {book.preview && <p className="text-amber-300 text-sm text-center py-2">Pratinjau — bab preview saja.</p>}
 
-      {/* viewer */}
       <main className="flex-1 flex items-center justify-center overflow-auto p-4">
         {pages.length === 0 ? (
           <p className="text-white/70">Menyusun halaman…</p>
-        ) : profile === "desktop" ? (
+        ) : (
           <div className="flex items-center gap-3">
             <button className="text-white/80 hover:text-white disabled:opacity-30" disabled={spread <= 0} onClick={() => spreadRef.current?.prev()} aria-label="Sebelumnya"><ChevronLeft size={40} /></button>
             <div style={{ width: prof.w * 2 * desktopScale, height: prof.h * desktopScale }}>
@@ -168,38 +228,23 @@ export default function ReaderV2({ slug }: { slug: string }) {
             </div>
             <button className="text-white/80 hover:text-white disabled:opacity-30" disabled={spread >= maxSpread} onClick={() => spreadRef.current?.next()} aria-label="Berikutnya"><ChevronRight size={40} /></button>
           </div>
-        ) : (
-          <div className="flex flex-col items-center gap-3">
-            <div style={{ width: prof.w * mobileScale, height: prof.h * mobileScale }}>
-              <div style={{ transform: `scale(${mobileScale})`, transformOrigin: "top left", boxShadow: "0 10px 40px rgba(0,0,0,.4)" }}>{renderPage(cur)}</div>
-            </div>
-            <div className="flex items-center gap-4 text-white">
-              <button className={iconBtn} disabled={cur <= 0} onClick={() => setCur((c) => c - 1)}><ChevronLeft size={20} /></button>
-              <span className="text-sm">{cur + 1} / {pages.length}</span>
-              <button className={iconBtn} disabled={cur >= pages.length - 1} onClick={() => setCur((c) => c + 1)}><ChevronRight size={20} /></button>
-            </div>
-          </div>
         )}
       </main>
 
-      {/* slider halaman */}
       {pages.length > 0 && (
         <footer className="px-6 py-3 bg-black/40">
           <input type="range" min={1} max={pages.length} value={curPage + 1} onChange={(e) => gotoPage(Number(e.target.value) - 1)} className="w-full accent-pink-500" aria-label="Geser halaman" />
-          <p className="text-center text-white/60 text-xs mt-1">Halaman {curPage + 1}–{Math.min(curPage + (profile === "desktop" ? 2 : 1), pages.length)} dari {pages.length}</p>
+          <p className="text-center text-white/60 text-xs mt-1">Halaman {curPage + 1}–{Math.min(curPage + 2, pages.length)} dari {pages.length}</p>
         </footer>
       )}
 
-      {/* TOC drawer */}
       {tocOpen && (
         <div className="fixed inset-0 z-50 bg-black/50 flex" onClick={() => setTocOpen(false)}>
           <nav className="w-72 max-w-[80vw] h-full bg-zinc-900 text-white p-4 overflow-auto" onClick={(e) => e.stopPropagation()}>
             <div className="flex items-center justify-between mb-3"><h2 className="font-semibold">Daftar Isi</h2><button onClick={() => setTocOpen(false)} aria-label="Tutup"><X size={18} /></button></div>
             <ol className="space-y-1">
               {book.chapters.map((c, ci) => (
-                <li key={c.id}>
-                  <button className="w-full text-left px-2 py-2 rounded hover:bg-white/10 text-sm" onClick={() => { const p = chapterStart.get(ci); if (p != null) gotoPage(p); setTocOpen(false); }}>{c.title}</button>
-                </li>
+                <li key={c.id}><button className="w-full text-left px-2 py-2 rounded hover:bg-white/10 text-sm" onClick={() => { const p = chapterStart.get(ci); if (p != null) gotoPage(p); setTocOpen(false); }}>{c.title}</button></li>
               ))}
             </ol>
           </nav>

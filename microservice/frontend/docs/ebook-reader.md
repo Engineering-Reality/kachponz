@@ -20,8 +20,14 @@ Paginasi pada ukuran logis profil → jumlah halaman stabil; halaman di-scale ut
 ## Status
 - Fase a: model konten + paginator(+test) + API bertoken + render statis. ✅
 - Fase b: spread desktop + page-turn + toolbar (tema/TOC/fullscreen) + keyboard + slider. ✅
-- Menyusul: (c) HP swipe ikut jari + chrome auto-hide, (d) komponen interaktif penuh,
-  (e) cetak + Playwright + lint emoji.
+- Fase c: HP — MobilePager swipe ikut jari (track 3 halaman, snap spring), chrome
+  auto-hide 3 dtk (tap tengah toggle), safe-area, TOC bottom sheet, reduced-motion crossfade. ✅
+- Menyusul: (d) komponen interaktif penuh, (e) cetak + Playwright + lint emoji.
+
+## HP (fase c)
+- Geser MENGIKUTI jari via pointer events + framer `useMotionValue`/`animate` (spring).
+- Geser dimatikan bila sentuhan mulai di input/textarea/select/button/tabel bisa-geser/[data-no-swipe].
+- Virtualisasi: hanya render halaman cur-1..cur+1.
 
 ## Catatan
 - Watermark dihapus dari tampilan atas permintaan pemilik (semula §9). Gerbang akses tetap:
