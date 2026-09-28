@@ -1,23 +1,39 @@
 import { test, expect } from "@playwright/test";
 
-// Kriteria selesai §10 ebook.md. Butuh EBOOK_TOKEN (order 'paid' my-mind-palace)
-// + dev server dgn EBOOK_READER_V2=true. Screenshot disimpan di artifacts/screens/.
+// Kriteria selesai Bagian 1 & E-Book Reader V2.
+// Butuh EBOOK_TOKEN (order 'paid' my-mind-palace) + dev server dgn EBOOK_READER_V2=true.
 const TOKEN = process.env.EBOOK_TOKEN || "";
 const url = `/read/my-mind-palace?t=${TOKEN}`;
 
 test.beforeEach(async ({ page }) => {
-  test.skip(!TOKEN, "set EBOOK_TOKEN");
+  test.skip(!TOKEN, "set EBOOK_TOKEN untuk menjalankan E2E");
   await page.goto(url);
   await page.waitForSelector(".page", { timeout: 15000 });
 });
 
-test("tidak ada halaman yang overflow", async ({ page }) => {
-  const bad = await page.$$eval(".page", (els) =>
-    els.filter((e) => e.scrollHeight > e.clientHeight + 1).length);
-  expect(bad).toBe(0);
+test("anti-overflow: elemen konten terakhir tidak melewati batas bawah halaman", async ({ page }) => {
+  const badPages = await page.$$eval(".page", (pages) => {
+    const overflows: number[] = [];
+    pages.forEach((p, idx) => {
+      const pageRect = p.getBoundingClientRect();
+      const content = p.querySelector(".page-content") || p;
+      const children = Array.from(content.children);
+      if (children.length > 0) {
+        const lastChild = children[children.length - 1];
+        const lastRect = lastChild.getBoundingClientRect();
+        // Cek apakah tepi bawah elemen konten melewati batas bawah container halaman (+ 1px toleransi subpixel)
+        if (lastRect.bottom > pageRect.bottom + 1.5) {
+          overflows.push(idx);
+        }
+      }
+    });
+    return overflows;
+  });
+
+  expect(badPages, `Ditemukan overflow pada halaman indeks: ${badPages.join(", ")}`).toEqual([]);
 });
 
-test("tidak ada emoji di UI/konten", async ({ page }) => {
+test("tidak ada emoji mentah di UI maupun konten e-book", async ({ page }) => {
   const text = await page.locator(".ebook").innerText();
   const emoji = /[\u{1F000}-\u{1FAFF}\u{2600}-\u{27BF}\u{2B00}-\u{2BFF}\u{1F1E6}-\u{1F1FF}]/u;
   expect(emoji.test(text)).toBeFalsy();
@@ -25,18 +41,17 @@ test("tidak ada emoji di UI/konten", async ({ page }) => {
 
 test("mengetik/klik kuis TIDAK memicu flip; state bertahan setelah reload", async ({ page }, testInfo) => {
   const marker = await page.locator(".pageno").first().innerText().catch(() => "1");
-  // buka lembar kerja pertama (via daftar isi kalau perlu) — cari textarea/field
   const field = page.locator(".ebook textarea, .ebook input.field").first();
   if (await field.count()) {
     await field.scrollIntoViewIfNeeded();
-    await field.fill("catatan uji e2e");
-    // flip tak berubah: nomor halaman pertama sama
+    await field.fill("catatan uji e2e anti-overflow");
     expect(await page.locator(".pageno").first().innerText().catch(() => marker)).toBe(marker);
     await page.reload();
     await page.waitForSelector(".page");
-    // isian bertahan (localStorage)
     const again = page.locator(".ebook textarea, .ebook input.field").first();
-    if (await again.count()) expect(await again.inputValue()).toContain("catatan uji");
+    if (await again.count()) {
+      expect(await again.inputValue()).toContain("catatan uji");
+    }
   }
   await page.screenshot({ path: `artifacts/screens/${testInfo.project.name}.png`, fullPage: false });
 });

@@ -4,7 +4,8 @@ import HtmlReader from "./HtmlReader";
 import ReaderV2 from "./ReaderV2";
 import { getSupabaseAdmin } from "@/lib/ebook/supabaseAdmin";
 
-const READER_V2 = process.env.EBOOK_READER_V2 === "true";
+// Reader V2 aktif secara default (bisa di-disable dengan EBOOK_READER_V2=false jika perlu)
+const READER_V2 = process.env.EBOOK_READER_V2 !== "false";
 
 export const dynamic = "force-dynamic";
 
@@ -24,7 +25,7 @@ export default async function ReadPage({ params }: { params: Promise<{ slug: str
   const { slug } = await params;
   const html = await isHtmlEbook(slug);
   return (
-    <Suspense fallback={<div className="min-h-screen flex items-center justify-center bg-zinc-900 text-white">Memuat e-book…</div>}>
+    <Suspense fallback={<div className="min-h-screen flex items-center justify-center bg-[#0B0A1F] text-white">Memuat e-book…</div>}>
       {html ? (READER_V2 ? <ReaderV2 slug={slug} /> : <HtmlReader slug={slug} />) : <Reader slug={slug} />}
     </Suspense>
   );

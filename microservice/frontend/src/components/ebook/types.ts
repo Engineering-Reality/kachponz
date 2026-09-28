@@ -1,5 +1,5 @@
-// Model konten e-book (discriminated union). Diekstrak dari source.html ke
-// book.json oleh scripts/extract-book.ts, lalu dipaginasi & dirender fixed-layout.
+// Model konten e-book (discriminated union).
+// Diekstrak dari source.html ke book.json lalu dipaginasi & dirender fixed-layout.
 
 export interface ImgRef {
   path: string; // path di bucket privat 'ebooks', mis '<slug>/img/bab1.webp'
@@ -22,7 +22,7 @@ export interface QuizQuestion {
   id: string;
   prompt: string;
   options: { id: string; label: string; correct?: boolean; dim?: string }[];
-  explanation?: string; // untuk 'knowledge': tampil sbg popover
+  explanation?: string; // untuk 'knowledge': tampil di balik kartu / feedback kelinci
 }
 
 export interface MindNode {
@@ -46,12 +46,17 @@ export type Block =
   | { type: "code"; lang?: string; source: string; keepTogether: true }
   | { type: "worksheet"; id: string; title: string; fields: Field[]; splitAt?: number[]; keepTogether: true }
   | { type: "quiz"; id: string; variant: "type" | "knowledge" | "scale"; title: string; questions: QuizQuestion[]; keepTogether: true }
+  | { type: "quest"; id: string; quizId: string; variant: "type" | "knowledge" | "scale"; questionIndex: number; totalQuestions: number; question: QuizQuestion; keepTogether: true }
+  | { type: "characterCard"; id: string; title: string; keepTogether: true }
   | { type: "cocdBox"; id: string; title: string; keepTogether: true }
   | { type: "crazy8"; id: string; title: string; keepTogether: true }
   | { type: "mindMap"; id: string; title: string; nodes: MindNode[]; keepTogether: true }
   | { type: "fishbone"; id: string; title: string; spine: string; bones: Bone[]; keepTogether: true }
+  | { type: "fiveWhys"; id: string; title: string; keepTogether: true }
+  | { type: "complaintJars"; id: string; title: string; keepTogether: true }
+  | { type: "releaseNotes"; id: string; title: string; keepTogether: true }
   | { type: "certificate"; title: string; fields: string[]; keepTogether: true }
-  | { type: "fullPage"; kind: "cover" | "toc" | "chapterOpener" | "blank"; title?: string; subtitle?: string; img?: ImgRef; imgDark?: ImgRef; chapterNo?: number; tocEntries?: string[] };
+  | { type: "fullPage"; kind: "cover" | "toc" | "palaceMap" | "chapterOpener" | "blank"; title?: string; subtitle?: string; img?: ImgRef; imgDark?: ImgRef; chapterNo?: number; tocEntries?: string[] };
 
 export interface Chapter {
   id: string;
