@@ -1,0 +1,62 @@
+/* Token & gaya e-book reader V2. Dua tema via next-themes (html[data-theme]).
+   Skala tipe 4 tingkat, satu gaya callout (4 varian), satu gaya kartu worksheet. */
+.ebook {
+  --paper: #ffffff; --ink: #141414; --ink-soft: #5c5c5c; --line: #d4d4d4;
+  --accent: #141414; --accent-soft: #f1f1f1; --gold: #8a6d1a; --lav: #6b5bd6;
+  --opener-bg: #ffffff; --opener-ink: #141414; --num: #5c5c5c;
+  --serif: var(--font-fraunces, "Fraunces", Georgia, serif);
+  --sans: var(--font-nunito, "Nunito", system-ui, sans-serif);
+  --t1: 28px; --t2: 20px; --t3: 16px; --tb: 15px; /* skala tipe */
+}
+:root[data-theme="dark"] .ebook, .dark .ebook {
+  --paper: #131034; --ink: #ece9ff; --ink-soft: #b4aedb; --line: #3a3472;
+  --accent: #9f92e6; --accent-soft: #2a2562; --gold: #e7b24a; --lav: #9f92e6;
+  --opener-bg: #1c1848; --opener-ink: #ffffff; --num: #e7b24a;
+}
+
+.ebook { color: var(--ink); font-family: var(--sans); font-size: var(--tb); line-height: 1.6; }
+.ebook .page { background: var(--paper); color: var(--ink); position: relative; overflow: hidden; }
+.ebook h1, .ebook h2, .ebook h3 { font-family: var(--serif); font-weight: 700; line-height: 1.2; margin: 0 0 .5em; }
+.ebook h1 { font-size: var(--t1); } .ebook h2 { font-size: var(--t2); } .ebook h3 { font-size: var(--t3); }
+.ebook p { margin: 0 0 .8em; }
+.ebook em { font-style: italic; }
+
+.ebook .pull { font-family: var(--serif); font-size: var(--t2); font-style: italic; color: var(--accent);
+  border-left: 3px solid var(--gold); padding-left: 16px; margin: .6em 0; }
+
+.ebook figure { margin: .6em 0; }
+.ebook figure img, .ebook figure svg { width: 100%; height: auto; border-radius: 10px; display: block; }
+.ebook figcaption { font-size: 12px; color: var(--ink-soft); margin-top: 6px; text-align: center; }
+
+.ebook .callout { border: 1px solid var(--line); border-radius: 14px; padding: 14px 16px; margin: .6em 0;
+  background: var(--accent-soft); display: flex; gap: 12px; }
+.ebook .callout .ic { flex: 0 0 auto; color: var(--accent); }
+.ebook .callout h4 { font-family: var(--serif); font-size: var(--t3); margin: 0 0 4px; }
+
+.ebook table { width: 100%; border-collapse: collapse; font-size: 13px; margin: .6em 0; }
+.ebook th, .ebook td { border: 1px solid var(--line); padding: 6px 8px; text-align: left; vertical-align: top; }
+.ebook th { background: var(--accent-soft); font-family: var(--serif); }
+
+.ebook .card { border: 1px solid var(--line); border-radius: 14px; padding: 14px 16px; margin: .6em 0; background: var(--paper); }
+.ebook .card-head { display: flex; align-items: center; gap: 8px; margin-bottom: 8px; }
+.ebook .card-head .tag { font-size: 12px; color: var(--gold); font-weight: 700; letter-spacing: .04em; text-transform: uppercase; }
+.ebook .lbl { display: block; font-size: 12px; color: var(--ink-soft); margin: 8px 0 4px; font-weight: 600; }
+.ebook .field { width: 100%; border: 1px solid var(--line); border-radius: 8px; background: transparent; color: var(--ink);
+  font: inherit; padding: 8px 10px; }
+.ebook .reserved { color: var(--ink-soft); font-size: 12px; border: 1px dashed var(--line); border-radius: 10px; padding: 10px; }
+
+/* fullPage */
+.ebook .fp { display: flex; flex-direction: column; align-items: center; justify-content: center; text-align: center;
+  height: 100%; background: var(--opener-bg); color: var(--opener-ink); gap: 12px; padding: 32px; }
+.ebook .fp .knum { font-family: var(--serif); font-size: 48px; color: var(--num); }
+.ebook .fp img { max-width: 70%; border-radius: 12px; }
+
+/* watermark per halaman + nomor */
+.ebook .wm { position: absolute; inset: 0; pointer-events: none; overflow: hidden; opacity: .07;
+  display: flex; flex-wrap: wrap; align-content: center; justify-content: center; gap: 48px 64px;
+  transform: rotate(-28deg) scale(1.4); }
+.ebook .wm span { font-weight: 700; white-space: nowrap; font-size: 16px; color: var(--ink); }
+.ebook .pageno { position: absolute; bottom: 10px; font-size: 11px; color: var(--num); }
+.ebook .pageno.l { left: 16px; } .ebook .pageno.r { right: 16px; }
+
+@media (prefers-reduced-motion: reduce) { .ebook * { animation-duration: .001ms !important; } }
