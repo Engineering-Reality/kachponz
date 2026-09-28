@@ -22,7 +22,15 @@ Paginasi pada ukuran logis profil → jumlah halaman stabil; halaman di-scale ut
 - Fase b: spread desktop + page-turn + toolbar (tema/TOC/fullscreen) + keyboard + slider. ✅
 - Fase c: HP — MobilePager swipe ikut jari (track 3 halaman, snap spring), chrome
   auto-hide 3 dtk (tap tengah toggle), safe-area, TOC bottom sheet, reduced-motion crossfade. ✅
-- Menyusul: (d) komponen interaktif penuh, (e) cetak + Playwright + lint emoji.
+- Fase d: komponen interaktif + state tersimpan (localStorage per slug+order). Kuis knowledge
+  ditandai benar/salah in-place + penjelasan via tooltip; kuis tipe/skala → panel samping (desktop)
+  / bottom sheet (HP), halaman tak bertambah tinggi. Worksheet/COCD/Crazy8/MindMap/Fishbone/
+  Certificate editable tinggi-tetap; textarea HP → editor full-screen (sheet). ✅
+- Menyusul: (e) cetak lembar kerja A4 + Playwright + lint emoji.
+
+## State (fase d)
+- `EbookProvider` (context) + localStorage key `mmp:<slug>:<order_ref>`; hasil kuis & editor
+  dirender DI LUAR halaman (panel/sheet) agar tinggi halaman stabil setelah paginasi.
 
 ## HP (fase c)
 - Geser MENGIKUTI jari via pointer events + framer `useMotionValue`/`animate` (spring).

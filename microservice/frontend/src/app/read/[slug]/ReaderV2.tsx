@@ -7,6 +7,7 @@ import { ChevronLeft, ChevronRight, ListTree, Moon, Sun, Maximize2, X } from "lu
 import { BlockView } from "@/components/ebook/Blocks";
 import { BookSpread, type SpreadHandle } from "@/components/ebook/BookSpread";
 import { MobilePager } from "@/components/ebook/MobilePager";
+import { EbookProvider } from "@/components/ebook/state";
 import { paginate, type PageAtom } from "@/components/ebook/Paginator";
 import type { Block, Book } from "@/components/ebook/types";
 import "@/app/read/ebook-theme.css";
@@ -145,10 +146,10 @@ export default function ReaderV2({ slug }: { slug: string }) {
   const curPage = profile === "desktop" ? spread * 2 : cur;
   const iconBtn = "p-2 rounded-lg text-zinc-200 hover:bg-white/10 disabled:opacity-40";
   const themeCls = `ebook ${isDark ? "dark" : ""}`;
+  const storageKey = `mmp:${slug}:${book.watermark || "guest"}`;
 
   // ── MOBILE ───────────────────────────────────────────────────────────────
-  if (profile === "mobile") {
-    return (
+  const mobile = (
       <div className={`${themeCls} fixed inset-0 flex items-center justify-center overflow-hidden`} style={{ background: "#26262e" }}>
         <div ref={measureRef} aria-hidden style={{ position: "absolute", left: -99999, top: 0, width: prof.w - prof.margin * 2, visibility: "hidden" }}>
           {flat.map((f) => <div key={f.id} data-atom={f.id}>{f.block.type !== "fullPage" && <BlockView b={f.block} />}</div>)}
@@ -192,11 +193,10 @@ export default function ReaderV2({ slug }: { slug: string }) {
           </div>
         )}
       </div>
-    );
-  }
+  );
 
   // ── DESKTOP ──────────────────────────────────────────────────────────────
-  return (
+  const desktop = (
     <div className={`${themeCls} min-h-screen flex flex-col`} style={{ background: "#2b2b33" }}>
       <header className="flex items-center justify-between gap-3 px-4 py-2 bg-black/40 text-white">
         <div className="flex items-center gap-2 min-w-0">
@@ -252,4 +252,6 @@ export default function ReaderV2({ slug }: { slug: string }) {
       )}
     </div>
   );
+
+  return <EbookProvider storageKey={storageKey} profile={profile}>{profile === "mobile" ? mobile : desktop}</EbookProvider>;
 }

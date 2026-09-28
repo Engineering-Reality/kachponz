@@ -1,20 +1,10 @@
 import React from "react";
-import { Rabbit, Code2, Hammer, Compass, PencilLine, Brain, Award, Boxes, Timer, Network, GitFork } from "lucide-react";
+import { Rabbit, Code2, Hammer, Compass } from "lucide-react";
 import type { Block } from "./types";
+import { WorksheetView, QuizView, CocdView, Crazy8View, MindMapView, FishboneView, CertificateView } from "./Interactive";
 
 const CALLOUT_ICON = { note: Rabbit, developer: Code2, tryNow: Hammer, story: Compass } as const;
 const CALLOUT_LABEL = { note: "Catatan Kelinci", developer: "Cara Developer", tryNow: "Coba Sekarang", story: "Kisah Nara" } as const;
-
-// Placeholder blok interaktif (ruang dicadangkan; interaktivitas penuh di fase d).
-function Reserved({ icon: Icon, tag, title, note }: { icon: React.ElementType; tag: string; title: string; note?: string }) {
-  return (
-    <div className="card">
-      <div className="card-head"><Icon size={16} aria-hidden /><span className="tag">{tag}</span></div>
-      <h3>{title}</h3>
-      {note && <p className="reserved">{note}</p>}
-    </div>
-  );
-}
 
 export function BlockView({ b }: { b: Block }) {
   switch (b.type) {
@@ -52,7 +42,7 @@ export function BlockView({ b }: { b: Block }) {
     }
     case "table":
       return (
-        <div style={{ overflowX: "auto" }}>
+        <div style={{ overflowX: "auto" }} className="swipeable-table">
           <table>
             {b.head.length > 0 && <thead><tr>{b.head.map((h, i) => <th key={i}>{h}</th>)}</tr></thead>}
             <tbody>{b.rows.map((r, i) => <tr key={i}>{r.map((c, j) => <td key={j}>{c}</td>)}</tr>)}</tbody>
@@ -62,41 +52,19 @@ export function BlockView({ b }: { b: Block }) {
     case "code":
       return <pre className="card"><code>{b.source}</code></pre>;
     case "worksheet":
-      return (
-        <div className="card">
-          <div className="card-head"><PencilLine size={16} aria-hidden /><span className="tag">Lembar Kerja</span></div>
-          <h3>{b.title}</h3>
-          {b.fields.map((f) => (
-            <div key={f.id}>
-              <label className="lbl">{f.label}</label>
-              {f.kind === "textarea" ? <textarea className="field" rows={f.lines || 3} readOnly /> : <input className="field" readOnly />}
-            </div>
-          ))}
-        </div>
-      );
+      return <WorksheetView b={b} />;
     case "quiz":
-      return (
-        <div className="card">
-          <div className="card-head"><Brain size={16} aria-hidden /><span className="tag">Kuis</span></div>
-          <h3>{b.title}</h3>
-          {b.questions.map((q) => (
-            <div key={q.id}>
-              <p><b>{q.prompt}</b></p>
-              {q.options.map((o) => <p key={o.id} className="reserved" style={{ margin: "4px 0" }}>{o.label}</p>)}
-            </div>
-          ))}
-        </div>
-      );
+      return <QuizView b={b} />;
     case "cocdBox":
-      return <Reserved icon={Boxes} tag="COCD Box" title={b.title} note="Kuadran Now / How / Wow — interaktif (fase d)." />;
+      return <CocdView b={b} />;
     case "crazy8":
-      return <Reserved icon={Timer} tag="Crazy 8s" title={b.title} note="8 sketsa ide bertimer — interaktif (fase d)." />;
+      return <Crazy8View b={b} />;
     case "mindMap":
-      return <Reserved icon={Network} tag="Mind Map" title={b.title} note="Peta pikiran terisi otomatis — interaktif (fase d)." />;
+      return <MindMapView b={b} />;
     case "fishbone":
-      return <Reserved icon={GitFork} tag="Diagram Tulang Ikan" title={b.title} note="Sebab-akibat — interaktif (fase d)." />;
+      return <FishboneView b={b} />;
     case "certificate":
-      return <Reserved icon={Award} tag="Sertifikat" title={b.title} note="Isi & cetak — fase d." />;
+      return <CertificateView b={b} />;
     case "fullPage": {
       if (b.kind === "toc")
         return (
