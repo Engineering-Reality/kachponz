@@ -131,8 +131,7 @@ const SECTIONS = [
 ];
 
 const chapters = [];
-// Cover + TOC sebagai bab depan
-chapters.push({ id: "cover", title: "Sampul", blocks: [{ type: "fullPage", kind: "cover", title: "My Mind Palace Vol. I", subtitle: "Engineering Reality" }] });
+// Bab isi dulu (untuk daftar isi), cover & TOC diprepend belakangan.
 for (const [id, title] of SECTIONS) {
   const sec = book.querySelector(`#${id}`);
   if (!sec) { console.warn("lewati section:", id); continue; }
@@ -140,6 +139,24 @@ for (const [id, title] of SECTIONS) {
   walk(sec, blocks);
   chapters.push({ id, title, isPreview: id === "pengantar", blocks });
 }
+
+// COVER: ambil gambar sampul terang & gelap (data-URI) → 2 varian per tema.
+const coverImg = (sel) => {
+  const el = book.querySelector(sel);
+  const src = el ? saveDataUri(el.querySelector("img")?.getAttribute("src") || el.getAttribute("src")) : null;
+  return src ? { path: src, w: 1024, h: 1280, alt: "Sampul" } : undefined;
+};
+const coverLight = coverImg(".cover-light") || coverImg(".cover:not(.cover-dark)");
+const coverDark = coverImg(".cover-dark");
+const coverBlock = { type: "fullPage", kind: "cover", title: coverLight || coverDark ? undefined : "My Mind Palace Vol. I",
+  subtitle: coverLight || coverDark ? undefined : "Engineering Reality", img: coverLight || coverDark, imgDark: coverDark || coverLight };
+
+// DAFTAR ISI: dibangkitkan dari judul bab (adaptif tema, rapi).
+const tocEntries = chapters.filter((c) => !["kuis-ruang"].includes(c.id)).map((c) => c.title);
+const tocBlock = { type: "fullPage", kind: "toc", title: "Daftar Isi", tocEntries };
+
+chapters.unshift({ id: "daftar-isi", title: "Daftar Isi", blocks: [tocBlock] });
+chapters.unshift({ id: "cover", title: "Sampul", blocks: [coverBlock] });
 
 const out = { slug: SLUG, title: "My Mind Palace Vol. I: Engineering Reality", version: "1", chapters };
 writeFileSync(`${DIR}/book.json`, JSON.stringify(out, null, 2));

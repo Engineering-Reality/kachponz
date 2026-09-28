@@ -51,7 +51,7 @@ export type Block =
   | { type: "mindMap"; id: string; title: string; nodes: MindNode[]; keepTogether: true }
   | { type: "fishbone"; id: string; title: string; spine: string; bones: Bone[]; keepTogether: true }
   | { type: "certificate"; title: string; fields: string[]; keepTogether: true }
-  | { type: "fullPage"; kind: "cover" | "toc" | "chapterOpener" | "blank"; title?: string; subtitle?: string; img?: ImgRef; chapterNo?: number };
+  | { type: "fullPage"; kind: "cover" | "toc" | "chapterOpener" | "blank"; title?: string; subtitle?: string; img?: ImgRef; imgDark?: ImgRef; chapterNo?: number; tocEntries?: string[] };
 
 export interface Chapter {
   id: string;

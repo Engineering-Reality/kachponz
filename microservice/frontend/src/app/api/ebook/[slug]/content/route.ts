@@ -18,8 +18,10 @@ const err = (s: number, m: string) => new NextResponse(JSON.stringify({ error: m
 async function signImages(chapters: any[], supabase: ReturnType<typeof getSupabaseAdmin>) {
   const paths = new Set<string>();
   for (const c of chapters) for (const b of c.blocks || []) {
-    if (b?.img?.path) paths.add(b.img.path);
-    if (b?.img?.path2x) paths.add(b.img.path2x);
+    for (const ref of [b?.img, b?.imgDark]) {
+      if (ref?.path) paths.add(ref.path);
+      if (ref?.path2x) paths.add(ref.path2x);
+    }
   }
   if (paths.size === 0) return;
   const list = [...paths];
@@ -27,8 +29,10 @@ async function signImages(chapters: any[], supabase: ReturnType<typeof getSupaba
   const map = new Map<string, string>();
   (data || []).forEach((d, i) => d.signedUrl && map.set(list[i], d.signedUrl));
   for (const c of chapters) for (const b of c.blocks || []) {
-    if (b?.img?.path && map.has(b.img.path)) b.img.url = map.get(b.img.path);
-    if (b?.img?.path2x && map.has(b.img.path2x)) b.img.url2x = map.get(b.img.path2x);
+    for (const ref of [b?.img, b?.imgDark]) {
+      if (ref?.path && map.has(ref.path)) ref.url = map.get(ref.path);
+      if (ref?.path2x && map.has(ref.path2x)) ref.url2x = map.get(ref.path2x);
+    }
   }
 }
 

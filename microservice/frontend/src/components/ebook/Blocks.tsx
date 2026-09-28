@@ -97,7 +97,32 @@ export function BlockView({ b }: { b: Block }) {
       return <Reserved icon={GitFork} tag="Diagram Tulang Ikan" title={b.title} note="Sebab-akibat — interaktif (fase d)." />;
     case "certificate":
       return <Reserved icon={Award} tag="Sertifikat" title={b.title} note="Isi & cetak — fase d." />;
-    case "fullPage":
+    case "fullPage": {
+      if (b.kind === "toc")
+        return (
+          <div className="fp toc">
+            <h2>{b.title || "Daftar Isi"}</h2>
+            <ol>{(b.tocEntries || []).map((t, i) => <li key={i}><span className="tt">{t}</span></li>)}</ol>
+          </div>
+        );
+      if (b.kind === "cover") {
+        const light = (b.img as { url?: string })?.url;
+        const dark = (b.imgDark as { url?: string })?.url || light;
+        return (
+          <div className="fp cover">
+            {light ? (
+              <>
+                {/* eslint-disable-next-line @next/next/no-img-element */}
+                <img className="only-light" src={light} alt="Sampul" />
+                {/* eslint-disable-next-line @next/next/no-img-element */}
+                <img className="only-dark" src={dark} alt="Sampul" />
+              </>
+            ) : (
+              <>{b.title && <h1>{b.title}</h1>}{b.subtitle && <p>{b.subtitle}</p>}</>
+            )}
+          </div>
+        );
+      }
       return (
         <div className="fp">
           {b.chapterNo != null && <div className="knum">{b.chapterNo}</div>}
@@ -109,6 +134,7 @@ export function BlockView({ b }: { b: Block }) {
           {b.subtitle && <p>{b.subtitle}</p>}
         </div>
       );
+    }
     default:
       return null;
   }
