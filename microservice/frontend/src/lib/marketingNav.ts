@@ -13,6 +13,7 @@ export const MARKETING_NAV_LINKS: MarketingNavLink[] = [
   { href: "/company", label: "Company" },
   { href: "/blog", label: "Blog" },
   { href: "/pricing", label: "Pricing" },
+  { href: "/ebook", label: "E-Book" },
   { href: "/partners", label: "Partners" },
 ];
 

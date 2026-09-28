@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useEffect, useRef } from "react";
+import { useState, useEffect, useRef, type ElementType } from "react";
 import Link from "next/link";
 import { TransactionGraph } from "@/components/TransactionGraph";
 import { ParticleBackground } from "@/components/ParticleBackground";
@@ -375,7 +375,7 @@ export default function Home() {
                   <div className={`absolute inset-0 bg-gradient-to-r ${item.gradientClass} to-transparent opacity-0 group-hover:opacity-100 transition-opacity duration-500 pointer-events-none`} />
 
                   <div className="flex items-center gap-6 md:w-1/3 flex-shrink-0 relative z-10">
-                    <item.icon className={`w-6 h-6 ${item.iconClass}`} />
+                    {(() => { const Icon = item.icon as ElementType; return <Icon className={`w-6 h-6 ${item.iconClass}`} />; })()}
                     <h4 className="text-xl font-bold text-foreground tracking-tight">{item.title}</h4>
                   </div>
                   <div className="md:w-2/3 relative z-10">
