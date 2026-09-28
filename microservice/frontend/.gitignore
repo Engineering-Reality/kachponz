@@ -44,3 +44,8 @@ next-env.d.ts
 content/*/book.json
 content/*/source.html
 content/*/img/
+
+# playwright
+/test-results/
+/playwright-report/
+/artifacts/

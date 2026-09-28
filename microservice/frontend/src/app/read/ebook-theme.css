@@ -79,3 +79,16 @@
 :root[data-theme="dark"] .ebook .only-light, .dark .ebook .only-light { display: none; }
 
 @media (prefers-reduced-motion: reduce) { .ebook * { animation-duration: .001ms !important; } }
+
+/* cetak lembar kerja A4 hitam-putih */
+.print-root { color: #000; background: #fff; font-family: var(--sans); }
+.print-sheet { padding: 24px 28px; page-break-after: always; }
+.print-sheet h2 { font-family: var(--serif); font-size: 22px; margin: 0 0 16px; }
+.print-field { margin-bottom: 14px; }
+.print-lbl { font-size: 12px; font-weight: 700; margin-bottom: 4px; }
+.print-val { min-height: 44px; border: 1px solid #000; border-radius: 6px; padding: 8px 10px; white-space: pre-wrap; }
+@page { size: A4; margin: 14mm; }
+@media print {
+  html, body { background: #fff !important; }
+  .print-root { filter: grayscale(1); }
+}

@@ -3,8 +3,9 @@
 import { useCallback, useEffect, useLayoutEffect, useMemo, useRef, useState } from "react";
 import { useSearchParams } from "next/navigation";
 import { useTheme } from "next-themes";
-import { ChevronLeft, ChevronRight, ListTree, Moon, Sun, Maximize2, X } from "lucide-react";
+import { ChevronLeft, ChevronRight, ListTree, Moon, Sun, Maximize2, X, Printer } from "lucide-react";
 import { BlockView } from "@/components/ebook/Blocks";
+import { printSheets } from "@/components/ebook/Interactive";
 import { BookSpread, type SpreadHandle } from "@/components/ebook/BookSpread";
 import { MobilePager } from "@/components/ebook/MobilePager";
 import { EbookProvider } from "@/components/ebook/state";
@@ -204,6 +205,7 @@ export default function ReaderV2({ slug }: { slug: string }) {
           <h1 className="text-sm font-medium truncate">{book.title}</h1>
         </div>
         <div className="flex items-center gap-1">
+          <button className={iconBtn} onClick={() => printSheets("all")} aria-label="Cetak semua lembar kerja"><Printer size={18} /></button>
           <button className={iconBtn} onClick={() => setTheme(isDark ? "light" : "dark")} aria-label="Ganti tema">{isDark ? <Sun size={18} /> : <Moon size={18} />}</button>
           <button className={iconBtn} onClick={() => document.documentElement.requestFullscreen?.()} aria-label="Layar penuh"><Maximize2 size={18} /></button>
         </div>

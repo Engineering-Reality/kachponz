@@ -1,9 +1,17 @@
 "use client";
 
 import { useState } from "react";
-import { PencilLine, Brain, Boxes, Timer, Network, GitFork, Award, Check, X, Info, ChevronRight } from "lucide-react";
+import { PencilLine, Brain, Boxes, Timer, Network, GitFork, Award, Check, X, Info, ChevronRight, Printer } from "lucide-react";
 import { useEbook, type QuizDef } from "./state";
 import type { Block } from "./types";
+
+// Buka route cetak untuk satu / semua lembar kerja (token dari URL sekarang).
+export function printSheets(sheets: string) {
+  const parts = window.location.pathname.split("/");
+  const slug = parts[2] || "";
+  const t = new URLSearchParams(window.location.search).get("t") || "";
+  window.open(`/read/${slug}/print?t=${encodeURIComponent(t)}&sheets=${encodeURIComponent(sheets)}`, "_blank");
+}
 
 // Semua komponen ini BERTINGGI TETAP: perubahan state tidak menambah tinggi
 // halaman (hasil kuis → panel; edit textarea HP → sheet; penjelasan → tooltip).
@@ -27,7 +35,10 @@ function AreaField({ id, label, lines = 3 }: { id: string; label: string; lines?
 export function WorksheetView({ b }: { b: Extract<Block, { type: "worksheet" }> }) {
   return (
     <div className="card">
-      <div className="card-head"><PencilLine size={16} aria-hidden /><span className="tag">Lembar Kerja</span></div>
+      <div className="card-head" style={{ justifyContent: "space-between" }}>
+        <span style={{ display: "flex", alignItems: "center", gap: 8 }}><PencilLine size={16} aria-hidden /><span className="tag">Lembar Kerja</span></span>
+        <button type="button" data-no-swipe onClick={() => printSheets(b.id)} aria-label="Cetak lembar ini" style={{ background: "none", border: 0, color: "var(--ink-soft)", cursor: "pointer" }}><Printer size={15} /></button>
+      </div>
       <h3>{b.title}</h3>
       {b.fields.map((f) => (
         <div key={f.id}>

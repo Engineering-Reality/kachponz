@@ -26,7 +26,15 @@ Paginasi pada ukuran logis profil → jumlah halaman stabil; halaman di-scale ut
   ditandai benar/salah in-place + penjelasan via tooltip; kuis tipe/skala → panel samping (desktop)
   / bottom sheet (HP), halaman tak bertambah tinggi. Worksheet/COCD/Crazy8/MindMap/Fishbone/
   Certificate editable tinggi-tetap; textarea HP → editor full-screen (sheet). ✅
-- Menyusul: (e) cetak lembar kerja A4 + Playwright + lint emoji.
+- Fase e: cetak lembar kerja A4 hitam-putih (`/read/[slug]/print?sheets=`, isian ikut),
+  `npm run lint:emoji` (gagal bila emoji di reader/konten), Playwright `tests/ebook.spec.ts`
+  (viewport & tema, cek overflow/emoji/flip-saat-mengetik/state-persist). ✅ SELESAI a–e.
+
+## Menjalankan tes
+- Unit paginator: `npm run test:unit` (node --test, tanpa dependency).
+- Emoji: `npm run lint:emoji`.
+- E2E: `npx playwright install chromium` lalu dev server (EBOOK_READER_V2=true) →
+  `EBOOK_TOKEN=<token> npm run test:e2e`. Screenshot: `artifacts/screens/`.
 
 ## State (fase d)
 - `EbookProvider` (context) + localStorage key `mmp:<slug>:<order_ref>`; hasil kuis & editor

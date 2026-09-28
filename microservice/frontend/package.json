@@ -7,7 +7,10 @@
     "build": "next build",
     "start": "next start",
     "lint": "eslint",
-    "test:ebook": "node --test src/lib/ebook/*.test.ts"
+    "test:ebook": "node --test src/lib/ebook/*.test.ts",
+    "lint:emoji": "node scripts/lint-emoji.mjs",
+    "test:e2e": "playwright test",
+    "test:unit": "node --test src/components/ebook/*.test.ts"
   },
   "dependencies": {
     "@supabase/supabase-js": "^2.117.2",
@@ -31,6 +34,7 @@
     "tailwind-merge": "^3.6.0"
   },
   "devDependencies": {
+    "@playwright/test": "^1.63.0",
     "@tailwindcss/postcss": "^4",
     "@types/node": "^20",
     "@types/react": "^19",
