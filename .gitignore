@@ -39,3 +39,8 @@ yarn-error.log*
 # typescript
 *.tsbuildinfo
 next-env.d.ts
+
+# konten e-book berbayar (ada di storage, bukan repo)
+content/*/book.json
+content/*/source.html
+content/*/img/
