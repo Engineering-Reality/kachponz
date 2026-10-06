@@ -4,8 +4,8 @@ import { CheckCircle2, XCircle } from "lucide-react";
 
 export function BenchmarkSection() {
   return (
-    <section className="bg-transparent py-24 relative z-10 overflow-hidden">
-      <div className="max-w-[1400px] mx-auto px-6 lg:px-12">
+    <section className="bg-transparent py-16 md:py-24 relative z-10 overflow-hidden">
+      <div className="max-w-[1400px] mx-auto px-4 sm:px-6 lg:px-12">
         <div className="text-center space-y-4 mb-16">
           <p className="ui-label text-cyan-500">Benchmark</p>
           <h3 className="section-head text-3xl md:text-4xl text-foreground">The New Standard</h3>
@@ -14,12 +14,12 @@ export function BenchmarkSection() {
           </p>
         </div>
 
-        <div className="flex flex-col lg:flex-row rounded-[2rem] overflow-hidden border border-slate-200 dark:border-slate-800 shadow-2xl relative">
+        <div className="flex flex-col lg:flex-row rounded-[1.75rem] md:rounded-[2rem] overflow-hidden border border-slate-200 dark:border-white/10 shadow-2xl relative">
           
           {/* Legacy RPA Side - Rigid, Boxed-in, Monospaced */}
-          <div className="w-full lg:w-[40%] bg-slate-50 dark:bg-slate-900 border-b lg:border-b-0 lg:border-r border-slate-200 dark:border-slate-800 p-10 flex flex-col relative overflow-hidden">
+          <div className="w-full lg:w-[40%] bg-slate-50 dark:bg-white/[0.02] border-b lg:border-b-0 lg:border-r border-slate-200 dark:border-white/10 p-6 sm:p-10 flex flex-col relative overflow-hidden">
             <div className="absolute inset-0 bg-[url('data:image/svg+xml;base64,PHN2ZyB3aWR0aD0iMjAiIGhlaWdodD0iMjAiIHhtbG5zPSJodHRwOi8vd3d3LnczLm9yZy8yMDAwL3N2ZyI+PGNpcmNsZSBjeD0iMiIgY3k9IjIiIHI9IjEiIGZpbGw9IiMzMzQxNTUiLz48L3N2Zz4=')] opacity-[0.05] dark:opacity-20 pointer-events-none" />
-            <h4 className="font-mono text-xl text-slate-600 dark:text-slate-500 mb-8 border-b border-slate-200 dark:border-slate-800 pb-4">Legacy RPA</h4>
+            <h4 className="font-mono text-xl text-slate-600 dark:text-slate-500 mb-8 border-b border-slate-200 dark:border-white/10 pb-4">Legacy RPA</h4>
             <ul className="space-y-6 flex-1 relative z-10">
               {[
                 "Brittle DOM Selectors",
@@ -37,12 +37,12 @@ export function BenchmarkSection() {
           </div>
 
           {/* Amadeus Side - Expansive, Dynamic, Gradient */}
-          <div className="w-full lg:w-[60%] bg-white dark:bg-slate-950 p-10 lg:p-14 flex flex-col relative overflow-hidden group">
+          <div className="w-full lg:w-[60%] holo-glass holo-sheen !border-0 p-6 sm:p-10 lg:p-14 flex flex-col relative overflow-hidden group">
             {/* Dynamic moving gradient background */}
-            <div className="absolute inset-0 bg-gradient-to-br from-cyan-500/10 via-fuchsia-500/5 to-yellow-500/10 opacity-50 group-hover:opacity-100 transition-opacity duration-1000 pointer-events-none" />
+            <div className="absolute inset-0 bg-gradient-to-br from-[#3df2ff]/10 via-[#ff4fd8]/5 to-[#ffe36e]/10 opacity-50 group-hover:opacity-100 transition-opacity duration-1000 pointer-events-none" />
             <div className="absolute -top-40 -right-40 w-96 h-96 bg-cyan-500/10 dark:bg-cyan-500/20 blur-[100px] rounded-full pointer-events-none" />
             
-            <h4 className="text-2xl font-bold text-foreground mb-8 pb-4">Amadeus Agentic Flow</h4>
+            <h4 className="section-head text-xl md:text-2xl holo-text mb-8 pb-4 relative z-10 self-start">Amadeus agentic flow</h4>
             <ul className="space-y-6 flex-1 relative z-10">
               {[
                 { title: "Computer Vision Self-Healing", desc: "Agents dynamically remap coordinates when selectors fail." },

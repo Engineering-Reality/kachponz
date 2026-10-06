@@ -2,10 +2,10 @@
  * Magic Pen Autofill — suggests a value for a single Agent Creator form
  * field, given whatever other fields are already filled in as context.
  *
- * Uses openrouterChat() for text-in/text-out LLM calls.
+ * Uses netraChat() for text-in/text-out LLM calls.
  */
 
-import { openrouterChat } from './openrouterClient.js';
+import { netraChat } from './netraClient.js';
 import { env } from '../../config/env.js';
 
 export interface AutofillRequest {
@@ -47,8 +47,8 @@ function buildAutofillPrompt(req: AutofillRequest): string {
 
 export async function suggestFieldValue(req: AutofillRequest): Promise<string> {
   const prompt = buildAutofillPrompt(req);
-  const result = await openrouterChat({
-    model: env.OPENROUTER_LLM_MODEL,
+  const result = await netraChat({
+    model: env.NETRA_LLM_MODEL,
     messages: [
       { role: 'system', content: AUTOFILL_SYSTEM },
       { role: 'user', content: prompt },

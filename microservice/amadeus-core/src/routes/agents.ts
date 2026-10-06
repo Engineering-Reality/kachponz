@@ -6,7 +6,7 @@ import { DomainError } from '../types/domain.js';
 import { authenticateRobot } from '../middleware/auth.js';
 import { randomUUID } from 'node:crypto';
 import { runAgenticStep } from '../orchestrator/engine.js';
-import { openrouterChat, parseJsonLoose } from '../orchestrator/executors/openrouterClient.js';
+import { netraChat, parseJsonLoose } from '../orchestrator/executors/netraClient.js';
 import { env } from '../config/env.js';
 
 export const registerAgentsRoutes: FastifyPluginAsync = async (rootApp: FastifyInstance) => {
@@ -293,8 +293,8 @@ Respond with ONLY a valid JSON object, no markdown, no explanation.`;
 
       let parsed: any;
       try {
-        const res = await openrouterChat({
-          model: env.OPENROUTER_LLM_MODEL,
+        const res = await netraChat({
+          model: env.NETRA_LLM_MODEL,
           messages: [
             { role: 'system', content: systemPrompt },
             { role: 'user', content: description },
@@ -305,7 +305,7 @@ Respond with ONLY a valid JSON object, no markdown, no explanation.`;
         parsed = parseJsonLoose(res.content);
       } catch (err: any) {
         request.log.error({ err }, 'Agent Architect LLM generation failed');
-        if (err.name === 'OpenRouterApiError') throw err;
+        if (err.name === 'NetraApiError') throw err;
         // Don't forward the raw provider err.message to the client — it can
         // carry internal URLs/model names. Full detail is in the log above.
         // (security-audit.md finding #4)

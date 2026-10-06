@@ -1,0 +1,22 @@
+{
+  "available_models": [
+    "deepseek/deepseek-v4-flash-0731",
+    "deepseek/deepseek-v4.1-flash"
+  ],
+  "model_info": {
+    "deepseek/deepseek-v4-flash-0731": {
+      "provider": "netra",
+      "description": "DeepSeek V4 Flash (0731) - text-only, cost-efficient LLM",
+      "tool_calling": true,
+      "vision": false,
+      "cost": "Paid"
+    },
+    "deepseek/deepseek-v4.1-flash": {
+      "provider": "netra",
+      "description": "DeepSeek V4.1 Flash - multimodal (text + vision)",
+      "tool_calling": true,
+      "vision": true,
+      "cost": "Paid"
+    }
+  }
+}

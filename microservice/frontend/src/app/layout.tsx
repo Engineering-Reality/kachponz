@@ -1,8 +1,9 @@
-import type { Metadata } from "next";
-import { Inter, JetBrains_Mono, Poppins, Space_Grotesk } from "next/font/google";
+import type { Metadata, Viewport } from "next";
+import { Inter, JetBrains_Mono, Poppins, Unbounded } from "next/font/google";
 import "./globals.css";
 import { AppShell } from "@/components/AppShell";
 import { ThemeProvider } from "@/components/ThemeProvider";
+import { HoloRuntime } from "@/components/HoloRuntime";
 
 const inter = Inter({
   variable: "--font-sans",
@@ -21,12 +22,17 @@ const poppins = Poppins({
   weight: ["400", "500", "600", "700"],
 });
 
-// Display font for headlines and section heads — distinct from body Inter
-const spaceGrotesk = Space_Grotesk({
+// Display font — wide, geometric, echoes the squared AMADEUS wordmark in the logo
+const unbounded = Unbounded({
   variable: "--font-display",
   subsets: ["latin"],
-  weight: ["500", "600", "700"],
+  weight: ["300", "400", "500", "600"],
 });
+
+export const viewport: Viewport = {
+  themeColor: "#06051a",
+  viewportFit: "cover",
+};
 
 export const metadata: Metadata = {
   title: "Amadeus — Enterprise Agentic Orchestrator",
@@ -46,10 +52,11 @@ export default function RootLayout({
     <html
       lang="en"
       suppressHydrationWarning
-      className={`${inter.variable} ${jetbrainsMono.variable} ${poppins.variable} ${spaceGrotesk.variable} h-full antialiased`}
+      className={`${inter.variable} ${jetbrainsMono.variable} ${poppins.variable} ${unbounded.variable} h-full antialiased`}
     >
       <body className="min-h-full bg-background text-foreground transition-colors duration-300">
         <ThemeProvider attribute="class" defaultTheme="dark" enableSystem={false}>
+          <HoloRuntime />
           <AppShell>{children}</AppShell>
         </ThemeProvider>
       </body>

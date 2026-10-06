@@ -60,9 +60,9 @@ We utilize `@langchain/langgraph/prebuilt` to instantiate `createReactAgent` dyn
 import { createReactAgent } from "@langchain/langgraph/prebuilt";
 import { ChatOpenAI } from "@langchain/openai";
 
-// 1. Initialize the LLM (e.g., Qwen-Max)
+// 1. Initialize the LLM (e.g., DeepSeek V4 Flash via Netra)
 const llm = new ChatOpenAI({
-  modelName: process.env.QWEN_LLM_MODEL || "qwen-max",
+  modelName: process.env.NETRA_LLM_MODEL || "deepseek/deepseek-v4-flash-0731",
   temperature: 0,
 });
 
@@ -91,7 +91,7 @@ graph TD
     classDef rpa fill:#fff,stroke:#ec4899,stroke-width:3px,color:#171717,font-weight:bold
     classDef ext fill:#111,stroke:#f97316,stroke-width:2px,color:#f97316,stroke-dasharray:5 5
 
-    LLM[("Qwen-Max LLM")]:::ext
+    LLM[("DeepSeek LLM (Netra)")]:::ext
     
     subgraph S1 ["Transaction Tracker"]
         Engine["LangGraph createReactAgent"]:::engine

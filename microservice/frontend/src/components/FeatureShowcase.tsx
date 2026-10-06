@@ -85,7 +85,7 @@ export function FeatureShowcase() {
   }, []);
 
   return (
-    <section className="bg-transparent py-24 relative z-10">
+    <section className="bg-transparent py-16 md:py-24 relative z-10">
       <div className="max-w-[1400px] mx-auto px-6 lg:px-12">
         
         <div className="text-center md:text-left mb-16 lg:mb-0 lg:absolute lg:top-24 lg:left-12 z-20">
@@ -96,7 +96,7 @@ export function FeatureShowcase() {
         <div className="flex flex-col lg:flex-row items-start gap-12 lg:gap-24 relative lg:pt-32">
           
           {/* Left Sidebar (Sticky) */}
-          <div className="hidden lg:block w-64 flex-shrink-0 sticky top-32 z-10 bg-slate-50 dark:bg-[rgba(30,27,75,0.03)] rounded-2xl p-4 border border-slate-100 dark:border-transparent">
+          <div className="hidden lg:block w-64 flex-shrink-0 sticky top-32 z-10 holo-glass rounded-2xl p-4">
             <nav className="space-y-2 relative">
               {FEATURES.map((feature) => {
                 const isActive = activeFeature === feature.id;
@@ -105,14 +105,14 @@ export function FeatureShowcase() {
                   <a 
                     key={feature.id}
                     href={`#${feature.id}`}
-                    className={`relative flex items-center gap-4 py-4 px-4 transition-all duration-300 ${isActive ? "text-slate-900 dark:text-white font-semibold bg-slate-200/50 dark:bg-white/5 rounded-r-lg" : "text-slate-500 hover:text-slate-900 dark:text-[#8b5cf6]/60 font-medium dark:hover:text-white"}`}
+                    className={`relative flex items-center gap-4 py-4 px-4 transition-all duration-300 ${isActive ? "text-slate-900 dark:text-white font-semibold bg-slate-200/50 dark:bg-white/5 rounded-r-lg" : "text-slate-500 hover:text-slate-900 dark:text-slate-400 font-medium dark:hover:text-white"}`}
                     onClick={(e) => {
                       e.preventDefault();
                       document.getElementById(feature.id)?.scrollIntoView({ behavior: 'smooth', block: 'center' });
                     }}
                   >
                     {isActive && (
-                      <div className="absolute left-0 top-0 bottom-0 w-[2px] bg-gradient-to-b from-cyan-400 via-fuchsia-500 to-yellow-400" />
+                      <div className="absolute left-0 top-0 bottom-0 w-[2px] bg-gradient-to-b from-[#3df2ff] via-[#ff4fd8] to-[#ffe36e]" />
                     )}
                     <Icon className="w-4 h-4" />
                     {feature.navLabel}
@@ -123,24 +123,24 @@ export function FeatureShowcase() {
           </div>
 
           {/* Right Content Area (Scrollable) */}
-          <div className="flex-1 space-y-32 lg:space-y-48 pb-32 w-full">
+          <div className="flex-1 space-y-20 md:space-y-32 lg:space-y-48 pb-16 md:pb-32 w-full">
             {FEATURES.map((feature) => (
               <div 
                 key={feature.id} 
                 id={feature.id} 
-                className="feature-section flex flex-col xl:flex-row gap-10 items-center scroll-mt-48 min-h-[50vh]"
+                className="feature-section flex flex-col xl:flex-row gap-8 md:gap-10 items-center scroll-mt-48 xl:min-h-[50vh]"
               >
                 {/* Text Description */}
                 <div className="flex-1 space-y-6 w-full">
                   <div className="flex items-center gap-5">
-                    <div className="relative p-[2px] rounded-2xl overflow-hidden pastel-rainbow-border animate-border-spin shadow-[0_0_24px_rgba(217,70,239,0.25)] dark:shadow-[0_0_24px_rgba(217,70,239,0.4)] flex-shrink-0">
+                    <div className="relative holo-ring rounded-2xl flex-shrink-0">
                       <div className="relative z-10 bg-white/80 dark:bg-slate-900/80 backdrop-blur-xl p-3 rounded-[14px] flex items-center justify-center">
-                        <feature.icon className="w-8 h-8 text-slate-800 dark:text-white" />
+                        <feature.icon className="w-7 h-7 md:w-8 md:h-8 text-slate-800 dark:text-white" />
                       </div>
                     </div>
-                    <h3 className="text-3xl md:text-4xl font-semibold text-foreground tracking-tight">{feature.title}</h3>
+                    <h3 className="section-head text-2xl md:text-4xl text-foreground">{feature.title}</h3>
                   </div>
-                  <p className="text-lg text-slate-600 dark:text-slate-400 leading-relaxed max-w-xl">
+                  <p className="text-base md:text-lg text-slate-600 dark:text-slate-400 leading-relaxed max-w-xl">
                     {feature.description}
                   </p>
                   <ul className="space-y-3 mt-4">
@@ -156,8 +156,8 @@ export function FeatureShowcase() {
                     ))}
                   </ul>
                   <div className="pt-6">
-                    <div className="inline-block relative group p-[2px] rounded-full overflow-hidden pastel-rainbow-border animate-border-spin shadow-sm">
-                      <Link href={feature.href} className="flex justify-center items-center gap-2 bg-white/60 dark:bg-slate-900/60 backdrop-blur-md text-slate-900 dark:text-white px-7 py-3.5 text-[15px] font-semibold rounded-full hover:bg-white/80 dark:hover:bg-slate-900/80 transition-colors relative z-10">
+                    <div className="inline-block">
+                      <Link href={feature.href} className="wire-btn">
                         Explore {feature.navLabel} 
                         <ArrowRight className="w-4 h-4" />
                       </Link>
@@ -167,9 +167,9 @@ export function FeatureShowcase() {
 
                 {/* Screenshot/Video with Device Frame */}
                 <div className="flex-1 w-full xl:max-w-none">
-                  <div className="relative rounded-xl overflow-hidden border border-slate-200 dark:border-slate-800 bg-slate-50 dark:bg-[#0B0A1F] shadow-[0_0_40px_rgba(217,70,239,0.15)] group transition-transform duration-500 hover:shadow-[0_0_50px_rgba(34,211,238,0.2)] flex flex-col">
+                  <div className="relative rounded-2xl overflow-hidden holo-glass holo-sheen shadow-[0_0_40px_rgba(255,79,216,0.12)] group transition-shadow duration-500 hover:shadow-[0_0_60px_rgba(61,242,255,0.22)] flex flex-col">
                     {/* Device Chrome */}
-                    <div className="h-10 bg-slate-100 dark:bg-[#1E1B4B] border-b border-slate-200 dark:border-slate-800 flex items-center px-4 gap-2 flex-shrink-0">
+                    <div className="h-10 bg-slate-100/70 dark:bg-white/[0.03] border-b border-slate-200 dark:border-white/[0.06] flex items-center px-4 gap-2 flex-shrink-0">
                       <div className="flex gap-1.5">
                         <div className="w-2.5 h-2.5 rounded-full bg-slate-300 dark:bg-slate-700/50" />
                         <div className="w-2.5 h-2.5 rounded-full bg-slate-300 dark:bg-slate-700/50" />
@@ -181,7 +181,7 @@ export function FeatureShowcase() {
                     </div>
                     {/* Content */}
                     <div className="relative w-full aspect-video bg-black">
-                      <div className="absolute inset-0 bg-gradient-to-br from-fuchsia-500/10 via-transparent to-cyan-500/10 pointer-events-none z-20" />
+                      <div className="absolute inset-0 bg-gradient-to-br from-[#ff4fd8]/10 via-transparent to-[#3df2ff]/10 pointer-events-none z-20" />
                       <video 
                         src={feature.video} 
                         autoPlay 

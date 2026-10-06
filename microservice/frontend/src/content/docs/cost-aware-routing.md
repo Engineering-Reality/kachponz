@@ -6,7 +6,7 @@ The Amadeus platform introduces a core operational efficiency feature for the LC
 
 | Executor Kind | Cost Unit (Relative) | Execution Mode | Example Use Case |
 |---|---|---|---|
-| `llm` | ~3 | Synchronous (In-Process) | Qwen VL document examination |
+| `llm` | ~3 | Synchronous (In-Process) | DeepSeek VL (Netra) document examination |
 | `pad` | ~10 | Asynchronous (Fire-and-Track) | Power Automate Desktop flow |
 | `uipath` | ~100 | Asynchronous (Fire-and-Track) | UiPath Orchestrator job |
 
@@ -37,7 +37,7 @@ The router (`executors/router.ts`) utilizes a strict evaluation matrix in `choos
 |---|---|---|---|
 | `submitted` | *(None — manual/Contact Point)* | — | 0 |
 | `distributed_to_analyst` | `executor.pad.distribute` | pad | 10 |
-| `doc_examined` | `executor.qwen_vl.doc_exam` | llm | 3 |
+| `doc_examined` | `executor.netra_vl.doc_exam` | llm | 3 |
 | `ee_ntf_created` | `executor.pad.ee_create` | pad | 10 |
 | `ee_ntf_approved` | *(None — manual/checker)* | — | 0 |
 | `mt_converted` | `executor.uipath.mt_convert` | uipath | 100 |

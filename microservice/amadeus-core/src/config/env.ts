@@ -96,24 +96,32 @@ const EnvSchema = z.object({
   // OAUTH2 JWT Secret (Untuk verifikasi token Bearer stateless)
   OAUTH2_JWT_SECRET: z.string().min(16).optional(),
 
-  // ─── OpenRouter (LLM/VLM) — unified router over many model providers ──
-  // OpenAI-compatible endpoint: https://openrouter.ai/api/v1
-  // VL model: qwen/qwen3-vl-235b-a22b-instruct (multimodal — vision + text)
-  // LLM model: qwen/qwen-plus (text-only, cost-efficient)
-  OPENROUTER_BASE_URL: z.string().url().default('https://openrouter.ai/api/v1'),
-  OPENROUTER_API_KEY: z.string().optional(),
-  OPENROUTER_VL_MODEL: z.string().default('qwen/qwen3-vl-235b-a22b-instruct'),
-  OPENROUTER_LLM_MODEL: z.string().default('qwen/qwen-plus'),
-  OPENROUTER_TIMEOUT_MS: z.coerce.number().int().positive().default(60_000),
+  // ─── Netra Runtime (LLM/VLM) — OpenAI-compatible on-prem inference ──
+  // OpenAI-compatible endpoint: https://api.netraruntime.com/v1
+  // VL model: deepseek/deepseek-v4.1-flash (multimodal — vision + text)
+  // LLM model: deepseek/deepseek-v4-flash-0731 (text-only, cost-efficient)
+  NETRA_BASE_URL: z.string().url().default('https://api.netraruntime.com/v1'),
+  NETRA_API_KEY: z.string().optional(),
+  NETRA_VL_MODEL: z.string().default('deepseek/deepseek-v4.1-flash'),
+  NETRA_LLM_MODEL: z.string().default('deepseek/deepseek-v4-flash-0731'),
+  NETRA_TIMEOUT_MS: z.coerce.number().int().positive().default(60_000),
+  // Netra sampling knobs the OpenAI SDK types don't declare — spread into the
+  // request body via netraSamplingParams() (telemetry/llmUsage.ts).
+  // reasoning.effort is the shape Netra accepts (confirmed working live).
+  NETRA_REASONING_EFFORT: z.enum(['low', 'medium', 'high']).default('low'),
+  NETRA_TOP_K: z.coerce.number().int().default(40),
+  NETRA_MIN_P: z.coerce.number().default(0),
 
   // ─── Embeddings (RAG) ───────────────────────────────────────────────
-  // Reuses OPENROUTER_BASE_URL/OPENROUTER_API_KEY — OpenRouter serves both
-  // /chat/completions and /embeddings under the same base URL and key.
-  // EMBEDDING_DIM must match the `vector(N)` column in
+  // STAYS on OpenRouter: Netra has NO embeddings model (/embeddings → 404).
+  // Separate base URL/key from Netra so RAG embedding keeps working against
+  // its own provider. EMBEDDING_DIM must match the `vector(N)` column in
   // migrations/1795000000000_add_rag.ts if this model is ever changed —
   // qwen/qwen3-embedding-4b's native output is larger than 1024 dims, but
   // OpenRouter's /embeddings endpoint accepts a `dimensions` request field
   // that truncates it to exactly EMBEDDING_DIM (confirmed live).
+  EMBEDDING_BASE_URL: z.string().url().default('https://openrouter.ai/api/v1'),
+  EMBEDDING_API_KEY: z.string().optional(),
   EMBEDDING_MODEL: z.string().default('qwen/qwen3-embedding-4b'),
   EMBEDDING_DIM: z.coerce.number().int().positive().default(1024),
 
@@ -199,12 +207,14 @@ const EnvSchema = z.object({
   // Default off: zero behavior change and zero DB writes unless explicitly
   // turned on for a measurement session.
   LLM_USAGE_TELEMETRY: z.enum(['on', 'off']).default('off').transform((v) => v === 'on'),
-  // Optional OpenRouter provider pin (e.g. 'coreweave', 'deepinfra'). Unset =
-  // no `provider` field sent = today's behavior (OpenRouter auto-routes).
+  // LEGACY / measurement-only: these two vars are OpenRouter-shaped
+  // (provider.order / reasoning.enabled) and may NOT be honored by Netra —
+  // Netra uses reasoning.effort (see NETRA_REASONING_EFFORT). Kept for the
+  // sizing-measurement harness only; not part of the normal Netra request path.
+  // Optional provider pin (e.g. 'coreweave', 'deepinfra'). Unset =
+  // no `provider` field sent.
   LLM_MEASUREMENT_PROVIDER: z.string().optional(),
   // Optional force of reasoning/thinking on|off via `reasoning.enabled`.
-  // Unset = provider default (thinking ON for qwen3.6-35b-a3b, per
-  // docs/model-parity.md §6.2).
   LLM_MEASUREMENT_REASONING: z.enum(['on', 'off']).optional(),
   // Tags telemetry rows with a scenario label (S1..S5) during the sizing
   // exercise. Unset in normal operation.

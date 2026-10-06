@@ -14,7 +14,7 @@
  *   LLM_MEASUREMENT_SCENARIO   same as SCENARIO_LABEL (tags DB rows)
  *   LLM_MEASUREMENT_REASONING on|off
  *   LLM_MEASUREMENT_PROVIDER  coreweave (text) | deepinfra (vision, S3)
- *   OPENROUTER_LLM_MODEL / OPENROUTER_VL_MODEL  candidate slugs (this process only)
+ *   NETRA_LLM_MODEL / NETRA_VL_MODEL  candidate slugs (this process only)
  *
  * Usage: npx tsx scripts/measureScenario.ts
  */

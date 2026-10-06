@@ -108,8 +108,8 @@ async function loadAvailableModels() {
             'Mistral': { prefix: ['mistral/'], color: '#4caf50', logo: '🌪️', models: [] },    // Green
             'Moonshot': { prefix: ['moonshot/'], color: '#e040fb', logo: '🌙', models: [] }, // Purple
             'OpenAI': { prefix: ['openai/'], color: '#4da6ff', logo: '✨', models: [] },       // Blue
-            'Qwen': { prefix: ['qwen/'], color: '#00bcd4', logo: '🐉', models: [] }, // Cyan
             'X-AI': { prefix: ['x-ai/'], color: '#ffffff', logo: '✖️', models: [] } // White
+            // Netra's models are deepseek/* slugs → caught by the Deepseek category above.
         };
 
         const otherModels = [];
@@ -168,7 +168,7 @@ async function loadAvailableModels() {
         let finalHtml = '';
 
         // Iterate categories ensuring explicit order
-        const categoryOrder = ['Anthropic', 'Deepseek', 'Google', 'Mistral', 'Moonshot', 'OpenAI', 'Qwen', 'X-AI'];
+        const categoryOrder = ['Anthropic', 'Deepseek', 'Google', 'Mistral', 'Moonshot', 'OpenAI', 'X-AI'];
 
         categoryOrder.forEach(catName => {
             const catData = categories[catName];

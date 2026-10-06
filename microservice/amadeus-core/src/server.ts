@@ -14,7 +14,7 @@ import { registerAuthRoutes } from './routes/auth.js';
 import { registerFeatureSharingRoutes } from './routes/featureSharing.js';
 import { registerKnowledgeBaseRoutes } from './routes/knowledgeBase.js';
 import { DomainError } from './types/domain.js';
-import { OpenRouterApiError } from './orchestrator/executors/openrouterClient.js';
+import { NetraApiError } from './orchestrator/executors/netraClient.js';
 import { closePool } from './db/pool.js';
 import fastifySwagger from '@fastify/swagger';
 import fastifySwaggerUi from '@fastify/swagger-ui';
@@ -151,7 +151,7 @@ export async function buildServer() {
         error: { code: err.code, message: err.message, details: err.details },
       });
     }
-    if (err instanceof OpenRouterApiError) {
+    if (err instanceof NetraApiError) {
       // Full upstream detail (status + raw body) goes to the log only. The
       // client gets a generic message + requestId for correlation — the raw
       // provider body can carry internal URLs/model names/credential fragments.
@@ -159,7 +159,7 @@ export async function buildServer() {
       req.log.warn({ status: err.status, body: err.body }, err.message);
       return reply.code(err.status || 500).send({
         error: {
-          code: 'OPENROUTER_API_ERROR',
+          code: 'NETRA_API_ERROR',
           message: 'Upstream LLM provider returned an error',
           details: { requestId: req.id },
         },

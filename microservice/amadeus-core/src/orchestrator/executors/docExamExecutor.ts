@@ -1,14 +1,14 @@
 /**
- * OpenRouter (Qwen VL) Executor — menyelesaikan step `doc_examined` (LC/SKBDN/SBLC).
+ * Netra (DeepSeek VL) Executor — menyelesaikan step `doc_examined` (LC/SKBDN/SBLC).
  *
  * Alur:
  *   1. Terima referensi image LC di ctx.data.imageRef (URL / data URI /
  *      base64 sesuai kesepakatan sumber).
- *   2. Kirim ke Qwen VL (via OpenRouter, default VL model) dengan prompt struktur
+ *   2. Kirim ke DeepSeek VL (via Netra, default VL model) dengan prompt struktur
  *      ekstraksi field-field kunci LC (nomor, applicant, beneficiary, amount,
  *      currency, expiry, incoterm, port of loading/discharge, dokumen wajib).
  *   3. Parse JSON hasil ekstraksi.
- *   4. Kirim hasil ekstraksi ke Qwen LLM (via OpenRouter) untuk assessment
+ *   4. Kirim hasil ekstraksi ke DeepSeek LLM (via Netra) untuk assessment
  *      compliance ringan (misal: field wajib lengkap? tanggal expiry masih
  *      valid? amount masuk akal?). Ini SEBELUM langkah maker/checker manusia
  *      — bukan pengganti, hanya screening awal.
@@ -17,10 +17,14 @@
  * Keputusan reject/rework akan dilakukan di step berikutnya oleh maker/checker
  * manusia. Executor ini TIDAK memblokir alur; ia hanya menyajikan hasil
  * screening untuk mempercepat maker.
+ *
+ * Catatan vision Netra: deepseek-v4.1-flash HANYA menerima gambar base64
+ * data-URI; URL http(s) remote dibalas 502. Karena imageRef di sini bisa
+ * berupa URL remote, kita fetch & konversi ke data-URI dulu sebelum dikirim.
  */
 
 import { z } from 'zod';
-import { openrouterChat, parseJsonLoose } from './openrouterClient.js';
+import { netraChat, parseJsonLoose } from './netraClient.js';
 import type { Executor, ExecutorContext, ExecutorOutcome } from './base.js';
 import { env } from '../../config/env.js';
 import { logger } from '../../lib/logger.js';
@@ -91,10 +95,10 @@ Kembalikan HANYA JSON valid dengan struktur:
 }
 "proceed" bila lengkap dan tidak ada red flag; "review" bila ada hal yang perlu perhatian tapi tidak fatal; "reject" hanya bila jelas invalid (mis. expired, amount 0, applicant kosong).`;
 
-export const openrouterDocExamExecutor: Executor = {
+export const docExamExecutor: Executor = {
   descriptor: {
-    id: 'executor.openrouter_vl.doc_exam',
-    displayName: 'OpenRouter (Qwen VL) — LC Document Examination',
+    id: 'executor.netra_vl.doc_exam',
+    displayName: 'Netra (DeepSeek VL) — LC Document Examination',
     kind: 'llm',
     costUnit: 3,
     capabilities: [
@@ -104,28 +108,41 @@ export const openrouterDocExamExecutor: Executor = {
 
   async run(ctx: ExecutorContext): Promise<ExecutorOutcome> {
     const log = logger.child({
-      executor: 'openrouter_vl.doc_exam',
+      executor: 'netra_vl.doc_exam',
       transaction_id: ctx.transactionId,
     });
 
-    const imageRef = ctx.data?.imageRef;
-    if (typeof imageRef !== 'string' || imageRef.length === 0) {
+    const imageRefRaw = ctx.data?.imageRef;
+    if (typeof imageRefRaw !== 'string' || imageRefRaw.length === 0) {
       return {
         kind: 'failed',
         reason: 'imageRef dokumen tidak tersedia untuk pemeriksaan',
       };
     }
 
-    // === Langkah 1: ekstraksi field dari image via Qwen VL (OpenRouter) ===
+    // Netra vision menolak URL remote (502) — ubah jadi base64 data-URI dulu.
+    // base64 / data-URI diteruskan apa adanya.
+    let imageRef: string;
+    try {
+      imageRef = await toDataUri(imageRefRaw);
+    } catch (e) {
+      log.error({ err: e }, 'gagal mengambil image remote untuk konversi base64');
+      return {
+        kind: 'failed',
+        reason: `Gagal mengambil image dokumen: ${e instanceof Error ? e.message : String(e)}`,
+      };
+    }
+
+    // === Langkah 1: ekstraksi field dari image via DeepSeek VL (Netra) ===
     let extracted: ExtractedLc;
     let extractionRaw: string;
     try {
-      const vlRes = await openrouterChat({
-        model: env.OPENROUTER_VL_MODEL,
+      const vlRes = await netraChat({
+        model: env.NETRA_VL_MODEL,
         temperature: 0.1,
         max_tokens: 1024,
         responseJson: true,
-        callSite: 'qwenDocExam.extract',
+        callSite: 'docExam.extract',
         modelKind: 'vision',
         messages: [
           { role: 'system', content: EXTRACTION_SYSTEM },
@@ -149,15 +166,15 @@ export const openrouterDocExamExecutor: Executor = {
       };
     }
 
-    // === Langkah 2: assessment compliance ringan via Qwen LLM (OpenRouter) ===
+    // === Langkah 2: assessment compliance ringan via DeepSeek LLM (Netra) ===
     let assessment: Assessment;
     try {
-      const llmRes = await openrouterChat({
-        model: env.OPENROUTER_LLM_MODEL,
+      const llmRes = await netraChat({
+        model: env.NETRA_LLM_MODEL,
         temperature: 0.1,
         max_tokens: 512,
         responseJson: true,
-        callSite: 'qwenDocExam.assess',
+        callSite: 'docExam.assess',
         messages: [
           { role: 'system', content: ASSESSMENT_SYSTEM },
           {
@@ -197,10 +214,10 @@ export const openrouterDocExamExecutor: Executor = {
     return {
       kind: 'completed',
       resultData: {
-        examinedBy: 'executor.openrouter_vl.doc_exam',
-        provider: 'openrouter',
-        vlModel: env.OPENROUTER_VL_MODEL,
-        llmModel: env.OPENROUTER_LLM_MODEL,
+        examinedBy: 'executor.netra_vl.doc_exam',
+        provider: 'netra',
+        vlModel: env.NETRA_VL_MODEL,
+        llmModel: env.NETRA_LLM_MODEL,
         extracted,
         assessment,
         // JANGAN masukkan extractionRaw ke payload untuk mengurangi surface;
@@ -210,6 +227,20 @@ export const openrouterDocExamExecutor: Executor = {
     };
   },
 };
+
+/**
+ * Netra vision (deepseek-v4.1-flash) hanya menerima base64 data-URI; URL
+ * http(s) remote dibalas 502. Bila imageRef sudah data-URI/base64, kembalikan
+ * apa adanya; bila URL remote, fetch dan bungkus jadi data-URI.
+ */
+async function toDataUri(imageRef: string): Promise<string> {
+  if (!/^https?:\/\//i.test(imageRef)) return imageRef; // data-URI / base64 → lewat begitu saja
+  const res = await fetch(imageRef);
+  if (!res.ok) throw new Error(`fetch image ${res.status}`);
+  const mime = res.headers.get('content-type')?.split(';')[0]?.trim() || 'image/jpeg';
+  const base64 = Buffer.from(await res.arrayBuffer()).toString('base64');
+  return `data:${mime};base64,${base64}`;
+}
 
 function hashString(s: string): string {
   // Ringan; hanya untuk fingerprint jejak audit — bukan kripto.

@@ -3,8 +3,6 @@
 import { useState, useEffect, useRef } from "react";
 import Link from "next/link";
 import { TransactionGraph } from "@/components/TransactionGraph";
-import { ParticleBackground } from "@/components/ParticleBackground";
-import { SpectralText } from "@/components/SpectralText";
 import {
   ShieldCheck,
   Lock,
@@ -24,7 +22,8 @@ import {
 import { FiUser, FiCpu, FiTool } from "react-icons/fi";
 import { MarketingHeader } from "@/components/MarketingHeader";
 import { MarketingFooter } from "@/components/MarketingFooter";
-import { ParticleGlowText } from "@/components/ParticleGlowText";
+import { HoloStage } from "@/components/HoloStage";
+import { HoloText } from "@/components/HoloText";
 import { FeatureShowcase } from "@/components/FeatureShowcase";
 import { BenchmarkSection } from "@/components/BenchmarkSection";
 import { AuroraBackground } from "@/components/AuroraBackground";
@@ -96,12 +95,6 @@ export default function Home() {
     const elements = document.querySelectorAll(".scroll-reveal");
     elements.forEach((el) => observer.observe(el));
 
-    setTimeout(() => {
-      const h1 = document.querySelector("h1");
-      const p = document.querySelector("h1 + p");
-      document.title = `bw=${document.body.scrollWidth} iw=${window.innerWidth} h1w=${h1?.scrollWidth} pw=${p?.scrollWidth} h1cw=${h1?.clientWidth}`;
-    }, 500);
-
     return () => {
       observer.disconnect();
     };
@@ -113,59 +106,65 @@ export default function Home() {
     <div className="min-h-screen bg-background text-foreground overflow-x-hidden w-full max-w-[100vw]">
       <MarketingHeader />
 
-      {/* Hero Section — Redesigned Centered */}
-      <section className="relative pt-24 pb-16 md:pt-32 md:pb-24 overflow-hidden flex flex-col items-center justify-center text-center">
-        {/* Aurora Thread — hero mesh variant */}
-        <div className="absolute top-[40%] left-1/2 -translate-x-1/2 -translate-y-1/2 w-full max-w-[900px] h-[700px] md:h-[900px] z-0">
-          <AuroraThread variant="mesh" />
-        </div>
+      {/* Hero — the logo comes alive: a 4D tesseract in a responsive particle field */}
+      <section className="relative pt-[72px] md:pt-24 pb-16 md:pb-24 overflow-hidden holo-void flex flex-col items-center text-center">
+        <HoloStage>
+          <div className="max-w-5xl mx-auto px-5 md:px-6 flex flex-col items-center">
+            <h1 className="holo-headline mt-2 mb-6 md:mb-8 flex flex-col items-center gap-y-1 w-full">
+              <span>
+                <HoloText delay={0.15}>Human </HoloText>
+                <HoloText variant="foil" delay={0.3} className="font-light">whoops,</HoloText>
+              </span>
+              <span>
+                <HoloText delay={0.45}>Agent </HoloText>
+                <HoloText variant="foil" delay={0.6} className="font-light">loops,</HoloText>
+              </span>
+              <span>
+                <HoloText delay={0.75}>Robot </HoloText>
+                <HoloText variant="foil" delay={0.9} className="font-light">shoots.</HoloText>
+              </span>
+            </h1>
 
-        <div className="max-w-5xl mx-auto px-6 relative z-10 flex flex-col items-center">
-          <h1 className="display-hero text-[2.5rem] md:text-5xl lg:text-6xl xl:text-7xl tracking-tight leading-[1.1] mb-8 font-light flex flex-col md:flex-row flex-wrap justify-center items-center gap-y-2 md:gap-y-0 gap-x-2 md:gap-x-5 w-full">
-            <span className="w-full md:w-auto text-center bg-gradient-to-br from-slate-900 via-slate-700 to-black dark:from-white dark:via-slate-200 dark:to-slate-400 bg-clip-text text-transparent pb-1 drop-shadow-md">Human <ParticleGlowText text="Whoops," className="italic ml-1 md:ml-2" /></span>
-            <span className="w-full md:w-auto text-center bg-gradient-to-br from-slate-800 via-slate-600 to-slate-900 dark:from-slate-100 dark:via-slate-300 dark:to-slate-500 bg-clip-text text-transparent pb-1 drop-shadow-md">Agent <ParticleGlowText text="Loops," className="italic ml-1 md:ml-2" /></span>
-            <span className="w-full md:w-auto text-center bg-gradient-to-br from-slate-700 via-slate-500 to-slate-800 dark:from-slate-200 dark:via-slate-400 dark:to-slate-600 bg-clip-text text-transparent pb-1 drop-shadow-md">Robot <ParticleGlowText text="Shoots." className="italic ml-1 md:ml-2" /></span>
-          </h1>
+            <p className="text-[15px] md:text-[17px] text-slate-600 dark:text-slate-300 leading-relaxed max-w-[38rem] mb-8 md:mb-10">
+              The enterprise orchestration platform built for the Robotic Process Automation market. Coordinate human analysts, AI agents, and legacy RPA bots in one pipeline.
+            </p>
 
-          <p className="text-[17px] text-slate-600 dark:text-slate-300 leading-relaxed max-w-2xl mb-8">
-            The only enterprise-grade orchestration platform built specifically to target the Robotic Process Automation market. Seamlessly coordinate human analysts, intelligent AI agents, and legacy RPA bots to fully automate your complex operations.
-          </p>
-
-          <div className="flex flex-col md:flex-row items-stretch md:items-center justify-center gap-4 mb-12 w-full max-w-[280px] md:max-w-none">
-            <div className="relative group w-full md:w-auto p-[2px] rounded-full overflow-hidden pastel-rainbow-border animate-border-spin shadow-[0_0_24px_rgba(217,70,239,0.15)]">
-              <Link href="/playground" className="flex justify-center items-center gap-2 bg-white/40 dark:bg-slate-950/60 backdrop-blur-xl text-slate-900 dark:text-white px-8 py-4 text-[15px] font-medium rounded-full hover:bg-white/60 dark:hover:bg-slate-900/80 transition-colors w-full h-full relative z-10">
-                Experience Agent Flow Playground <ArrowRight className="w-4 h-4" />
+            <div className="flex flex-col sm:flex-row items-stretch sm:items-center justify-center gap-3 sm:gap-4 mb-12 md:mb-16 w-full max-w-[320px] sm:max-w-none">
+              <Link href="/playground" className="holo-ring holo-cta">
+                Open the playground <ArrowRight className="w-4 h-4" />
+              </Link>
+              <Link href="#demo" className="wire-btn">
+                Watch demo
               </Link>
             </div>
-            <Link href="#demo" className="inline-flex justify-center items-center gap-2 border border-slate-700/50 text-slate-200 px-8 py-4 text-[15px] font-medium rounded-full hover:bg-slate-800/50 transition-colors bg-slate-900/40 backdrop-blur shadow-sm w-full md:w-auto">
-              Watch Demo
-            </Link>
           </div>
+        </HoloStage>
 
+        <div className="max-w-5xl mx-auto px-4 md:px-6 relative z-10 flex flex-col items-center w-full">
           {/* Agent Flow Playground / Danantara Mockup */}
           <div className="w-full max-w-6xl relative group mx-auto mt-4">
             {/* Glossy overlay reflection */}
-            <div className="absolute inset-0 bg-gradient-to-br from-white/30 to-transparent rounded-[1.5rem] pointer-events-none z-20" />
+            <div className="absolute inset-0 bg-gradient-to-br from-white/30 dark:from-white/[0.06] to-transparent rounded-[1.5rem] pointer-events-none z-20" />
 
-            <div className="bg-[#FAFAFA] border border-slate-200 rounded-[1.5rem] overflow-hidden shadow-2xl shadow-slate-900/10 flex flex-col md:flex-row relative z-10 transition-transform duration-500 group-hover:-translate-y-2 min-h-[500px] md:min-h-0 md:h-[600px] text-left">
+            <div className="bg-[#FAFAFA] dark:bg-[#0c0a26]/85 dark:backdrop-blur-xl border border-slate-200 dark:border-white/10 rounded-[1.25rem] md:rounded-[1.5rem] holo-sheen overflow-hidden shadow-2xl shadow-slate-900/10 dark:shadow-[0_40px_120px_-30px_rgba(139,123,255,0.45)] flex flex-col md:flex-row relative z-10 transition-transform duration-500 group-hover:-translate-y-2 min-h-[460px] md:min-h-0 md:h-[600px] text-left">
 
               {/* Left Column: Chat Console */}
-              <div className="flex-1 flex flex-col border-r border-slate-200 bg-white relative">
+              <div className="flex-1 flex flex-col border-r border-slate-200 dark:border-white/10 bg-white dark:bg-transparent relative">
 
                 {/* Console Header */}
-                <div className="border-b border-slate-200 bg-white flex flex-col w-full shrink-0 min-w-0">
-                  <div className="h-10 flex items-center justify-between px-4 md:px-6 border-b border-slate-100 bg-slate-50/80">
+                <div className="border-b border-slate-200 dark:border-white/10 bg-white dark:bg-transparent flex flex-col w-full shrink-0 min-w-0">
+                  <div className="h-10 flex items-center justify-between px-4 md:px-6 border-b border-slate-100 dark:border-white/5 bg-slate-50/80 dark:bg-white/[0.03]">
                     <div className="flex items-center gap-3">
                       <div className="flex gap-1.5 mr-2">
                         <div className="w-2.5 h-2.5 rounded-full bg-red-400" />
                         <div className="w-2.5 h-2.5 rounded-full bg-amber-400" />
                         <div className="w-2.5 h-2.5 rounded-full bg-emerald-400" />
                       </div>
-                      <span className="ui-label text-slate-500 font-semibold tracking-widest text-[10px]">Amadeus Console</span>
+                      <span className="ui-label text-slate-500 dark:text-slate-400 font-semibold tracking-widest text-[10px]">Amadeus Console</span>
                     </div>
                     <div className="flex items-center gap-2">
                       <div className="w-2 h-2 rounded-full bg-emerald-500 animate-pulse"></div>
-                      <span className="ui-label text-slate-500 text-[10px]">UPLINK: STABLE</span>
+                      <span className="ui-label text-slate-500 dark:text-slate-400 text-[10px]">UPLINK: STABLE</span>
                     </div>
                   </div>
 
@@ -173,18 +172,18 @@ export default function Home() {
                   <div className="px-4 md:px-6 py-2.5 flex items-center gap-4 md:gap-6 overflow-x-auto scrollbar-hide w-full max-w-full">
                     <div className="flex items-center gap-3 shrink-0">
                       <label className="ui-label text-slate-400 text-[9px]">Active Node</label>
-                      <div className="text-[11px] font-medium text-slate-700 bg-slate-100 px-3 py-1 rounded">TradeFinance_Bot</div>
+                      <div className="text-[11px] font-medium text-slate-700 dark:text-slate-200 bg-slate-100 dark:bg-white/10 px-3 py-1 rounded">TradeFinance_Bot</div>
                     </div>
                     <div className="w-px h-4 bg-slate-200 shrink-0" />
                     <div className="flex items-center gap-3 shrink-0">
                       <label className="ui-label text-slate-400 text-[9px]">Target</label>
-                      <div className="text-[11px] font-medium text-blue-600 bg-blue-50 px-3 py-1 rounded">Danantara CX 100</div>
+                      <div className="text-[11px] font-medium text-blue-600 dark:text-cyan-300 bg-blue-50 dark:bg-cyan-400/10 px-3 py-1 rounded">Danantara CX 100</div>
                     </div>
                     <div className="w-px h-4 bg-slate-200 shrink-0" />
                     <div className="flex items-center gap-2 shrink-0">
                       <label className="ui-label text-slate-400 text-[9px]">Loop Mode</label>
                       <div className="relative w-8 h-4 rounded-full bg-indigo-600">
-                        <span className="absolute top-0.5 left-0.5 w-3 h-3 bg-white rounded-full shadow translate-x-4" />
+                        <span className="absolute top-0.5 left-0.5 w-3 h-3 bg-white dark:bg-transparent rounded-full shadow translate-x-4" />
                       </div>
                     </div>
                   </div>
@@ -198,45 +197,45 @@ export default function Home() {
                       <span className="text-white text-xs">US</span>
                     </div>
                     <div className="flex-1 min-w-0">
-                      <p className="font-semibold text-[13px] text-slate-900 mb-1">User</p>
-                      <p className="text-[13px] text-slate-700 break-words whitespace-pre-wrap">Please process LC Settlement #4012 on Danantara CX 100. Fallback to vision extraction if DOM selectors fail.</p>
+                      <p className="font-semibold text-[13px] text-slate-900 dark:text-white mb-1">User</p>
+                      <p className="text-[13px] text-slate-700 dark:text-slate-200 break-words whitespace-pre-wrap">Please process LC Settlement #4012 on Danantara CX 100. Fallback to vision extraction if DOM selectors fail.</p>
                     </div>
                   </div>
 
                   {/* System Log */}
                   <div className="flex gap-4">
-                    <div className="w-8 h-8 rounded-full border border-slate-200 bg-slate-50 flex items-center justify-center shrink-0 text-[10px]">⚙️</div>
+                    <div className="w-8 h-8 rounded-full border border-slate-200 dark:border-white/10 bg-slate-50 dark:bg-white/[0.03] flex items-center justify-center shrink-0 text-[10px]">⚙️</div>
                     <div className="flex-1 min-w-0">
-                      <p className="font-semibold text-[13px] text-slate-900 mb-1">System</p>
-                      <p className="text-[13px] text-slate-500 font-mono break-words whitespace-pre-wrap">[Agent Call] Using tool execute_cx100_bot( {"{"} "target": "LC_Settlement", "loop_mode": true {"}"} )</p>
+                      <p className="font-semibold text-[13px] text-slate-900 dark:text-white mb-1">System</p>
+                      <p className="text-[13px] text-slate-500 dark:text-slate-400 font-mono break-words whitespace-pre-wrap">[Agent Call] Using tool execute_cx100_bot( {"{"} "target": "LC_Settlement", "loop_mode": true {"}"} )</p>
                     </div>
                   </div>
 
                   {/* Assistant Message */}
                   <div className="flex gap-4">
-                    <div className="w-8 h-8 rounded-full bg-gradient-to-br from-blue-500 to-pink-500 flex items-center justify-center shrink-0 shadow-md">
+                    <div className="w-8 h-8 rounded-full bg-gradient-to-br from-[#3df2ff] via-[#8b7bff] to-[#ff4fd8] flex items-center justify-center shrink-0 shadow-md">
                       <Bot className="w-4 h-4 text-white" />
                     </div>
                     <div className="flex-1 min-w-0">
-                      <p className="font-semibold text-[13px] text-slate-900 mb-1">Amadeus</p>
-                      <div className="bg-blue-50/50 border border-blue-100 rounded-lg p-3 md:p-4 space-y-3 w-full">
-                        <p className="text-[13px] text-slate-700 break-words whitespace-pre-wrap">Connecting to Danantara CX 100... Established HMAC-SHA512 session.</p>
+                      <p className="font-semibold text-[13px] text-slate-900 dark:text-white mb-1">Amadeus</p>
+                      <div className="bg-blue-50/50 dark:bg-[#8b7bff]/10 border border-blue-100 dark:border-[#8b7bff]/25 rounded-lg p-3 md:p-4 space-y-3 w-full">
+                        <p className="text-[13px] text-slate-700 dark:text-slate-200 break-words whitespace-pre-wrap">Connecting to Danantara CX 100... Established HMAC-SHA512 session.</p>
                         <div className="space-y-1">
-                          <p className="text-[12px] text-slate-500 font-mono break-words whitespace-pre-wrap">Iteration 1: Searching for DOM Selector 'Submit_Btn'...</p>
+                          <p className="text-[12px] text-slate-500 dark:text-slate-400 font-mono break-words whitespace-pre-wrap">Iteration 1: Searching for DOM Selector 'Submit_Btn'...</p>
                           <p className="text-[12px] text-red-500 font-mono break-words whitespace-pre-wrap">SelectorNotFound. Loop mode triggered.</p>
-                          <p className="text-[12px] text-slate-500 font-mono break-words whitespace-pre-wrap">Iteration 2: Engaging Vision Agent for spatial coordinate mapping...</p>
+                          <p className="text-[12px] text-slate-500 dark:text-slate-400 font-mono break-words whitespace-pre-wrap">Iteration 2: Engaging Vision Agent for spatial coordinate mapping...</p>
                           <p className="text-[12px] text-green-600 font-mono font-medium break-words whitespace-pre-wrap">Coordinate mapped at (X: 1042, Y: 430). Click simulated.</p>
                         </div>
-                        <p className="text-[13px] text-slate-700 font-medium break-words whitespace-pre-wrap">LC Settlement processed successfully using Agent Loop.</p>
+                        <p className="text-[13px] text-slate-700 dark:text-slate-200 font-medium break-words whitespace-pre-wrap">LC Settlement processed successfully using Agent Loop.</p>
                       </div>
                     </div>
                   </div>
                 </div>
 
                 {/* Chat Input */}
-                <div className="p-4 bg-white border-t border-slate-100">
+                <div className="p-4 bg-white dark:bg-transparent border-t border-slate-100 dark:border-white/5">
                   <div className="relative flex items-center">
-                    <input type="text" disabled placeholder="Type a command..." className="w-full bg-slate-50 border border-slate-200 rounded-xl px-4 py-3 text-[13px] focus:outline-none" />
+                    <input type="text" disabled placeholder="Type a command..." className="w-full bg-slate-50 dark:bg-white/[0.03] border border-slate-200 dark:border-white/10 rounded-xl px-4 py-3 text-[13px] focus:outline-none dark:text-white dark:placeholder:text-slate-500" />
                     <button className="absolute right-2 p-1.5 bg-slate-900 rounded-lg shadow-sm">
                       <Send className="w-4 h-4 text-white" />
                     </button>
@@ -245,14 +244,14 @@ export default function Home() {
               </div>
 
               {/* Right Column: Context Panel */}
-              <div className="w-[40%] hidden lg:flex flex-col bg-slate-50 relative">
-                <div className="h-10 flex items-center px-6 border-b border-slate-200 bg-slate-100/50">
-                  <span className="ui-label text-slate-500 text-[10px]">Agent Context / Live Graph</span>
+              <div className="w-[40%] hidden lg:flex flex-col bg-slate-50 dark:bg-white/[0.03] relative">
+                <div className="h-10 flex items-center px-6 border-b border-slate-200 dark:border-white/10 bg-slate-100/50 dark:bg-white/[0.03]">
+                  <span className="ui-label text-slate-500 dark:text-slate-400 text-[10px]">Agent Context / Live Graph</span>
                 </div>
 
                 <div className="flex-1 p-6 flex flex-col gap-6">
                   {/* Visual Node Graph */}
-                  <div className="bg-white rounded-xl border border-slate-200 p-5 shadow-sm">
+                  <div className="bg-white dark:bg-transparent rounded-xl border border-slate-200 dark:border-white/10 p-5 shadow-sm">
                     <p className="ui-label text-slate-400 mb-4 text-[9px] text-center">AUTONOMOUS EXECUTION GRAPH</p>
                     <div className="relative flex items-center justify-between px-2 h-[100px]">
                       {/* Lines */}
@@ -265,29 +264,29 @@ export default function Home() {
                       </svg>
                       {/* Nodes */}
                       <div className="relative z-10 flex flex-col items-center group">
-                        <div className="w-12 h-12 rounded-[0.8rem] bg-white border border-pink-200 flex items-center justify-center text-lg shadow-sm">🧠</div>
+                        <div className="w-12 h-12 rounded-[0.8rem] bg-white dark:bg-transparent border border-pink-200 flex items-center justify-center text-lg shadow-sm">🧠</div>
                         <span className="font-mono text-[8px] text-pink-600 mt-2">Orchestrator</span>
                       </div>
                       <div className="relative z-10 flex flex-col items-center">
-                        <div className="w-12 h-12 rounded-[0.8rem] bg-red-50 border border-red-200 flex items-center justify-center text-lg shadow-sm">🤖</div>
+                        <div className="w-12 h-12 rounded-[0.8rem] bg-red-50 dark:bg-red-500/10 border border-red-200 dark:border-red-400/30 flex items-center justify-center text-lg shadow-sm">🤖</div>
                         <span className="font-mono text-[8px] text-red-600 mt-2">UiPath Bot</span>
                       </div>
                       <div className="relative z-10 flex flex-col items-center translate-y-[25px]">
-                        <div className="w-12 h-12 rounded-[0.8rem] bg-white border border-blue-200 flex items-center justify-center text-lg shadow-sm">👁️</div>
+                        <div className="w-12 h-12 rounded-[0.8rem] bg-white dark:bg-transparent border border-blue-200 flex items-center justify-center text-lg shadow-sm">👁️</div>
                         <span className="font-mono text-[8px] text-blue-600 mt-2">Vision Agent</span>
                       </div>
                     </div>
                   </div>
 
                   {/* Robot Logs / Metrics */}
-                  <div className="flex-1 bg-slate-900 rounded-xl border border-slate-800 p-5 font-mono text-[11px] text-slate-300 shadow-inner overflow-hidden flex flex-col">
+                  <div className="flex-1 bg-slate-900 dark:bg-black/40 rounded-xl border border-slate-800 dark:border-white/10 p-5 font-mono text-[11px] text-slate-300 shadow-inner overflow-hidden flex flex-col">
                     <div className="flex items-center justify-between mb-3 border-b border-slate-800 pb-2">
                       <span className="text-slate-400">ROBOT EXECUTION TRAIL</span>
                       <span className="text-emerald-400 flex items-center gap-1"><div className="w-1.5 h-1.5 rounded-full bg-emerald-400 animate-pulse" /> LIVE</span>
                     </div>
                     <div className="space-y-2 opacity-90">
                       <div className="flex gap-2"><span className="text-pink-500">10:42:01</span><span className="text-blue-400">[CX-100]</span> <span>Ping received.</span></div>
-                      <div className="flex gap-2"><span className="text-pink-500">10:42:02</span><span className="text-blue-400">[CX-100]</span> <span className="text-slate-500">Extracting DOM structure...</span></div>
+                      <div className="flex gap-2"><span className="text-pink-500">10:42:02</span><span className="text-blue-400">[CX-100]</span> <span className="text-slate-500 dark:text-slate-400">Extracting DOM structure...</span></div>
                       <div className="flex gap-2"><span className="text-pink-500">10:42:03</span><span className="text-yellow-400">[WARN]</span> <span className="text-red-400">Selector mismatch.</span></div>
                       <div className="flex gap-2"><span className="text-pink-500">10:42:03</span><span className="text-blue-400">[ORCH]</span> <span>Triggering Vision Agent mapping.</span></div>
                       <div className="flex gap-2"><span className="text-pink-500">10:42:05</span><span className="text-blue-400">[VISN]</span> <span className="text-emerald-400">Map success (X:1042, Y:430)</span></div>
@@ -307,7 +306,7 @@ export default function Home() {
       <AuroraThread variant="divider" />
 
       {/* Section 1.5: The Philosophy */}
-      <section className="bg-transparent py-24 scroll-reveal relative z-10">
+      <section className="bg-transparent py-16 md:py-24 scroll-reveal relative z-10">
         <div className="max-w-[1200px] mx-auto px-6 lg:px-12 space-y-16">
 
           {/* Row 1: The Thesis (Asymmetric 65/35) */}
@@ -325,14 +324,14 @@ export default function Home() {
             <div className="w-full lg:w-[35%] flex justify-center items-center relative min-h-[300px]">
               <div className="relative w-48 h-48 md:w-56 md:h-56">
                 {/* Background Glow */}
-                <div className="absolute inset-0 bg-gradient-to-tr from-cyan-500/20 via-fuchsia-500/20 to-yellow-500/20 rounded-full blur-3xl animate-pulse" style={{ animationDuration: '4s' }} />
+                <div className="absolute inset-0 bg-gradient-to-tr from-[#3df2ff]/25 via-[#ff4fd8]/25 to-[#ffe36e]/25 rounded-full blur-3xl animate-pulse" style={{ animationDuration: '4s' }} />
                 
                 {/* The Logo */}
                 {/* eslint-disable-next-line @next/next/no-img-element */}
                 <img 
                   src="/amadeus.svg" 
                   alt="Amadeus Enterprise" 
-                  className="relative z-10 w-full h-full object-contain drop-shadow-[0_0_15px_rgba(217,70,239,0.3)] float-soft"
+                  className="relative z-10 w-full h-full object-contain rounded-[2rem] bg-[#1e1b4b] dark:bg-transparent p-8 dark:p-0 drop-shadow-[0_0_24px_rgba(139,123,255,0.35)] float-soft"
                 />
                 
                 {/* Decorative Rings */}
@@ -343,7 +342,7 @@ export default function Home() {
           </div>
 
           {/* Row 2: The Three Actors */}
-          <div className="w-full bg-white dark:bg-[#1E1B4B] rounded-3xl border border-slate-200 dark:border-slate-800/50 shadow-2xl overflow-hidden relative">
+          <div className="w-full holo-glass holo-sheen rounded-3xl shadow-2xl overflow-hidden relative">
             <div className="absolute top-0 right-0 w-64 h-64 bg-fuchsia-500/5 rounded-full blur-3xl pointer-events-none" />
 
             <div className="flex flex-col">
@@ -370,7 +369,7 @@ export default function Home() {
                   gradientClass: "from-cyan-500/0 via-cyan-500/10",
                 }
               ].map((item, idx) => (
-                <div key={item.title} className={`p-8 md:p-10 flex flex-col md:flex-row md:items-center gap-6 relative group ${idx !== 2 ? 'border-b border-b-slate-100 dark:border-b-slate-800/50' : ''}`}>
+                <div key={item.title} className={`p-6 sm:p-8 md:p-10 flex flex-col md:flex-row md:items-center gap-6 relative group ${idx !== 2 ? 'border-b border-b-slate-200/70 dark:border-b-white/[0.06]' : ''}`}>
                   {/* Subtle hover gradient */}
                   <div className={`absolute inset-0 bg-gradient-to-r ${item.gradientClass} to-transparent opacity-0 group-hover:opacity-100 transition-opacity duration-500 pointer-events-none`} />
 
@@ -389,8 +388,8 @@ export default function Home() {
           </div>
 
           <div className="mt-16 text-center">
-            <div className="inline-flex items-center gap-3 bg-fuchsia-500/15 border border-fuchsia-500/30 px-6 py-2.5 rounded-full shadow-lg">
-              <span className="text-fuchsia-400 font-mono text-[14px] font-medium tracking-wide">
+            <div className="holo-ring inline-flex items-center gap-3 holo-glass px-5 sm:px-6 py-2.5 rounded-full">
+              <span className="holo-text font-mono text-[13px] sm:text-[14px] font-medium tracking-wide">
                 RPA + Agents = Agentic Process Automation (APA)
               </span>
             </div>
@@ -406,13 +405,13 @@ export default function Home() {
 
           <div className="flex flex-col md:flex-row md:items-end justify-between mb-8 gap-4">
             <div>
-              <h2 className="text-3xl font-semibold text-foreground tracking-tight mb-2">Your Enterprise-Grade Agent Laboratory.</h2>
+              <h2 className="section-head text-2xl md:text-3xl text-foreground mb-3">Your enterprise-grade agent laboratory</h2>
               <p className="text-slate-500 text-sm max-w-xl leading-relaxed">
                 Real-world business workflows require more than just a single tool. Seamlessly orchestrate AI agents, legacy RPA bots, document parsers, and human oversight into one unified pipeline.
               </p>
             </div>
 
-            <div className="bg-white/50 dark:bg-slate-900/50 backdrop-blur border border-slate-200 dark:border-slate-800 shadow-sm dark:shadow-[0_4px_20px_rgba(0,0,0,0.3)] rounded-2xl px-5 py-3 flex flex-col sm:flex-row items-center gap-4">
+            <div className="holo-glass rounded-2xl px-5 py-3 flex flex-col sm:flex-row items-center gap-4">
               <span className="text-[10px] font-medium text-slate-600 dark:text-slate-400 text-center sm:text-left">We Support<br />A2A Communication</span>
               <div className="hidden sm:block w-px h-8 bg-slate-300 dark:bg-slate-800" />
               <div className="flex flex-wrap justify-center items-center gap-4 md:gap-6">
@@ -423,7 +422,7 @@ export default function Home() {
             </div>
           </div>
 
-          <div className="w-full h-[500px] bg-white border border-slate-200 rounded-[2.5rem] p-4 shadow-sm overflow-hidden relative">
+          <div className="w-full h-[420px] md:h-[500px] bg-white dark:bg-white/[0.04] border border-slate-200 dark:border-white/10 rounded-[1.75rem] md:rounded-[2.5rem] p-2 md:p-4 shadow-sm dark:shadow-[0_30px_100px_-40px_rgba(61,242,255,0.35)] overflow-hidden relative">
             <TransactionGraph
               tx={{
                 current_step: LC_STEPS[tickerActive],
@@ -449,13 +448,13 @@ export default function Home() {
       <BenchmarkSection />
 
       {/* Section 4 & 5: FAQ and Security */}
-      <section className="bg-transparent py-24 relative overflow-hidden z-10">
-        <div className="max-w-[1400px] mx-auto px-6 lg:px-12 relative">
+      <section className="bg-transparent py-16 md:py-24 relative overflow-hidden z-10">
+        <div className="max-w-[1400px] mx-auto px-4 sm:px-6 lg:px-12 relative">
 
           {/* Unified Container */}
-          <div className="relative bg-white dark:bg-[#0B0A1F] border border-slate-200 dark:border-[rgba(139,92,246,0.15)] rounded-[2.5rem] p-10 lg:p-16 shadow-2xl overflow-hidden">
+          <div className="relative holo-glass holo-sheen rounded-[1.75rem] md:rounded-[2.5rem] p-6 sm:p-10 lg:p-16 shadow-2xl overflow-hidden">
             {/* Top-Right subtle Aurora mesh glow */}
-            <div className="absolute top-0 right-0 w-[500px] h-[500px] bg-gradient-to-bl from-fuchsia-500/10 via-cyan-500/5 to-transparent rounded-full blur-3xl -mt-48 -mr-48 pointer-events-none" />
+            <div className="absolute top-0 right-0 w-[500px] h-[500px] bg-gradient-to-bl from-[#ff4fd8]/10 via-[#3df2ff]/5 to-transparent rounded-full blur-3xl -mt-48 -mr-48 pointer-events-none" />
 
             <div className="grid grid-cols-1 lg:grid-cols-2 gap-16 xl:gap-24 relative z-10">
 
@@ -543,7 +542,7 @@ export default function Home() {
       <AuroraThread variant="divider" />
 
       {/* System Architecture at a Glance */}
-      <section className="py-24 bg-transparent relative z-10 scroll-reveal">
+      <section className="py-16 md:py-24 bg-transparent relative z-10 scroll-reveal">
         <div className="max-w-[1400px] mx-auto px-6 lg:px-12 space-y-16">
           <div className="text-left space-y-4 max-w-2xl">
             <p className="ui-label text-cyan-500">System Map</p>
@@ -556,7 +555,7 @@ export default function Home() {
           <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6">
 
             {/* Presentation Layer */}
-            <div className="group relative bg-white dark:bg-[#0B0A1F] border border-slate-200 dark:border-slate-800 rounded-3xl p-8 hover:border-cyan-500/50 transition-colors overflow-hidden">
+            <div className="group relative holo-glass holo-sheen rounded-3xl p-6 md:p-8 hover:border-cyan-500/50 transition-colors overflow-hidden">
               <div className="absolute top-0 right-0 w-32 h-32 bg-cyan-500/10 rounded-full blur-2xl -mt-16 -mr-16 pointer-events-none group-hover:bg-cyan-500/20 transition-colors" />
               <div className="relative z-10 space-y-4">
                 <div className="w-12 h-12 rounded-2xl bg-cyan-500/10 flex items-center justify-center border border-cyan-500/20">
@@ -574,7 +573,7 @@ export default function Home() {
             </div>
 
             {/* Orchestration Core */}
-            <div className="group relative bg-white dark:bg-[#0B0A1F] border border-slate-200 dark:border-slate-800 rounded-3xl p-8 hover:border-fuchsia-500/50 transition-colors overflow-hidden">
+            <div className="group relative holo-glass holo-sheen rounded-3xl p-6 md:p-8 hover:border-fuchsia-500/50 transition-colors overflow-hidden">
               <div className="absolute top-0 right-0 w-32 h-32 bg-fuchsia-500/10 rounded-full blur-2xl -mt-16 -mr-16 pointer-events-none group-hover:bg-fuchsia-500/20 transition-colors" />
               <div className="relative z-10 space-y-4">
                 <div className="w-12 h-12 rounded-2xl bg-fuchsia-500/10 flex items-center justify-center border border-fuchsia-500/20">
@@ -592,7 +591,7 @@ export default function Home() {
             </div>
 
             {/* Integration Layer */}
-            <div className="group relative bg-white dark:bg-[#0B0A1F] border border-slate-200 dark:border-slate-800 rounded-3xl p-8 hover:border-yellow-400/50 transition-colors overflow-hidden">
+            <div className="group relative holo-glass holo-sheen rounded-3xl p-6 md:p-8 hover:border-yellow-400/50 transition-colors overflow-hidden">
               <div className="absolute top-0 right-0 w-32 h-32 bg-yellow-400/10 rounded-full blur-2xl -mt-16 -mr-16 pointer-events-none group-hover:bg-yellow-400/20 transition-colors" />
               <div className="relative z-10 space-y-4">
                 <div className="w-12 h-12 rounded-2xl bg-yellow-400/10 flex items-center justify-center border border-yellow-400/20">
@@ -610,7 +609,7 @@ export default function Home() {
             </div>
 
             {/* Data Layer */}
-            <div className="group relative bg-white dark:bg-[#0B0A1F] border border-slate-200 dark:border-slate-800 rounded-3xl p-8 hover:border-emerald-400/50 transition-colors overflow-hidden">
+            <div className="group relative holo-glass holo-sheen rounded-3xl p-6 md:p-8 hover:border-emerald-400/50 transition-colors overflow-hidden">
               <div className="absolute top-0 right-0 w-32 h-32 bg-emerald-400/10 rounded-full blur-2xl -mt-16 -mr-16 pointer-events-none group-hover:bg-emerald-400/20 transition-colors" />
               <div className="relative z-10 space-y-4">
                 <div className="w-12 h-12 rounded-2xl bg-emerald-400/10 flex items-center justify-center border border-emerald-400/20">

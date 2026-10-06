@@ -1,7 +1,8 @@
 /**
  * AML/CFT knowledge base retrieval (apu.md Task 3b) — deliberately NOT
  * vector/embedding-based like ragClient.ts's retrievalWithRerank(). The only
- * working embedding path in this repo is OpenRouter (embeddingClient.ts);
+ * working embedding path in this repo stays on OpenRouter (embeddingClient.ts)
+ * even after the LLM/VLM migration to Netra — Netra has no embeddings model.
  */
 
 import { query } from '../../db/pool.js';

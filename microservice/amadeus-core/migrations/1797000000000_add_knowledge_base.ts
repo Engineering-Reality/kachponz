@@ -13,7 +13,7 @@ const __dirname = path.dirname(fileURLToPath(import.meta.url));
  *
  * `kb_documents.embedding` stays in the schema (vector(1024), matching
  * `rag_documents` in 1795000000000_add_rag.ts) but is intentionally left
- * NULL for now: the only working embedding path in this repo is DashScope
+ * NULL for now: the only working embedding path in this repo is OpenRouter
  * cloud (see embeddingClient.ts), which is dev/prototyping-only per POJK
  * 11/2022 / POJK 4/2023 / SWIFT CSP compliance concerns already flagged
  * there — unacceptable for query-time embedding of real counterparty names

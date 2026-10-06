@@ -1,11 +1,12 @@
 /**
  * Klien embedding untuk RAG — OpenRouter `qwen/qwen3-embedding-4b`.
  *
- * Reuses OPENROUTER_BASE_URL/OPENROUTER_API_KEY — OpenRouter serves both
- * /chat/completions and /embeddings under the same base URL. The model's
- * native output is wider than EMBEDDING_DIM, so the request includes a
- * `dimensions` field to truncate it (confirmed live: qwen/qwen3-embedding-4b
- * + dimensions:1024 returns exactly a 1024-length vector).
+ * TETAP di OpenRouter (bukan Netra): Netra tidak punya model embeddings
+ * (/embeddings → 404). Pakai blok env sendiri — EMBEDDING_BASE_URL /
+ * EMBEDDING_API_KEY — terpisah dari NETRA_*. The model's native output is
+ * wider than EMBEDDING_DIM, so the request includes a `dimensions` field to
+ * truncate it (confirmed live: qwen/qwen3-embedding-4b + dimensions:1024
+ * returns exactly a 1024-length vector).
  */
 
 import { env } from '../../config/env.js';
@@ -33,21 +34,21 @@ export async function embedText(text: string): Promise<number[]> {
 
 /** Batch embed — OpenRouter /embeddings endpoint accepts an array input. */
 export async function embedTexts(texts: string[]): Promise<number[][]> {
-  if (!env.OPENROUTER_BASE_URL) {
-    throw new EmbeddingApiError(500, 'OPENROUTER_BASE_URL belum dikonfigurasi');
+  if (!env.EMBEDDING_BASE_URL) {
+    throw new EmbeddingApiError(500, 'EMBEDDING_BASE_URL belum dikonfigurasi');
   }
-  if (!env.OPENROUTER_API_KEY) {
-    throw new EmbeddingApiError(500, 'OPENROUTER_API_KEY wajib di-set');
+  if (!env.EMBEDDING_API_KEY) {
+    throw new EmbeddingApiError(500, 'EMBEDDING_API_KEY wajib di-set');
   }
 
   const headers: Record<string, string> = {
     'Content-Type': 'application/json',
-    Authorization: `Bearer ${env.OPENROUTER_API_KEY}`,
+    Authorization: `Bearer ${env.EMBEDDING_API_KEY}`,
   };
 
-  const url = `${env.OPENROUTER_BASE_URL.replace(/\/$/, '')}/embeddings`;
+  const url = `${env.EMBEDDING_BASE_URL.replace(/\/$/, '')}/embeddings`;
   const controller = new AbortController();
-  const timer = setTimeout(() => controller.abort(), env.OPENROUTER_TIMEOUT_MS);
+  const timer = setTimeout(() => controller.abort(), env.NETRA_TIMEOUT_MS);
 
   let res: Response;
   try {

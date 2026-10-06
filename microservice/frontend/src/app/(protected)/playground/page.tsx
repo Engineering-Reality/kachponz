@@ -139,8 +139,23 @@ function PlaygroundInner() {
   const [currentSessionId, setCurrentSessionId] = useState<string | null>(null);
   const [attachments, setAttachments] = useState<Attachment[]>([]);
   const fileInputRef = useRef<HTMLInputElement>(null);
-  const [isSidebarOpen, setIsSidebarOpen] = useState(true);
-  const [isRightSidebarOpen, setIsRightSidebarOpen] = useState(true);
+  // Both panels are overlay drawers under lg and in-flow columns above it.
+  // Start them closed on a phone so the chat column owns the whole viewport.
+  const [isSidebarOpen, setIsSidebarOpen] = useState(false);
+  const [isRightSidebarOpen, setIsRightSidebarOpen] = useState(false);
+
+  useEffect(() => {
+    if (typeof window === "undefined") return;
+    const mq = window.matchMedia("(min-width: 1024px)");
+    const apply = (wide: boolean) => {
+      setIsSidebarOpen(wide);
+      setIsRightSidebarOpen(wide);
+    };
+    apply(mq.matches);
+    const onChange = (e: MediaQueryListEvent) => apply(e.matches);
+    mq.addEventListener("change", onChange);
+    return () => mq.removeEventListener("change", onChange);
+  }, []);
   const [runtimeMode, setRuntimeMode] = useState<'cloud' | 'on_prem'>('cloud');
 
   // Typing indicator — true from the moment a message is sent until the
@@ -813,8 +828,26 @@ function PlaygroundInner() {
     <div className="flex h-full text-slate-900 dark:text-white overflow-hidden bg-[#FAFAFA] dark:bg-[var(--background)]">
 
       {/* Sessions Sidebar (Far Left) */}
-      <aside className={`bg-slate-50 dark:bg-slate-800/50 border-r border-slate-200 dark:border-slate-700 flex flex-col shrink-0 z-10 transition-all duration-300 ${isSidebarOpen ? 'w-64' : 'w-0 overflow-hidden border-r-0'}`}>
-        <div className="p-4 border-b border-slate-200 dark:border-slate-700 whitespace-nowrap">
+      {/* Backdrop — drawer mode only (under lg) */}
+      {(isSidebarOpen || isRightSidebarOpen) && (
+        <button
+          type="button"
+          aria-label="Close panel"
+          onClick={() => { setIsSidebarOpen(false); setIsRightSidebarOpen(false); }}
+          className="lg:hidden fixed inset-0 z-30 bg-[#06051a]/50 backdrop-blur-sm"
+        />
+      )}
+
+      <aside className={`bg-slate-50 dark:bg-slate-800/50 border-r border-slate-200 dark:border-slate-700 flex flex-col z-40 transition-transform duration-300 fixed top-0 bottom-[68px] left-0 w-[82vw] max-w-[20rem] lg:inset-y-0 lg:bottom-0 lg:static lg:z-10 lg:shrink-0 lg:translate-x-0 lg:transition-all ${isSidebarOpen ? 'translate-x-0 lg:w-64' : '-translate-x-full lg:w-0 lg:overflow-hidden lg:border-r-0'}`}>
+        <div className="p-4 border-b border-slate-200 dark:border-slate-700 whitespace-nowrap flex items-center gap-2">
+          <button
+            type="button"
+            onClick={() => setIsSidebarOpen(false)}
+            aria-label="Close chat list"
+            className="lg:hidden shrink-0 w-10 h-10 flex items-center justify-center rounded-xl border border-slate-200 dark:border-slate-700 text-slate-500 dark:text-slate-400"
+          >
+            <X className="w-4 h-4" />
+          </button>
           <button onClick={startNewSession} className="w-full flex items-center justify-center gap-2 bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-700 shadow-sm text-slate-700 dark:text-slate-300 py-2.5 rounded-xl text-sm font-medium hover:bg-slate-50 dark:bg-slate-800/50 transition-colors">
             <MessageSquarePlus className="w-4 h-4" />
             New Chat
@@ -831,7 +864,10 @@ function PlaygroundInner() {
                 {groupSessions.map(session => (
                   <div key={session.id} className="relative group px-1">
                     <button
-                      onClick={() => switchSession(session.id)}
+                      onClick={() => {
+                        switchSession(session.id);
+                        if (window.matchMedia("(max-width: 1023px)").matches) setIsSidebarOpen(false);
+                      }}
                       className={`w-full text-left px-3 py-1.5 rounded-lg text-[13px] transition-colors flex items-center gap-2 pr-8 ${currentSessionId === session.id ? 'bg-indigo-50/50 dark:bg-slate-800/80 text-indigo-700 dark:text-slate-200 font-medium' : 'text-slate-600 dark:text-slate-400 hover:bg-slate-100 dark:hover:bg-slate-800/50'}`}
                     >
                       <div className="flex-1 min-w-0 truncate" title={session.title}>
@@ -862,11 +898,11 @@ function PlaygroundInner() {
           {/* Chat Header / Amadeus Console Top Bar */}
           <div className="border-b border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-900 flex flex-col sticky top-0 z-20 w-full shrink-0 shadow-sm">
             {/* Top Row: Title & Basic Info */}
-            <div className="h-10 flex items-center justify-between px-6 border-b border-slate-100 dark:border-slate-800 bg-slate-50 dark:bg-slate-800/80 backdrop-blur">
+            <div className="h-11 flex items-center justify-between px-3 md:px-6 border-b border-slate-100 dark:border-slate-800 bg-slate-50 dark:bg-slate-800/80 backdrop-blur">
               <div className="flex items-center gap-3">
                 <button
                   onClick={() => setIsSidebarOpen(!isSidebarOpen)}
-                  className="p-1.5 text-slate-400 dark:text-slate-500 hover:text-slate-700 dark:hover:text-slate-300 hover:bg-slate-100 dark:bg-slate-800 transition-colors rounded-lg mr-1"
+                  className="p-2.5 -ml-1 text-slate-500 dark:text-slate-400 hover:text-slate-700 dark:hover:text-slate-200 hover:bg-slate-100 dark:hover:bg-slate-800 transition-colors rounded-lg"
                   title="Toggle Sidebar"
                 >
                   <Menu className="w-4 h-4" />
@@ -943,8 +979,8 @@ function PlaygroundInner() {
                     value={runtimeMode}
                     onChange={(val: any) => setRuntimeMode(val)}
                     options={[
-                      { value: 'cloud', label: 'DashScope Qwen (Cloud)' },
-                      { value: 'on_prem', label: 'DashScope Qwen (On-Prem)' }
+                      { value: 'cloud', label: 'Netra DeepSeek (Cloud)' },
+                      { value: 'on_prem', label: 'Netra DeepSeek (On-Prem)' }
                     ]}
                     className="relative z-10 !py-1 text-xs !bg-transparent"
                     triggerClassName="rounded-[5px] border-transparent !bg-white/90 dark:!bg-slate-900/90 text-slate-800 dark:text-white backdrop-blur-sm shadow-sm"
@@ -1485,7 +1521,7 @@ function PlaygroundInner() {
         </main>
         
         {/* Right Sidebar — UiPathLiveGraph */}
-        <aside className={`bg-white dark:bg-slate-900 border-l border-slate-200 dark:border-slate-700 flex flex-col overflow-hidden shrink-0 z-10 transition-all duration-300 ${isRightSidebarOpen ? 'flex-1 min-w-[400px]' : 'w-0 border-l-0 min-w-0'}`}>
+        <aside className={`bg-white dark:bg-slate-900 border-l border-slate-200 dark:border-slate-700 flex flex-col overflow-hidden z-40 transition-transform duration-300 fixed top-0 bottom-[68px] right-0 w-[88vw] max-w-[26rem] lg:inset-y-0 lg:bottom-0 lg:static lg:z-10 lg:shrink-0 lg:translate-x-0 lg:transition-all ${isRightSidebarOpen ? 'translate-x-0 lg:flex-1 lg:min-w-[400px]' : 'translate-x-full lg:w-0 lg:border-l-0 lg:min-w-0'}`}>
           <UiPathLiveGraph sessionLabel={currentSessionId} agentId={selectedAgent} />
         </aside>
       </div>

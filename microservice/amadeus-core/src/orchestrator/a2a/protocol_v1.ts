@@ -2,7 +2,7 @@
  * Amadeus A2A Protocol v1 — In-house Multi-Agent Coordination.
  *
  * Milik Bank Mandiri. Protokol ini dirancang internal untuk koordinasi antar-
- * robot RPA (UiPath, PAD) dan agent LLM (Qwen VL, dll) dalam alur settlement
+ * robot RPA (UiPath, PAD) dan agent LLM (DeepSeek VL, dll) dalam alur settlement
  * Import LC/SKBDN/SBLC. Bukan produk vendor manapun.
  *
  * Prinsip desain (dari research umum multi-agent systems 2025-2026):

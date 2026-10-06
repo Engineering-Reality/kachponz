@@ -1,13 +1,13 @@
 /**
  * Chat Recommendation — 2-4 short follow-up suggestions shown as tappable
- * chips after an assistant turn. Called via openrouterChat().
+ * chips after an assistant turn. Called via netraChat().
  *
  * Recommendations are a nice-to-have: on any failure (network, non-JSON
  * response, etc.) this fails quietly and returns [] rather than throwing —
  * it must never block or break the actual chat flow.
  */
 
-import { openrouterChat } from './openrouterClient.js';
+import { netraChat } from './netraClient.js';
 import { env } from '../../config/env.js';
 
 export interface ConversationTailMessage {
@@ -46,8 +46,8 @@ Provide recommendations that are:
 export async function suggestFollowUps(conversationTail: ConversationTailMessage[]): Promise<string[]> {
   const prompt = buildRecommendationPrompt(conversationTail);
   try {
-    const result = await openrouterChat({
-      model: env.OPENROUTER_LLM_MODEL,
+    const result = await netraChat({
+      model: env.NETRA_LLM_MODEL,
       messages: [
         { role: 'system', content: RECOMMENDATION_SYSTEM },
         { role: 'user', content: prompt },

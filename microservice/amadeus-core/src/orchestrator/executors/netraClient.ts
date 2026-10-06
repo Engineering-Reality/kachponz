@@ -1,23 +1,27 @@
 /**
- * Klien OpenRouter — OpenAI-compatible wrapper untuk openrouter.ai, sebuah
- * router terpadu di atas banyak provider model (dipakai di sini terutama
- * untuk model Qwen).
+ * Klien Netra Runtime — OpenAI-compatible wrapper untuk Netra Runtime,
+ * endpoint inference OpenAI-compatible (dipakai di sini untuk model DeepSeek
+ * text + vision).
  *
- * Endpoint OpenAI-compatible tunggal (bukan multi-region seperti provider
- * sebelumnya):
- *   https://openrouter.ai/api/v1
+ * Endpoint OpenAI-compatible tunggal:
+ *   https://api.netraruntime.com/v1
  *
  * Model yang dipakai:
- *   - OPENROUTER_VL_MODEL  : qwen/qwen3-vl-235b-a22b-instruct (multimodal, vision + text)
- *   - OPENROUTER_LLM_MODEL : qwen/qwen-plus (text-only, cost-efficient)
+ *   - NETRA_VL_MODEL  : deepseek/deepseek-v4.1-flash (multimodal, vision + text)
+ *   - NETRA_LLM_MODEL : deepseek/deepseek-v4-flash-0731 (text-only, cost-efficient)
  *
- * API key diambil dari env OPENROUTER_API_KEY.
+ * API key diambil dari env NETRA_API_KEY.
  */
 
 import { env } from '../../config/env.js';
-import { logLlmUsageEvent, measurementBodyOverrides } from '../../telemetry/llmUsage.js';
+import {
+  logLlmUsageEvent,
+  measurementBodyOverrides,
+  netraSamplingParams,
+  extractReasoning,
+} from '../../telemetry/llmUsage.js';
 
-interface OpenRouterChatMessage {
+interface NetraChatMessage {
   role: 'system' | 'user' | 'assistant';
   content:
     | string
@@ -27,22 +31,24 @@ interface OpenRouterChatMessage {
       >;
 }
 
-export interface OpenRouterChatRequest {
+export interface NetraChatRequest {
   model: string;
-  messages: OpenRouterChatMessage[];
+  messages: NetraChatMessage[];
   temperature?: number;
   max_tokens?: number;
   /** Bila di-set, minta model kembalikan JSON valid (best-effort). */
   responseJson?: boolean;
-  /** Telemetry tag (owo.md/tok.md sizing exercise) — e.g. 'chatTitle', 'autofill', 'qwenDocExam'. */
+  /** Telemetry tag (owo.md/tok.md sizing exercise) — e.g. 'chatTitle', 'autofill', 'docExam'. */
   callSite?: string;
   modelKind?: 'text' | 'vision';
   agentId?: string;
   threadId?: string;
 }
 
-export interface OpenRouterChatResponse {
+export interface NetraChatResponse {
   content: string;
+  /** Reasoning kept on a SEPARATE channel — never concatenated into `content`. */
+  reasoning?: string;
   model: string;
   usage?: {
     prompt_tokens?: number;
@@ -53,42 +59,43 @@ export interface OpenRouterChatResponse {
   provider?: string;
 }
 
-export class OpenRouterApiError extends Error {
+export class NetraApiError extends Error {
   constructor(
     public readonly status: number,
     message: string,
     public readonly body?: string,
   ) {
     super(message);
-    this.name = 'OpenRouterApiError';
+    this.name = 'NetraApiError';
   }
 }
 
 /**
- * Kirim chat completion ke OpenRouter. OpenAI-compatible endpoint.
+ * Kirim chat completion ke Netra Runtime. OpenAI-compatible endpoint.
  */
-export async function openrouterChat(req: OpenRouterChatRequest): Promise<OpenRouterChatResponse> {
-  if (!env.OPENROUTER_API_KEY) {
-    throw new OpenRouterApiError(500, 'OPENROUTER_API_KEY wajib di-set');
+export async function netraChat(req: NetraChatRequest): Promise<NetraChatResponse> {
+  if (!env.NETRA_API_KEY) {
+    throw new NetraApiError(500, 'NETRA_API_KEY wajib di-set');
   }
 
-  const url = `${env.OPENROUTER_BASE_URL.replace(/\/$/, '')}/chat/completions`;
+  const url = `${env.NETRA_BASE_URL.replace(/\/$/, '')}/chat/completions`;
   const headers: Record<string, string> = {
     'Content-Type': 'application/json',
-    Authorization: `Bearer ${env.OPENROUTER_API_KEY}`,
+    Authorization: `Bearer ${env.NETRA_API_KEY}`,
   };
 
   const body: Record<string, unknown> = {
     model: req.model,
     messages: req.messages,
     temperature: req.temperature ?? 0.1,
+    ...netraSamplingParams(),
     ...measurementBodyOverrides(),
   };
   if (req.max_tokens) body.max_tokens = req.max_tokens;
   if (req.responseJson) body.response_format = { type: 'json_object' };
 
   const controller = new AbortController();
-  const timer = setTimeout(() => controller.abort(), env.OPENROUTER_TIMEOUT_MS);
+  const timer = setTimeout(() => controller.abort(), env.NETRA_TIMEOUT_MS);
   const startedAt = Date.now();
 
   let res: Response;
@@ -100,9 +107,9 @@ export async function openrouterChat(req: OpenRouterChatRequest): Promise<OpenRo
       signal: controller.signal,
     });
   } catch (e) {
-    throw new OpenRouterApiError(
+    throw new NetraApiError(
       0,
-      `Gagal menghubungi OpenRouter: ${e instanceof Error ? e.message : String(e)}`,
+      `Gagal menghubungi Netra: ${e instanceof Error ? e.message : String(e)}`,
     );
   } finally {
     clearTimeout(timer);
@@ -110,23 +117,28 @@ export async function openrouterChat(req: OpenRouterChatRequest): Promise<OpenRo
 
   if (!res.ok) {
     const txt = await res.text().catch(() => '');
-    throw new OpenRouterApiError(res.status, `OpenRouter API ${res.status}`, txt.slice(0, 500));
+    throw new NetraApiError(res.status, `Netra API ${res.status}`, txt.slice(0, 500));
   }
 
   const json = (await res.json()) as {
     choices?: Array<{ message?: { content?: string }; finish_reason?: string }>;
     model?: string;
-    usage?: OpenRouterChatResponse['usage'];
+    usage?: NetraChatResponse['usage'];
     provider?: string;
   };
-  const content = json.choices?.[0]?.message?.content ?? '';
+  const message = json.choices?.[0]?.message;
+  const content = message?.content ?? '';
+  // Reasoning stays on its own channel; never folded into user-visible content.
+  const reasoning = extractReasoning(message);
 
   if (req.callSite) {
     void logLlmUsageEvent({
       callSite: req.callSite,
       modelSlug: json.model ?? req.model,
       modelKind: req.modelKind ?? 'text',
-      provider: json.provider,
+      // Netra returns no `provider` field — write the literal 'netra' so rows
+      // stay distinguishable from pre-migration OpenRouter rows.
+      provider: json.provider ?? 'netra',
       agentId: req.agentId,
       threadId: req.threadId,
       thinkingEnabled: env.LLM_MEASUREMENT_REASONING ? env.LLM_MEASUREMENT_REASONING === 'on' : undefined,
@@ -142,6 +154,7 @@ export async function openrouterChat(req: OpenRouterChatRequest): Promise<OpenRo
 
   return {
     content,
+    reasoning: reasoning || undefined,
     model: json.model ?? req.model,
     usage: json.usage,
     provider: json.provider,

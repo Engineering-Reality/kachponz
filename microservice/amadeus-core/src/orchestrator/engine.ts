@@ -25,7 +25,7 @@ import { jsonSchemaToZod } from "./jsonSchemaToZod.js";
 import { callFn } from "../db/rpc.js";
 import { env } from "../config/env.js";
 import { searchKnowledgeBase, getAgentKnowledgeBases } from "./executors/kbClient.js";
-import { logLlmUsageEvent, measurementBodyOverrides } from "../telemetry/llmUsage.js";
+import { logLlmUsageEvent, measurementBodyOverrides, netraSamplingParams, extractReasoning } from "../telemetry/llmUsage.js";
 
 const mcpHost = loadPortRange().host;
 
@@ -1036,11 +1036,11 @@ export async function runAgenticStep(
 
     const resolvedModel = agentConfig.model && agentConfig.model !== "gpt-4o"
       ? agentConfig.model
-      : (requiresVision ? env.OPENROUTER_VL_MODEL : env.OPENROUTER_LLM_MODEL);
+      : (requiresVision ? env.NETRA_VL_MODEL : env.NETRA_LLM_MODEL);
 
-    // OpenRouter API (OPENROUTER_BASE_URL + OPENROUTER_API_KEY from .env)
-    const apiKey = env.OPENROUTER_API_KEY ?? '';
-    const baseURL = env.OPENROUTER_BASE_URL;
+    // Netra Runtime API (NETRA_BASE_URL + NETRA_API_KEY from .env)
+    const apiKey = env.NETRA_API_KEY ?? '';
+    const baseURL = env.NETRA_BASE_URL;
 
     // Telemetry (owo.md LANJUTAN C): one ReAct iteration = one fetch call to
     // /chat/completions here, so a fetch wrapper gives us step_index for free.
@@ -1065,7 +1065,7 @@ export async function runAgenticStep(
               callSite: 'engine.react',
               modelSlug: json?.model ?? resolvedModel,
               modelKind: requiresVision ? 'vision' : 'text',
-              provider: json?.provider,
+              provider: json?.provider ?? 'netra',
               thinkingEnabled: env.LLM_MEASUREMENT_REASONING
                 ? env.LLM_MEASUREMENT_REASONING === 'on'
                 : undefined,
@@ -1090,7 +1090,7 @@ export async function runAgenticStep(
       modelName: resolvedModel,
       temperature: 1,
       topP: 1,
-      modelKwargs: { top_k: 40, min_p: 0, ...measurementBodyOverrides() },
+      modelKwargs: { ...netraSamplingParams(), ...measurementBodyOverrides() },
       apiKey,
       configuration: {
         baseURL,
@@ -1322,18 +1322,20 @@ export async function runAgenticStepStream(
 
     const resolvedModel = agentConfig.model && agentConfig.model !== "gpt-4o"
       ? agentConfig.model
-      : (requiresVision ? env.OPENROUTER_VL_MODEL : env.OPENROUTER_LLM_MODEL);
+      : (requiresVision ? env.NETRA_VL_MODEL : env.NETRA_LLM_MODEL);
 
-    // OpenRouter API (OPENROUTER_BASE_URL + OPENROUTER_API_KEY from .env)
-    const apiKey = env.OPENROUTER_API_KEY ?? '';
-    const baseURL = env.OPENROUTER_BASE_URL;
+    // Netra Runtime API (NETRA_BASE_URL + NETRA_API_KEY from .env)
+    const apiKey = env.NETRA_API_KEY ?? '';
+    const baseURL = env.NETRA_BASE_URL;
 
     const modelInitStart = Date.now();
     const llm = new ChatOpenAI({
       modelName: resolvedModel,
       temperature: 1,
       topP: 1,
-      modelKwargs: { top_k: 40, min_p: 0 },
+      // Keep in sync with the invoke path above: same sampling params AND the
+      // measurement overrides (previously missing here — the known drift).
+      modelKwargs: { ...netraSamplingParams(), ...measurementBodyOverrides() },
       apiKey,
       configuration: {
         baseURL,
@@ -1384,6 +1386,12 @@ export async function runAgenticStepStream(
             content: lastMsg.content,
             name: lastMsg.name,
           };
+
+          // Netra reasoning (3 shapes) stays on its OWN channel — never folded
+          // into message.content. LangChain stows provider extras in
+          // additional_kwargs.
+          const reasoning = extractReasoning(lastMsg.additional_kwargs);
+          if (reasoning) payload.reasoning = reasoning;
 
           if (isAgent && lastMsg._getType() === 'ai') {
             finalAgentOutput = lastMsg.content;

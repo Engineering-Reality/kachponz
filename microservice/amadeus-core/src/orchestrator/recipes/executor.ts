@@ -18,7 +18,7 @@ import { DomainError } from '../../types/domain.js';
 import { txLogger } from '../../lib/logger.js';
 import { env } from '../../config/env.js';
 import { resolveCorsOrigin } from '../../config/cors.js';
-import { logLlmUsageEvent, measurementBodyOverrides } from '../../telemetry/llmUsage.js';
+import { logLlmUsageEvent, measurementBodyOverrides, netraSamplingParams } from '../../telemetry/llmUsage.js';
 import { connectToMcpToolById, extractJobTraceMeta } from '../engine.js';
 import type { RecipeDef, RecipeResolverDef, RecipeRunState, RecipeStepDef, StepOutcome } from './types.js';
 
@@ -349,9 +349,9 @@ async function classifyFault(detail: string): Promise<'retry' | 'abort'> {
         .then((json: any) => {
           void logLlmUsageEvent({
             callSite: 'recipe.classifyFault',
-            modelSlug: json?.model ?? env.OPENROUTER_LLM_MODEL,
+            modelSlug: json?.model ?? env.NETRA_LLM_MODEL,
             modelKind: 'text',
-            provider: json?.provider,
+            provider: json?.provider ?? 'netra',
             promptTokens: json?.usage?.prompt_tokens,
             completionTokens: json?.usage?.completion_tokens,
             totalTokens: json?.usage?.total_tokens,
@@ -368,12 +368,12 @@ async function classifyFault(detail: string): Promise<'retry' | 'abort'> {
   };
 
   const llm = new ChatOpenAI({
-    modelName: env.OPENROUTER_LLM_MODEL || 'qwen/qwen-plus',
+    modelName: env.NETRA_LLM_MODEL || 'deepseek/deepseek-v4-flash-0731',
     temperature: 0,
-    modelKwargs: { ...measurementBodyOverrides() },
-    apiKey: env.OPENROUTER_API_KEY,
+    modelKwargs: { ...netraSamplingParams(), ...measurementBodyOverrides() },
+    apiKey: env.NETRA_API_KEY,
     configuration: {
-      baseURL: env.OPENROUTER_BASE_URL,
+      baseURL: env.NETRA_BASE_URL,
       fetch: env.LLM_USAGE_TELEMETRY ? telemetryFetch : undefined,
     },
   });

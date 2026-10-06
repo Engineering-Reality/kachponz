@@ -7,8 +7,8 @@ const __dirname = path.dirname(fileURLToPath(import.meta.url));
 
 /**
  * Text-only RAG (pgvector), ported from legacy Python microservice/rag/.
- * embedding is vector(1024) — dimension returned by DashScope's
- * text-embedding-v3 (confirmed live against the API, see embeddingClient.ts),
+ * embedding is vector(1024) — dimension returned by the embedding model
+ * (qwen/qwen3-embedding-4b via OpenRouter, confirmed live; see embeddingClient.ts),
  * NOT the 768-dim CLIP embedding the old EmbedderService produced; that
  * class of in-process torch/transformers model is explicitly not ported.
  * `rerank_documents` recreates the Supabase RPC function the legacy code
