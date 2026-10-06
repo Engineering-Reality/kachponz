@@ -1,0 +1,42 @@
+[
+  {
+    "name": "linux-deps",
+    "hidden": true,
+    "matrix": {
+      "deps": ["libgl1-mesa-dev", "libglfw3-dev", "libx11-dev", "libxext-dev", "libxtst-dev", "libxcursor-dev", "libxrandr-dev", "libxi-dev", "pkg-config", "cmake", "build-essential", "libglu1-mesa-dev"]
+    }
+  },
+  {
+    "name": "linux-default",
+    "inherits": "linux-deps",
+    "display": "Linux (GCC) — Release",
+    "architecture": {
+      "compiler": "gcc"
+    },
+    "configuration": "Release",
+    "cacheVariables": {
+      "CMAKE_BUILD_TYPE": "Release",
+      "CMAKE_CXX_COMPILER": "g++"
+    }
+  },
+  {
+    "name": "linux-debug",
+    "inherits": "linux-deps",
+    "display": "Linux (GCC) — Debug",
+    "configuration": "Debug",
+    "cacheVariables": {
+      "CMAKE_BUILD_TYPE": "Debug",
+      "CMAKE_CXX_COMPILER": "g++"
+    }
+  },
+  {
+    "name": "linux-clang",
+    "inherits": "linux-deps",
+    "display": "Linux (Clang) — Release",
+    "configuration": "Release",
+    "cacheVariables": {
+      "CMAKE_BUILD_TYPE": "Release",
+      "CMAKE_CXX_COMPILER": "clang++"
+    }
+  }
+]
