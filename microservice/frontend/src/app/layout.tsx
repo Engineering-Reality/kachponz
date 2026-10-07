@@ -30,7 +30,7 @@ const unbounded = Unbounded({
 });
 
 export const viewport: Viewport = {
-  themeColor: "#06051a",
+  themeColor: "#050505",
   viewportFit: "cover",
 };
 

@@ -8,13 +8,15 @@ export function MarketingFooter() {
   return (
     <>
       {/* Closing CTA — bookends the hero's tesseract with the same foil */}
-      <section className="relative holo-void py-20 md:py-28 overflow-hidden">
-        <AuroraThread variant="mesh" size="sm" />
+      <section
+        className="relative py-20 md:py-28 overflow-hidden"
+        data-holo-anchor="0.5 0.2 0.15 1"
+        data-holo-anchor-m="0.5 0.16 0.24 1"
+        data-holo-label="Begin"
+      >
         <div className="relative z-10 max-w-3xl mx-auto px-5 text-center flex flex-col items-center">
-          <span className="holo-nucleus relative isolate inline-flex mb-8">
-            {/* eslint-disable-next-line @next/next/no-img-element */}
-            <img src="/amadeus.svg" alt="" className="w-16 h-16 object-contain rounded-2xl bg-[#1e1b4b] dark:bg-transparent p-1.5 dark:p-0 float-soft" />
-          </span>
+          {/* The companion returns to centre here — it bookends the hero. */}
+          <div className="h-[clamp(180px,28vh,300px)]" aria-hidden="true" />
           <h2 className="section-head text-[clamp(1.6rem,4.5vw,2.75rem)] wire-text mb-4">
             Bring your bots into the loop
           </h2>
@@ -30,7 +32,7 @@ export function MarketingFooter() {
         </div>
         <AuroraThread variant="divider" position="absolute" className="bottom-0 left-0" />
       </section>
-      <footer className="bg-white dark:bg-[#04030f] pt-16 pb-8 border-t border-slate-200 dark:border-white/[0.06]" style={{ paddingBottom: "max(2rem, env(safe-area-inset-bottom))" }}>
+      <footer className="relative z-10 bg-white dark:bg-[#030303] pt-16 pb-8 border-t border-slate-200 dark:border-white/[0.06]" style={{ paddingBottom: "max(2rem, env(safe-area-inset-bottom))" }}>
         <div className="max-w-6xl mx-auto px-6">
           <div className="grid grid-cols-2 md:grid-cols-5 gap-8 pb-12">
             <div className="col-span-2 space-y-4">

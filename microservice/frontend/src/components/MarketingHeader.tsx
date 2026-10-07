@@ -113,7 +113,7 @@ export function MarketingHeader() {
             type="button"
             aria-label="Close menu"
             onClick={() => setOpen(false)}
-            className="fixed inset-0 -z-10 bg-[#06051a]/40 backdrop-blur-sm pointer-events-auto lg:hidden"
+            className="fixed inset-0 -z-10 bg-black/50 backdrop-blur-sm pointer-events-auto lg:hidden"
           />
           <nav
             id="mobile-nav"

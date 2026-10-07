@@ -24,6 +24,9 @@ import { MarketingHeader } from "@/components/MarketingHeader";
 import { MarketingFooter } from "@/components/MarketingFooter";
 import { HoloStage } from "@/components/HoloStage";
 import { HoloText } from "@/components/HoloText";
+import { HoloCompanion } from "@/components/HoloCompanion";
+import { BrutalFrame } from "@/components/BrutalFrame";
+import { Parallax, ScrubReveal, Tilt, Marquee } from "@/components/Motion";
 import { FeatureShowcase } from "@/components/FeatureShowcase";
 import { BenchmarkSection } from "@/components/BenchmarkSection";
 import { AuroraBackground } from "@/components/AuroraBackground";
@@ -103,12 +106,14 @@ export default function Home() {
 
 
   return (
-    <div className="min-h-screen bg-background text-foreground overflow-x-hidden w-full max-w-[100vw]">
+    <div className="min-h-screen bg-background text-foreground overflow-x-clip w-full max-w-[100vw]">
+      <HoloCompanion />
+      <BrutalFrame />
       <MarketingHeader />
 
       {/* Hero — the logo comes alive: a 4D tesseract in a responsive particle field */}
       <section className="relative pt-[72px] md:pt-24 pb-16 md:pb-24 overflow-hidden holo-void flex flex-col items-center text-center">
-        <HoloStage>
+        <HoloStage core={false}>
           <div className="max-w-5xl mx-auto px-5 md:px-6 flex flex-col items-center">
             <h1 className="holo-headline mt-2 mb-6 md:mb-8 flex flex-col items-center gap-y-1 w-full">
               <span>
@@ -142,11 +147,12 @@ export default function Home() {
 
         <div className="max-w-5xl mx-auto px-4 md:px-6 relative z-10 flex flex-col items-center w-full">
           {/* Agent Flow Playground / Danantara Mockup */}
-          <div className="w-full max-w-6xl relative group mx-auto mt-4">
+          <ScrubReveal className="w-full">
+          <Tilt className="w-full max-w-6xl relative group mx-auto mt-4 rounded-[1.5rem]" max={4}>
             {/* Glossy overlay reflection */}
             <div className="absolute inset-0 bg-gradient-to-br from-white/30 dark:from-white/[0.06] to-transparent rounded-[1.5rem] pointer-events-none z-20" />
 
-            <div className="bg-[#FAFAFA] dark:bg-[#0c0a26]/85 dark:backdrop-blur-xl border border-slate-200 dark:border-white/10 rounded-[1.25rem] md:rounded-[1.5rem] holo-sheen overflow-hidden shadow-2xl shadow-slate-900/10 dark:shadow-[0_40px_120px_-30px_rgba(139,123,255,0.45)] flex flex-col md:flex-row relative z-10 transition-transform duration-500 group-hover:-translate-y-2 min-h-[460px] md:min-h-0 md:h-[600px] text-left">
+            <div className="bg-[#FAFAFA] dark:bg-[#0e0e10]/90 dark:backdrop-blur-xl border border-slate-200 dark:border-white/10 rounded-[1.25rem] md:rounded-[1.5rem] holo-sheen overflow-hidden shadow-2xl shadow-slate-900/10 dark:shadow-[0_40px_120px_-30px_rgba(139,123,255,0.45)] flex flex-col md:flex-row relative z-10 min-h-[460px] md:min-h-0 md:h-[600px] text-left">
 
               {/* Left Column: Chat Console */}
               <div className="flex-1 flex flex-col border-r border-slate-200 dark:border-white/10 bg-white dark:bg-transparent relative">
@@ -296,53 +302,45 @@ export default function Home() {
               </div>
 
             </div>
-          </div>
+          </Tilt>
+          </ScrubReveal>
         </div>
 
         {/* Bottom Fade to blend into next section */}
         <div className="absolute bottom-0 left-0 w-full h-32 bg-gradient-to-t from-background to-transparent pointer-events-none z-20" />
       </section>
 
-      <AuroraThread variant="divider" />
+      <Marquee items={["Humans", "AI agents", "RPA robots", "MCP", "Loop mode", "HMAC-SHA512", "OJK / BI", "Air-gapped"]} />
 
       {/* Section 1.5: The Philosophy */}
-      <section className="bg-transparent py-16 md:py-24 scroll-reveal relative z-10">
+      <section
+        className="bg-transparent py-16 md:py-28 relative z-10"
+        data-holo-anchor="0.8 0.22 0.17 1"
+        data-holo-anchor-m="0.82 0.06 0.12 1"
+        data-holo-label="Mission"
+      >
         <div className="max-w-[1200px] mx-auto px-6 lg:px-12 space-y-16">
 
           {/* Row 1: The Thesis (Asymmetric 65/35) */}
           <div className="flex flex-col lg:flex-row gap-12 lg:gap-24 items-center">
             <div className="w-full lg:w-[65%]">
-              <p className="ui-label text-cyan-500 mb-6">Our Mission</p>
-              <div className="relative pl-8 before:absolute before:inset-y-0 before:left-0 before:w-[2px] before:bg-gradient-to-b before:from-cyan-400 before:via-fuchsia-500 before:to-yellow-400">
+              <span className="sec-index">02 / Mission</span>
+              <Parallax speed={-0.08}>
+              <div className="relative pl-8 before:absolute before:inset-y-0 before:left-0 before:w-[2px] before:bg-gradient-to-b before:from-[#3df2ff] before:via-[#ff4fd8] before:to-[#ffe36e]">
                 <h3 className="text-[clamp(1.5rem,3vw,2.2rem)] font-semibold text-foreground leading-snug tracking-tight">
                   AI doesn't fix a disorganized company, it transforms your disorganization into a system. We built Amadeus to bridge the critical gap between humans, intelligent agents, and rigid robots.
                 </h3>
               </div>
+              </Parallax>
             </div>
 
-            {/* Amadeus Logo Composition (35%) */}
-            <div className="w-full lg:w-[35%] flex justify-center items-center relative min-h-[300px]">
-              <div className="relative w-48 h-48 md:w-56 md:h-56">
-                {/* Background Glow */}
-                <div className="absolute inset-0 bg-gradient-to-tr from-[#3df2ff]/25 via-[#ff4fd8]/25 to-[#ffe36e]/25 rounded-full blur-3xl animate-pulse" style={{ animationDuration: '4s' }} />
-                
-                {/* The Logo */}
-                {/* eslint-disable-next-line @next/next/no-img-element */}
-                <img 
-                  src="/amadeus.svg" 
-                  alt="Amadeus Enterprise" 
-                  className="relative z-10 w-full h-full object-contain rounded-[2rem] bg-[#1e1b4b] dark:bg-transparent p-8 dark:p-0 drop-shadow-[0_0_24px_rgba(139,123,255,0.35)] float-soft"
-                />
-                
-                {/* Decorative Rings */}
-                <div className="absolute -inset-4 border border-fuchsia-500/20 dark:border-fuchsia-500/10 rounded-full animate-spin-slow pointer-events-none" style={{ animationDuration: '20s' }} />
-                <div className="absolute -inset-8 border border-cyan-400/20 dark:border-cyan-400/10 rounded-full animate-reverse-spin pointer-events-none" style={{ animationDuration: '25s' }} />
-              </div>
-            </div>
+            {/* The companion object docks into this column (see data-holo-anchor). */}
+            <div className="hidden lg:block w-full lg:w-[35%] min-h-[320px]" aria-hidden="true" />
           </div>
 
           {/* Row 2: The Three Actors */}
-          <div className="w-full holo-glass holo-sheen rounded-3xl shadow-2xl overflow-hidden relative">
+          <ScrubReveal>
+          <div className="w-full brutal-panel holo-sheen overflow-hidden relative">
             <div className="absolute top-0 right-0 w-64 h-64 bg-fuchsia-500/5 rounded-full blur-3xl pointer-events-none" />
 
             <div className="flex flex-col">
@@ -386,6 +384,7 @@ export default function Home() {
               ))}
             </div>
           </div>
+          </ScrubReveal>
 
           <div className="mt-16 text-center">
             <div className="holo-ring inline-flex items-center gap-3 holo-glass px-5 sm:px-6 py-2.5 rounded-full">
@@ -397,15 +396,19 @@ export default function Home() {
         </div>
       </section>
 
-      <AuroraThread variant="divider" />
-
       {/* Section 2: Live Flow Ticker */}
-      <section className="bg-transparent py-14 relative z-10">
+      <section
+        className="bg-transparent py-16 md:py-24 relative z-10"
+        data-holo-anchor="0.05 0.3 0.06 0"
+        data-holo-anchor-m="0.86 0.05 0.09 0"
+        data-holo-label="Laboratory"
+      >
         <div className="max-w-6xl mx-auto px-6">
 
           <div className="flex flex-col md:flex-row md:items-end justify-between mb-8 gap-4">
             <div>
-              <h2 className="section-head text-2xl md:text-3xl text-foreground mb-3">Your enterprise-grade agent laboratory</h2>
+              <span className="sec-index">03 / Laboratory</span>
+              <h2 className="section-head text-2xl md:text-4xl text-foreground mb-3">Your enterprise-grade agent laboratory</h2>
               <p className="text-slate-500 text-sm max-w-xl leading-relaxed">
                 Real-world business workflows require more than just a single tool. Seamlessly orchestrate AI agents, legacy RPA bots, document parsers, and human oversight into one unified pipeline.
               </p>
@@ -422,7 +425,8 @@ export default function Home() {
             </div>
           </div>
 
-          <div className="w-full h-[420px] md:h-[500px] bg-white dark:bg-white/[0.04] border border-slate-200 dark:border-white/10 rounded-[1.75rem] md:rounded-[2.5rem] p-2 md:p-4 shadow-sm dark:shadow-[0_30px_100px_-40px_rgba(61,242,255,0.35)] overflow-hidden relative">
+          <ScrubReveal>
+          <div className="w-full h-[420px] md:h-[520px] brutal-panel p-2 md:p-3 dark:shadow-[0_30px_100px_-40px_rgba(61,242,255,0.3)] overflow-hidden relative">
             <TransactionGraph
               tx={{
                 current_step: LC_STEPS[tickerActive],
@@ -431,28 +435,33 @@ export default function Home() {
               events={EMPTY_EVENTS}
             />
           </div>
+          </ScrubReveal>
           <p className="text-xs text-slate-400 mt-4 text-center">
             Step transitions are append-only and cryptographically logged. Nodes are processed asynchronously by different MCP agents.
           </p>
         </div>
       </section>
 
-      <AuroraThread variant="divider" className="max-w-6xl mx-auto" />
-
       {/* Section 3: Feature Showcase */}
       <FeatureShowcase />
 
-      <AuroraThread variant="divider" className="max-w-6xl mx-auto" />
+      <Marquee reverse items={["Agent architect", "Tools registry", "Flow playground", "Agent gallery", "Knowledge bases", "Recipes"]} />
 
       {/* Section 3.5: Benchmark Section */}
       <BenchmarkSection />
 
       {/* Section 4 & 5: FAQ and Security */}
-      <section className="bg-transparent py-16 md:py-24 relative overflow-hidden z-10">
+      <section
+        className="bg-transparent py-16 md:py-24 relative overflow-hidden z-10"
+        data-holo-anchor="0.96 0.5 0.055 0"
+        data-holo-anchor-m="0.86 0.04 0.08 0"
+        data-holo-label="Trust"
+      >
         <div className="max-w-[1400px] mx-auto px-4 sm:px-6 lg:px-12 relative">
 
           {/* Unified Container */}
-          <div className="relative holo-glass holo-sheen rounded-[1.75rem] md:rounded-[2.5rem] p-6 sm:p-10 lg:p-16 shadow-2xl overflow-hidden">
+          <ScrubReveal>
+          <div className="relative brutal-panel holo-sheen p-6 sm:p-10 lg:p-16 overflow-hidden">
             {/* Top-Right subtle Aurora mesh glow */}
             <div className="absolute top-0 right-0 w-[500px] h-[500px] bg-gradient-to-bl from-[#ff4fd8]/10 via-[#3df2ff]/5 to-transparent rounded-full blur-3xl -mt-48 -mr-48 pointer-events-none" />
 
@@ -461,7 +470,7 @@ export default function Home() {
               {/* Left Column: FAQ */}
               <div className="space-y-10">
                 <div className="space-y-4">
-                  <p className="ui-label text-cyan-500">Questions? We got answers</p>
+                  <span className="sec-index">06 / Questions</span>
                   <h3 className="section-head text-3xl md:text-4xl text-foreground">FAQ</h3>
                 </div>
 
@@ -496,7 +505,7 @@ export default function Home() {
               {/* Right Column: Security */}
               <div className="space-y-10">
                 <div className="space-y-4">
-                  <p className="ui-label text-emerald-400">Enterprise Ready</p>
+                  <span className="sec-index">07 / Compliance</span>
                   <h3 className="section-head text-3xl md:text-4xl text-foreground">Compliance &amp; Security</h3>
                 </div>
 
@@ -536,26 +545,30 @@ export default function Home() {
               </div>
             </div>
           </div>
+          </ScrubReveal>
         </div>
       </section>
 
-      <AuroraThread variant="divider" />
-
       {/* System Architecture at a Glance */}
-      <section className="py-16 md:py-24 bg-transparent relative z-10 scroll-reveal">
+      <section
+        className="py-16 md:py-28 bg-transparent relative z-10"
+        data-holo-anchor="0.82 0.16 0.11 1"
+        data-holo-anchor-m="0.84 0.05 0.1 1"
+        data-holo-label="Architecture"
+      >
         <div className="max-w-[1400px] mx-auto px-6 lg:px-12 space-y-16">
           <div className="text-left space-y-4 max-w-2xl">
-            <p className="ui-label text-cyan-500">System Map</p>
+            <span className="sec-index">08 / System map</span>
             <h2 className="section-head text-3xl md:text-4xl text-foreground">Architecture at a glance</h2>
             <p className="text-slate-400 text-lg leading-relaxed">
               Amadeus is strictly divided into four specialized layers to ensure scalability and separation of concerns. From the interactive canvas to the persistent storage, every layer is built for enterprise orchestration.
             </p>
           </div>
 
-          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6">
+          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4 md:gap-5 [&>*:nth-child(2)]:lg:translate-y-10 [&>*:nth-child(4)]:lg:translate-y-10">
 
             {/* Presentation Layer */}
-            <div className="group relative holo-glass holo-sheen rounded-3xl p-6 md:p-8 hover:border-cyan-500/50 transition-colors overflow-hidden">
+            <div className="group relative brutal-panel rounded-md p-6 md:p-8 h-full hover:border-cyan-500/50 transition-colors overflow-hidden">
               <div className="absolute top-0 right-0 w-32 h-32 bg-cyan-500/10 rounded-full blur-2xl -mt-16 -mr-16 pointer-events-none group-hover:bg-cyan-500/20 transition-colors" />
               <div className="relative z-10 space-y-4">
                 <div className="w-12 h-12 rounded-2xl bg-cyan-500/10 flex items-center justify-center border border-cyan-500/20">
@@ -573,7 +586,7 @@ export default function Home() {
             </div>
 
             {/* Orchestration Core */}
-            <div className="group relative holo-glass holo-sheen rounded-3xl p-6 md:p-8 hover:border-fuchsia-500/50 transition-colors overflow-hidden">
+            <div className="group relative brutal-panel rounded-md p-6 md:p-8 h-full hover:border-fuchsia-500/50 transition-colors overflow-hidden">
               <div className="absolute top-0 right-0 w-32 h-32 bg-fuchsia-500/10 rounded-full blur-2xl -mt-16 -mr-16 pointer-events-none group-hover:bg-fuchsia-500/20 transition-colors" />
               <div className="relative z-10 space-y-4">
                 <div className="w-12 h-12 rounded-2xl bg-fuchsia-500/10 flex items-center justify-center border border-fuchsia-500/20">
@@ -591,7 +604,7 @@ export default function Home() {
             </div>
 
             {/* Integration Layer */}
-            <div className="group relative holo-glass holo-sheen rounded-3xl p-6 md:p-8 hover:border-yellow-400/50 transition-colors overflow-hidden">
+            <div className="group relative brutal-panel rounded-md p-6 md:p-8 h-full hover:border-yellow-400/50 transition-colors overflow-hidden">
               <div className="absolute top-0 right-0 w-32 h-32 bg-yellow-400/10 rounded-full blur-2xl -mt-16 -mr-16 pointer-events-none group-hover:bg-yellow-400/20 transition-colors" />
               <div className="relative z-10 space-y-4">
                 <div className="w-12 h-12 rounded-2xl bg-yellow-400/10 flex items-center justify-center border border-yellow-400/20">
@@ -609,7 +622,7 @@ export default function Home() {
             </div>
 
             {/* Data Layer */}
-            <div className="group relative holo-glass holo-sheen rounded-3xl p-6 md:p-8 hover:border-emerald-400/50 transition-colors overflow-hidden">
+            <div className="group relative brutal-panel rounded-md p-6 md:p-8 h-full hover:border-emerald-400/50 transition-colors overflow-hidden">
               <div className="absolute top-0 right-0 w-32 h-32 bg-emerald-400/10 rounded-full blur-2xl -mt-16 -mr-16 pointer-events-none group-hover:bg-emerald-400/20 transition-colors" />
               <div className="relative z-10 space-y-4">
                 <div className="w-12 h-12 rounded-2xl bg-emerald-400/10 flex items-center justify-center border border-emerald-400/20">

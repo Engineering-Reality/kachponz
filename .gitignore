@@ -139,3 +139,7 @@ reference-mcp-compass.py
 node_modules/
 .next/
 database/*.sql
+
+# Cloudflare / OpenNext build output
+.open-next/
+.wrangler/

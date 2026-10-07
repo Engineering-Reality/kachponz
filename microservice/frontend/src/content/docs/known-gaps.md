@@ -6,7 +6,7 @@ This document outlines the current technical limitations and known gaps within t
 
 ### Empty Dispatch Payload
 Currently, `dispatch_step` passes an empty payload (`data: {}`) to the underlying executors. 
-- **Impact**: The Netra DeepSeek VL `doc_examined` LLM executor fails with *"imageRef dokumen tidak tersedia"* when triggered via standard dispatch, because it expects a document reference.
+- **Impact**: The Qwen VL `doc_examined` LLM executor fails with *"imageRef dokumen tidak tersedia"* when triggered via standard dispatch, because it expects a document reference.
 - **Workaround**: The `e2e-demo.ts` script works around this by falling back to a simulated `complete_step` when the dispatch does not return a `completed` state. 
 
 ### PAD Executor Trigger
@@ -36,17 +36,3 @@ If `AMADEUS_SIGNATURE_PEPPER` is defined in the `transaction_tracker` environmen
 Currently, `X-Robot-Signing-Secret` is transmitted in the clear (over HTTP headers). The server hashes this rapidly via Argon2 and compares it against the database.
 - **Security Posture**: This is a deliberate interim design for the MVP. 
 - **Roadmap**: Hardening this layer with strict OAuth2 or mTLS is required before exposing the service outside of the internal air-gapped network.
-
----
-
-## 4. Netra Provider Migration Gaps
-
-The LLM/VLM layer was migrated from OpenRouter/Qwen to **Netra Runtime** (OpenAI-compatible, DeepSeek models). Two deliberate exceptions remain.
-
-### Embeddings Still Run on OpenRouter
-Netra has **no embeddings model** (`/embeddings` → 404). RAG embedding therefore stays on OpenRouter via its own env block (`EMBEDDING_BASE_URL` / `EMBEDDING_API_KEY`, default `qwen/qwen3-embedding-4b`).
-- **Impact**: The DB embedding column is `vector(1024)` — dim/model must not change, and an OpenRouter key is still required for any RAG/embedding feature even though all text/vision calls now go to Netra.
-
-### Netra Vision Accepts Base64 Data-URIs Only
-`deepseek/deepseek-v4.1-flash` accepts **base64 `data:` URIs** for images but returns **502 for remote `http(s)` image URLs**.
-- **Impact**: All internal vision executors already send base64. The `doc_examined` executor's `imageRef` may be a remote URL, so `docExamExecutor.ts` fetches remote URLs and converts them to a base64 data-URI before sending. Base64/data-URI `imageRef`s pass through unchanged.

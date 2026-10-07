@@ -66,9 +66,25 @@ export function HoloText({ children, variant = "wire", delay = 0, className = ""
     const io = new IntersectionObserver(([e]) => (visible = e.isIntersecting));
     io.observe(el);
 
+    // Cache each glyph's screen centre instead of calling getBoundingClientRect
+    // every frame — that forced a synchronous layout per glyph per frame, the
+    // main source of scroll jank. Re-measure only when layout can have changed.
+    let centers: { cx: number; cy: number }[] = [];
+    const measure = () => {
+      centers = glyphs.map((g) => {
+        const r = g.getBoundingClientRect();
+        return { cx: r.left + r.width / 2, cy: r.top + r.height / 2 };
+      });
+    };
+    let needMeasure = true;
+    const markDirty = () => { needMeasure = true; };
+    window.addEventListener("resize", markDirty, { passive: true });
+    window.addEventListener("scroll", markDirty, { passive: true });
+
     const tick = (now: number) => {
       raf = requestAnimationFrame(tick);
       if (!visible) return;
+      if (needMeasure) { measure(); needMeasure = false; }
       const t = (now - start) / 1000;
 
       // Pointer position relative to this line, in [-1, 1].
@@ -92,10 +108,10 @@ export function HoloText({ children, variant = "wire", delay = 0, className = ""
         const d = Math.abs(f - sweep);
         const lit = Math.exp(-(d * d) / 0.012);
 
-        // 3. pointer parallax
-        const gr = g.getBoundingClientRect();
-        const dx = (pointerX - (gr.left + gr.width / 2)) / 400;
-        const dy = (pointerY - (gr.top + gr.height / 2)) / 400;
+        // 3. pointer parallax (uses cached centre — no per-frame layout read)
+        const c = centers[i] || { cx: 0, cy: 0 };
+        const dx = (pointerX - c.cx) / 400;
+        const dy = (pointerY - c.cy) / 400;
         const lean = Math.max(-1, Math.min(1, dx));
         const leanY = Math.max(-1, Math.min(1, dy));
 
@@ -118,6 +134,8 @@ export function HoloText({ children, variant = "wire", delay = 0, className = ""
     return () => {
       cancelAnimationFrame(raf);
       io.disconnect();
+      window.removeEventListener("resize", markDirty);
+      window.removeEventListener("scroll", markDirty);
     };
   }, [mounted, delay, children]);
 

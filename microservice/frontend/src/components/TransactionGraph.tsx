@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useState, useMemo } from 'react';
+import { useEffect, useState, useMemo, useSyncExternalStore } from 'react';
 import {
   ReactFlow,
   Controls,
@@ -15,6 +15,7 @@ import {
 } from '@xyflow/react';
 import '@xyflow/react/dist/style.css';
 import { X, CheckCircle, Clock, Shield, AlertTriangle } from 'lucide-react';
+import { useTheme } from 'next-themes';
 
 const CustomNode = ({ data, isConnectable }: any) => {
   const isActive = data.status === 'active';
@@ -25,17 +26,17 @@ const CustomNode = ({ data, isConnectable }: any) => {
   let textColor = '';
   
   if (isActive) {
-    nodeStyle = 'backdrop-blur-md bg-white/90 border-transparent shadow-[0_15px_35px_rgba(99,102,241,0.25)]';
-    textColor = 'text-indigo-600';
+    nodeStyle = 'backdrop-blur-md bg-white/90 dark:bg-[#161618]/95 border-transparent shadow-[0_15px_35px_rgba(139,123,255,0.3)]';
+    textColor = 'text-indigo-600 dark:text-[#3df2ff]';
   } else if (isCompleted) {
-    nodeStyle = 'backdrop-blur-md bg-emerald-50/80 border-emerald-200/60 shadow-[0_8px_20px_rgba(16,185,129,0.05)]';
-    textColor = 'text-emerald-700';
+    nodeStyle = 'backdrop-blur-md bg-emerald-50/80 dark:bg-emerald-500/10 border-emerald-200/60 dark:border-emerald-400/25 shadow-[0_8px_20px_rgba(16,185,129,0.05)]';
+    textColor = 'text-emerald-700 dark:text-emerald-300';
   } else if (isFailed) {
-    nodeStyle = 'backdrop-blur-md bg-red-50/80 border-red-200/60 shadow-[0_8px_20px_rgba(239,68,68,0.05)]';
-    textColor = 'text-red-700';
+    nodeStyle = 'backdrop-blur-md bg-red-50/80 dark:bg-red-500/10 border-red-200/60 dark:border-red-400/25 shadow-[0_8px_20px_rgba(239,68,68,0.05)]';
+    textColor = 'text-red-700 dark:text-red-300';
   } else {
-    nodeStyle = 'backdrop-blur-sm bg-slate-50/60 border-slate-200/40 shadow-sm opacity-75';
-    textColor = 'text-slate-400';
+    nodeStyle = 'backdrop-blur-sm bg-slate-50/60 dark:bg-white/[0.03] border-slate-200/40 dark:border-white/[0.08] shadow-sm opacity-75';
+    textColor = 'text-slate-400 dark:text-slate-500';
   }
 
   return (
@@ -51,7 +52,7 @@ const CustomNode = ({ data, isConnectable }: any) => {
             {data.actorHint}
           </span>
         </div>
-        <div className={`font-semibold text-xs ${isActive ? 'text-slate-900' : 'text-slate-600'}`}>
+        <div className={`font-semibold text-xs ${isActive ? 'text-slate-900 dark:text-white' : 'text-slate-600 dark:text-slate-300'}`}>
           {data.label}
         </div>
         {isActive && (
@@ -114,6 +115,11 @@ const sequence = [
 ];
 
 export function TransactionGraph({ tx, events }: { tx: any, events: any[] }) {
+  const { resolvedTheme } = useTheme();
+  // Theme is unknown during SSR; read it only once hydrated so the server
+  // and client render the same React Flow className (avoids a hydration diff).
+  const hydrated = useSyncExternalStore(() => () => {}, () => true, () => false);
+  const isDark = hydrated && resolvedTheme === 'dark';
   const currentStep = tx?.current_step || null;
   const [nodes, setNodes, onNodesChange] = useNodesState<Node>([]);
   const [edges, setEdges, onEdgesChange] = useEdgesState<Edge>([]);
@@ -195,7 +201,7 @@ export function TransactionGraph({ tx, events }: { tx: any, events: any[] }) {
   }, [selectedNode, events]);
 
   return (
-    <div className="w-full h-full bg-slate-50 border-none rounded-lg overflow-hidden relative flex">
+    <div className="w-full h-full bg-slate-50 dark:bg-[#09090a] border-none rounded-[4px] overflow-hidden relative flex">
       <svg style={{ position: 'absolute', width: 0, height: 0 }}>
         <defs>
           <linearGradient id="rainbow-gradient" x1="0%" y1="0%" x2="100%" y2="0%">
@@ -217,12 +223,13 @@ export function TransactionGraph({ tx, events }: { tx: any, events: any[] }) {
           onNodeClick={onNodeClick}
           fitView
           fitViewOptions={{ padding: 0.2 }}
+          colorMode={isDark ? "dark" : "light"}
           proOptions={{ hideAttribution: true }}
           minZoom={0.5}
         >
-          <Background color="#cbd5e1" gap={16} size={1} />
+          <Background color={isDark ? "#2a2a2e" : "#cbd5e1"} gap={16} size={1} />
           <Controls 
-            className="bg-white border-slate-200 fill-slate-500 shadow-sm" 
+            className="bg-white dark:bg-[#161618] border-slate-200 dark:border-white/10 fill-slate-500 shadow-sm" 
             showInteractive={false}
           />
         </ReactFlow>

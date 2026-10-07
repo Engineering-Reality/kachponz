@@ -73,7 +73,7 @@ export function AppShell({ children }: { children: React.ReactNode }) {
   return (
     <div className="flex h-[100dvh] bg-[#f8f9fa] dark:bg-[var(--background)] overflow-hidden">
       {/* Left Rail — enterprise dark console (Desktop) */}
-      <aside className="hidden md:flex w-64 flex-shrink-0 bg-slate-950 text-slate-100 flex-col border-r border-white/10 shadow-[4px_0_24px_rgba(0,0,0,0.02)] z-20">
+      <aside className="hidden md:flex w-64 flex-shrink-0 bg-[#080809] text-slate-100 flex-col border-r border-white/[0.07] z-20 relative">
         {/* Logo */}
         <div className="h-16 flex items-center px-6 border-b border-white/5">
           <Link href="/" className="flex items-center gap-3 group">
@@ -96,12 +96,12 @@ export function AppShell({ children }: { children: React.ReactNode }) {
                     <Link
                       key={href}
                       href={href}
-                      className={`relative flex items-center gap-3 px-3 py-2.5 rounded-xl text-sm font-medium transition-all duration-200 ${ isActive ? "bg-white/10 text-white shadow-sm backdrop-blur-md border border-white/5" : "text-white/60 hover:bg-white/5 hover:text-white" }`}
+                      className={`relative flex items-center gap-3 px-3 py-2.5 rounded-md text-sm font-medium transition-all duration-200 ${ isActive ? "bg-white/[0.06] text-white border border-white/[0.08] holo-nav-active" : "text-white/55 hover:bg-white/[0.04] hover:text-white border border-transparent" }`}
                     >
                       {isActive && (
                         <span className="absolute left-0 top-1/2 -translate-y-1/2 h-6 w-[4px] rounded-r-full bg-gradient-to-b from-[var(--aurora-blue)] via-[var(--aurora-violet)] to-[var(--aurora-fuchsia)] shadow-[0_0_8px_rgba(139,92,246,0.6)]" />
                       )}
-                      <Icon className={`w-4 h-4 flex-shrink-0 ${isActive ? "text-violet-400" : "text-white/40"}`} />
+                      <Icon className={`w-4 h-4 flex-shrink-0 ${isActive ? "text-[#3df2ff]" : "text-white/40"}`} />
                       {label}
                     </Link>
                   );
@@ -126,9 +126,9 @@ export function AppShell({ children }: { children: React.ReactNode }) {
       </aside>
 
       {/* Main Area */}
-      <main className="flex-1 flex flex-col overflow-hidden bg-[#FAFAFA] dark:bg-[var(--background)] relative">
+      <main className="flex-1 flex flex-col overflow-hidden bg-[#FAFAFA] dark:bg-[var(--background)] relative app-canvas">
         {/* Top Bar */}
-        <header className="relative h-16 bg-white/80 dark:bg-slate-900/80 backdrop-blur-xl border-b border-slate-200/60 dark:border-white/10 flex items-center justify-between px-4 md:px-8 flex-shrink-0 z-10 sticky top-0">
+        <header className="relative h-16 bg-white/80 dark:bg-[#080809]/85 backdrop-blur-xl border-b border-slate-200/60 dark:border-white/[0.07] flex items-center justify-between px-4 md:px-8 flex-shrink-0 z-10 sticky top-0 app-header-foil">
           <div className="flex items-center gap-3">
             <div>
               <h1 className="text-base font-semibold text-slate-800 dark:text-white leading-tight">
@@ -218,7 +218,7 @@ export function AppShell({ children }: { children: React.ReactNode }) {
               <Link
                 key={href}
                 href={href}
-                className={`flex flex-col items-center justify-center w-16 h-12 gap-1 rounded-xl transition-all ${ isActive ? "text-cyan-600 dark:text-cyan-400" : "text-slate-400 hover:text-slate-600 dark:hover:text-slate-200" }`}
+                className={`flex flex-col items-center justify-center w-16 h-12 gap-1 rounded-xl transition-all ${ isActive ? "text-cyan-600 dark:text-[#3df2ff]" : "text-slate-400 hover:text-slate-600 dark:hover:text-slate-200" }`}
               >
                 <div className={`relative p-1.5 rounded-full ${isActive ? 'bg-cyan-50 dark:bg-cyan-900/30' : ''}`}>
                   <Icon className={`w-5 h-5 ${isActive ? "text-cyan-600 dark:text-cyan-400" : ""}`} />

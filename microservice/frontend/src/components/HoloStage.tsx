@@ -24,18 +24,16 @@ for (let i = 0; i < 16; i++) {
   }
 }
 
-const FACES: [number, number, number, number][] = [];
-for (let a = 0; a < 4; a++) {
-  for (let b = a + 1; b < 4; b++) {
-    const fixed = [0, 1, 2, 3].filter((k) => k !== a && k !== b);
-    for (let s = 0; s < 4; s++) {
-      let base = 0;
-      if (s & 1) base |= 1 << fixed[0];
-      if (s & 2) base |= 1 << fixed[1];
-      FACES.push([base, base | (1 << a), base | (1 << a) | (1 << b), base | (1 << b)]);
-    }
-  }
-}
+/* The inner 3-cube of the tesseract (w = -1, vertex indices 0..7), rendered as
+ * the logo's opaque cyan→magenta→gold gradient cube inside the white wireframe. */
+const CUBE_QUADS: [number, number, number, number][] = [
+  [0, 4, 6, 2], // -x
+  [1, 3, 7, 5], // +x
+  [0, 1, 5, 4], // -y
+  [2, 6, 7, 3], // +y
+  [0, 2, 3, 1], // -z
+  [4, 5, 7, 6], // +z
+];
 
 function rot4(v: V4, i: number, j: number, ang: number) {
   const c = Math.cos(ang);
@@ -67,7 +65,13 @@ const clamp01 = (x: number) => Math.max(0, Math.min(1, x));
 
 /* ------------------------------------------------------------------ */
 
-export function HoloStage({ children }: { children?: React.ReactNode }) {
+/**
+ * `core` — when false, the möbius loop and tesseract are NOT drawn here; the
+ * page-level HoloCompanion draws them instead so the object can leave the
+ * hero and follow the reader down the page. The hero keeps only the
+ * spacetime lattice and the free swarm.
+ */
+export function HoloStage({ children, core = true }: { children?: React.ReactNode; core?: boolean }) {
   const wrapRef = useRef<HTMLDivElement>(null);
   const slotRef = useRef<HTMLDivElement>(null);
   const canvasRef = useRef<HTMLCanvasElement>(null);
@@ -77,6 +81,7 @@ export function HoloStage({ children }: { children?: React.ReactNode }) {
   const onFlip = useCallback(() => {
     requestTiltPermission();
     flipRef.current();
+    window.dispatchEvent(new CustomEvent("holo:flip"));
     setFlipped(true);
   }, []);
 
@@ -126,7 +131,7 @@ export function HoloStage({ children }: { children?: React.ReactNode }) {
       sHue = new Float32Array(N);
       const p: [number, number, number] = [0, 0, 0];
       for (let i = 0; i < N; i++) {
-        sBound[i] = i % 3 === 0 ? 0 : 1;
+        sBound[i] = core && i % 3 !== 0 ? 1 : 0;
         sPhase[i] = Math.random() * Math.PI * 2;
         sOff[i] = (Math.random() * 2 - 1) * 0.95;
         sSize[i] = 0.5 + Math.pow(Math.random(), 2.2) * (isMobile ? 2.0 : 2.5);
@@ -249,10 +254,10 @@ export function HoloStage({ children }: { children?: React.ReactNode }) {
           g += (255 - g) * whiten;
           b += (255 - b) * whiten;
         } else {
-          const ink = 0.35 + whiten * 0.35;
-          r = r * (1 - ink) + 30 * ink;
-          g = g * (1 - ink) + 27 * ink;
-          b = b * (1 - ink) + 75 * ink;
+          const ink = 0.5 + whiten * 0.3;
+          r = r * (1 - ink) + 22 * ink;
+          g = g * (1 - ink) + 22 * ink;
+          b = b * (1 - ink) + 28 * ink;
         }
         return `rgba(${r | 0},${g | 0},${b | 0},${a})`;
       };
@@ -265,7 +270,7 @@ export function HoloStage({ children }: { children?: React.ReactNode }) {
         const wellDepth = 1.5 + shock * 1.6;
         const dip = (x: number, z: number) => 1.45 + wellDepth / ((x * x + z * z) * 2.2 + 0.6);
         ctx.lineWidth = 1;
-        const latAlpha = (dark ? 0.13 : 0.08) * latticeIn;
+        const latAlpha = (dark ? 0.13 : 0.11) * latticeIn;
         for (let pass = 0; pass < 2; pass++) {
           for (let a = -EXT; a <= EXT + 0.001; a += STEP) {
             ctx.beginPath();
@@ -288,7 +293,7 @@ export function HoloStage({ children }: { children?: React.ReactNode }) {
 
       /* 1b. Volumetric rays — light escaping the nucleus through the band. */
       const rayIn = reduced ? 1 : clamp01((t - 0.9) / 1.6);
-      if (rayIn > 0) {
+      if (core && rayIn > 0) {
         const RAYS = isMobile ? 14 : 22;
         const maxLen = R * 3.2;
         ctx.save();
@@ -320,7 +325,7 @@ export function HoloStage({ children }: { children?: React.ReactNode }) {
       const spin = reduced ? 0 : t * 0.22;
       const pa: [number, number, number] = [0, 0, 0];
 
-      if (bandIn > 0) {
+      if (core && bandIn > 0) {
         const quads: { d: number; pts: number[]; u: number }[] = [];
         const reach = Math.PI * 2 * bandIn;
         for (let i = 0; i < SEG; i++) {
@@ -383,6 +388,7 @@ export function HoloStage({ children }: { children?: React.ReactNode }) {
         }
       }
 
+      if (core) {
       /* 3. Tesseract nucleus at the centre of the loop. */
       const proj = new Float64Array(16 * 3);
       const v4: V4 = [0, 0, 0, 0];
@@ -434,26 +440,50 @@ export function HoloStage({ children }: { children?: React.ReactNode }) {
       }
 
       if (nucleusIn > 0) {
-        for (const f of FACES) {
-          const wm = (proj[f[0] * 3 + 2] + proj[f[1] * 3 + 2] + proj[f[2] * 3 + 2] + proj[f[3] * 3 + 2]) / 4;
-          const k = Math.pow(inner(wm), 4);
-          if (k < 0.05) continue;
-          const ax = proj[f[0] * 3], ay = proj[f[0] * 3 + 1];
-          const bx2 = proj[f[2] * 3], by2 = proj[f[2] * 3 + 1];
-          const g = ctx.createLinearGradient(ax, ay, bx2, by2);
-          const alpha = k * (dark ? 0.34 : 0.18) * nucleusIn;
-          g.addColorStop(0, col(foil, alpha));
-          g.addColorStop(0.5, col(foil + 0.33, alpha));
-          g.addColorStop(1, col(foil + 0.66, alpha));
+        // Official nucleus: the three visible faces are ALWAYS cyan / magenta /
+        // yellow (one hue per axis), each gradient from a bright white shared
+        // corner out to the saturated colour. Colour is tied to the VISIBLE face
+        // (back faces culled), so the cube never shows red/green/blue no matter
+        // how it is turned — only CMY + white, like the logo. Opaque, both themes.
+        const CMY = [
+          `rgba(0,229,255,${nucleusIn})`,  // cyan
+          `rgba(255,46,220,${nucleusIn})`, // magenta
+          `rgba(255,228,40,${nucleusIn})`, // yellow
+        ];
+        const vis: { q: [number, number, number, number]; axis: number }[] = [];
+        const vc = [0, 0, 0, 0, 0, 0, 0, 0];
+        CUBE_QUADS.forEach((q, qi) => {
+          const [i0, i1, i2, i3] = q;
+          const x0 = proj[i0 * 3], y0 = proj[i0 * 3 + 1], x1 = proj[i1 * 3], y1 = proj[i1 * 3 + 1];
+          const x2 = proj[i2 * 3], y2 = proj[i2 * 3 + 1], x3 = proj[i3 * 3], y3 = proj[i3 * 3 + 1];
+          const area = (x0 * y1 - x1 * y0) + (x1 * y2 - x2 * y1) + (x2 * y3 - x3 * y2) + (x3 * y0 - x0 * y3);
+          if (area >= 0) return;
+          vis.push({ q, axis: qi >> 1 });
+          for (const v of q) vc[v]++;
+        });
+        let shared = -1;
+        for (let v = 0; v < 8; v++) if (vc[v] === 3) { shared = v; break; }
+        const prevComp = ctx.globalCompositeOperation;
+        ctx.globalCompositeOperation = "source-over";
+        ctx.shadowColor = `rgba(255,255,255,${0.2 * nucleusIn})`;
+        ctx.shadowBlur = 14;
+        for (const { q, axis } of vis) {
+          const si = shared >= 0 ? q.indexOf(shared) : 0;
+          const nv = q[si], fv = q[(si + 2) % 4];
+          const g = ctx.createLinearGradient(proj[nv * 3], proj[nv * 3 + 1], proj[fv * 3], proj[fv * 3 + 1]);
+          g.addColorStop(0, `rgba(255,255,255,${nucleusIn})`);
+          g.addColorStop(1, CMY[axis]);
           ctx.fillStyle = g;
           ctx.beginPath();
-          ctx.moveTo(ax, ay);
-          ctx.lineTo(proj[f[1] * 3], proj[f[1] * 3 + 1]);
-          ctx.lineTo(bx2, by2);
-          ctx.lineTo(proj[f[3] * 3], proj[f[3] * 3 + 1]);
+          ctx.moveTo(proj[q[0] * 3], proj[q[0] * 3 + 1]);
+          ctx.lineTo(proj[q[1] * 3], proj[q[1] * 3 + 1]);
+          ctx.lineTo(proj[q[2] * 3], proj[q[2] * 3 + 1]);
+          ctx.lineTo(proj[q[3] * 3], proj[q[3] * 3 + 1]);
           ctx.closePath();
           ctx.fill();
         }
+        ctx.shadowBlur = 0;
+        ctx.globalCompositeOperation = prevComp;
       }
 
       for (let e = 0; e < EDGES.length; e++) {
@@ -476,6 +506,8 @@ export function HoloStage({ children }: { children?: React.ReactNode }) {
         ctx.stroke();
       }
       ctx.globalAlpha = 1;
+
+      }
 
       /* 4. Agent swarm — two thirds ride the loop, the rest drift. */
       const flowT = t * 0.25;
@@ -666,13 +698,15 @@ export function HoloStage({ children }: { children?: React.ReactNode }) {
       io.disconnect();
       document.removeEventListener("visibilitychange", onVis);
     };
-  }, []);
+  }, [core]);
 
   return (
     <div ref={wrapRef} className="relative w-full">
       <canvas ref={canvasRef} className="absolute inset-0 pointer-events-none" aria-hidden="true" />
       <div
         ref={slotRef}
+        data-holo-anchor={core ? undefined : "0.5 0.5 slot 1"}
+        data-holo-label={core ? undefined : "Hero"}
         className="relative mx-auto h-[clamp(290px,48svh,520px)] w-full max-w-[620px] flex items-end justify-center"
       >
         <button

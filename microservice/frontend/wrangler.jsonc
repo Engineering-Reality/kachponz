@@ -1,0 +1,16 @@
+{
+  "$schema": "node_modules/wrangler/config-schema.json",
+  "name": "amadeus-holo",
+  "main": ".open-next/worker.js",
+  "workers_dev": false,
+  "compatibility_date": "2025-03-25",
+  "compatibility_flags": ["nodejs_compat"],
+  "assets": {
+    "directory": ".open-next/assets",
+    "binding": "ASSETS"
+  },
+  "vars": {
+    "AMADEUS_API_URL": "https://amadeus-api.placeholder.invalid",
+    "AMADEUS_JWT_SECRET": "dev_local_secret_change_me"
+  }
+}

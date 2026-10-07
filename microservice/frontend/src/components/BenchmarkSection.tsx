@@ -4,17 +4,22 @@ import { CheckCircle2, XCircle } from "lucide-react";
 
 export function BenchmarkSection() {
   return (
-    <section className="bg-transparent py-16 md:py-24 relative z-10 overflow-hidden">
+    <section
+      className="bg-transparent py-16 md:py-24 relative z-10 overflow-hidden"
+      data-holo-anchor="0.5 0.12 0.07 0"
+      data-holo-anchor-m="0.86 0.04 0.08 0"
+      data-holo-label="Benchmark"
+    >
       <div className="max-w-[1400px] mx-auto px-4 sm:px-6 lg:px-12">
         <div className="text-center space-y-4 mb-16">
-          <p className="ui-label text-cyan-500">Benchmark</p>
+          <span className="sec-index">05 / Benchmark</span>
           <h3 className="section-head text-3xl md:text-4xl text-foreground">The New Standard</h3>
           <p className="text-slate-600 dark:text-slate-400 max-w-2xl mx-auto text-[15px]">
             Traditional RPA is rigid and breaks when UI changes. LLM Agents are unpredictable and struggle with strict compliance. Amadeus combines the best of both.
           </p>
         </div>
 
-        <div className="flex flex-col lg:flex-row rounded-[1.75rem] md:rounded-[2rem] overflow-hidden border border-slate-200 dark:border-white/10 shadow-2xl relative">
+        <div className="flex flex-col lg:flex-row rounded-md overflow-hidden border border-slate-200 dark:border-white/10 relative">
           
           {/* Legacy RPA Side - Rigid, Boxed-in, Monospaced */}
           <div className="w-full lg:w-[40%] bg-slate-50 dark:bg-white/[0.02] border-b lg:border-b-0 lg:border-r border-slate-200 dark:border-white/10 p-6 sm:p-10 flex flex-col relative overflow-hidden">
